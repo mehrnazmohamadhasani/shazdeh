@@ -1,17 +1,10 @@
 /* eslint-disable no-console */
-import path from "node:path";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import "dotenv/config";
 
-const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
-const url = databaseUrl.startsWith("file:")
-  ? path.resolve(process.cwd(), databaseUrl.slice("file:".length))
-  : databaseUrl;
-
 const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url }),
+  accelerateUrl: process.env.DATABASE_URL ?? "postgres://localhost:5432/postgres",
 });
 
 type SeedItem = {
