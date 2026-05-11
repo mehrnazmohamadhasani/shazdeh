@@ -32,11 +32,23 @@ export function ImageUploader({
       fd.append("file", file);
       fd.append("folder", folder);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "Upload failed");
+      const text = await res.text();
+      let body: unknown;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Upload failed: invalid response"
+            : `Upload failed (${res.status}): ${text.slice(0, 200)}`,
+        );
       }
-      const data = (await res.json()) as { url: string };
+      if (!res.ok) {
+        const err = body as { error?: string } | null;
+        throw new Error(err?.error ?? `Upload failed (${res.status})`);
+      }
+      const data = body as { url?: string };
+      if (!data?.url) throw new Error("Upload failed: no image URL returned");
       onChange(data.url);
       toast.success("Image uploaded");
     } catch (e) {
