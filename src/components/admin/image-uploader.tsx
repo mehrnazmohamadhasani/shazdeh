@@ -40,7 +40,7 @@ export function ImageUploader({
     setPending(true);
     try {
       if (file.size > MAX_UPLOAD_BYTES) {
-        const signRes = await fetch("/api/upload/cloudinary-sign", {
+        const signRes = await fetch("/api/upload-cloudinary-sign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ folder }),
