@@ -1,0 +1,157 @@
+// Shazdeh — Premium Iranian-inspired kitchen brand (Dubai)
+// Prisma schema. SQLite for local development, but ready for Postgres
+// in production by changing the `provider` and `DATABASE_URL`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  EDITOR
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  passwordHash  String
+  role          UserRole @default(ADMIN)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Menu ────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  tagline     String?
+  description String?
+  imageUrl    String?
+  order       Int        @default(0)
+  isActive    Boolean    @default(true)
+  items       MenuItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model MenuItem {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  name          String
+  nameFa        String?
+  description   String?
+  story         String?
+  price         Float
+  currency      String        @default("AED")
+  imageUrl      String?
+  categoryId    String
+  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  variants      ItemVariant[]
+  ingredients   String?
+  allergens     String?
+  spicyLevel    Int           @default(0) // 0 = none, 1 = mild, 2 = medium, 3 = hot
+  isVegetarian  Boolean       @default(false)
+  isAvailable   Boolean       @default(true)
+  isBestseller  Boolean       @default(false)
+  isNew         Boolean       @default(false)
+  isSignature   Boolean       @default(false)
+  order         Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([categoryId])
+}
+
+model ItemVariant {
+  id          String   @id @default(cuid())
+  itemId      String
+  item        MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  label       String
+  price       Float
+  isAvailable Boolean  @default(true)
+  order       Int      @default(0)
+
+  @@index([itemId])
+}
+
+// ─── Content ────────────────────────────────────────────────────────────────
+
+model Banner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  ctaLabel    String?
+  ctaHref     String?
+  imageUrl    String
+  position    String   @default("home_hero") // home_hero | home_secondary | menu_hero
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GalleryImage {
+  id        String   @id @default(cuid())
+  title     String?
+  caption   String?
+  imageUrl  String
+  width     Int?
+  height    Int?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SocialLink {
+  id        String   @id @default(cuid())
+  platform  String   // instagram | tiktok | whatsapp | talabat | deliveroo | careem | noon
+  label     String
+  url       String
+  icon      String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RestaurantSettings {
+  id            String   @id @default("default")
+  brandName     String   @default("Shazdeh")
+  tagline       String?
+  description   String?
+  email         String?
+  phone         String?
+  whatsapp      String?
+  address       String?
+  mapUrl        String?
+  openingHours  String?  // JSON string of weekly hours
+  heroVideoUrl  String?
+  logoUrl       String?
+  faviconUrl    String?
+  metaTitle     String?
+  metaDesc      String?
+  ogImageUrl    String?
+  updatedAt     DateTime @updatedAt
+}
