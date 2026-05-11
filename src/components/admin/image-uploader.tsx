@@ -4,6 +4,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { Upload, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
 
 export function ImageUploader({
   value,
@@ -26,6 +27,13 @@ export function ImageUploader({
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(
+        "Image is too large for upload (max 3MB). Resize or export a smaller JPEG, then try again.",
+      );
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
     setPending(true);
     try {
       const fd = new FormData();
@@ -111,7 +119,7 @@ export function ImageUploader({
                 <Upload className="h-5 w-5" strokeWidth={1.5} />
                 <span className="text-[12px] font-light">Click to upload</span>
                 <span className="text-[10px] text-warm-white/45 font-light">
-                  JPG, PNG, WebP · max 12MB
+                  JPG, PNG, WebP · max 3MB (host limit)
                 </span>
               </div>
             )}

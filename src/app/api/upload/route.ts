@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth, serverError } from "@/lib/api";
 import { uploadImage } from "@/lib/storage";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -20,9 +21,12 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (file.size > 12 * 1024 * 1024) {
+    if (file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json(
-        { error: "File too large (max 12MB)" },
+        {
+          error:
+            "File too large (max 3MB on this host). Resize or compress the image, then try again.",
+        },
         { status: 413 },
       );
     }
