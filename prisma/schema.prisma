@@ -1,6 +1,5 @@
 // Shazdeh — Premium Iranian-inspired kitchen brand (Dubai)
-// Prisma schema. SQLite for local development, but ready for Postgres
-// in production by changing the `provider` and `DATABASE_URL`.
+// Prisma schema configured for Postgres via prisma.config.ts.
 
 generator client {
   provider = "prisma-client"
@@ -10,7 +9,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
