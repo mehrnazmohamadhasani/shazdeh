@@ -4,7 +4,10 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { Upload, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
+import {
+  MAX_DIRECT_CLOUDINARY_BYTES,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/upload-limits";
 
 export function ImageUploader({
   value,
@@ -27,15 +30,84 @@ export function ImageUploader({
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    if (file.size > MAX_UPLOAD_BYTES) {
+    if (file.size > MAX_DIRECT_CLOUDINARY_BYTES) {
       toast.error(
-        "Image is too large for upload (max 3MB). Resize or export a smaller JPEG, then try again.",
+        `Image is too large (max ${Math.round(MAX_DIRECT_CLOUDINARY_BYTES / (1024 * 1024))}MB).`,
       );
       if (inputRef.current) inputRef.current.value = "";
       return;
     }
     setPending(true);
     try {
+      if (file.size > MAX_UPLOAD_BYTES) {
+        const signRes = await fetch("/api/upload/cloudinary-sign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folder }),
+        });
+        const signText = await signRes.text();
+        let signBody: unknown;
+        try {
+          signBody = signText ? JSON.parse(signText) : null;
+        } catch {
+          throw new Error(
+            signRes.ok
+              ? "Could not start large upload"
+              : `Large upload unavailable (${signRes.status})`,
+          );
+        }
+        if (!signRes.ok) {
+          const err = signBody as { error?: string } | null;
+          throw new Error(
+            err?.error ??
+              "Large uploads need Cloudinary. Set STORAGE_DRIVER=cloudinary and CLOUDINARY_* env vars, then redeploy — or use a file under 3MB.",
+          );
+        }
+        const sig = signBody as {
+          cloudName: string;
+          apiKey: string;
+          timestamp: string;
+          signature: string;
+          folder: string;
+        };
+        const cForm = new FormData();
+        cForm.append("file", file);
+        cForm.append("api_key", sig.apiKey);
+        cForm.append("timestamp", sig.timestamp);
+        cForm.append("signature", sig.signature);
+        cForm.append("folder", sig.folder);
+        const upRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
+          { method: "POST", body: cForm },
+        );
+        const upText = await upRes.text();
+        let upJson: unknown;
+        try {
+          upJson = upText ? JSON.parse(upText) : null;
+        } catch {
+          throw new Error(
+            `Cloudinary upload failed (${upRes.status}): ${upText.slice(0, 160)}`,
+          );
+        }
+        if (!upRes.ok) {
+          const err = upJson as { error?: { message?: string } | string };
+          const msg =
+            typeof err?.error === "string"
+              ? err.error
+              : err?.error?.message;
+          throw new Error(
+            msg ?? `Cloudinary upload failed (${upRes.status})`,
+          );
+        }
+        const data = upJson as { secure_url?: string };
+        if (!data?.secure_url) {
+          throw new Error("Cloudinary returned no image URL");
+        }
+        onChange(data.secure_url);
+        toast.success("Image uploaded");
+        return;
+      }
+
       const fd = new FormData();
       fd.append("file", file);
       fd.append("folder", folder);
@@ -119,7 +191,7 @@ export function ImageUploader({
                 <Upload className="h-5 w-5" strokeWidth={1.5} />
                 <span className="text-[12px] font-light">Click to upload</span>
                 <span className="text-[10px] text-warm-white/45 font-light">
-                  JPG, PNG, WebP · max 3MB (host limit)
+                  JPG, PNG, WebP · up to 3MB via server, or up to 20MB via Cloudinary
                 </span>
               </div>
             )}
