@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+/** Strip whitespace; empty string → undefined (avoids bad Cloudinary keys from copy/paste). */
+function envTrim(v: string | undefined): string | undefined {
+  if (v === undefined) return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1).default("file:./dev.db"),
   AUTH_SECRET: z
@@ -30,7 +37,7 @@ export const env = envSchema.parse({
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
   SUPABASE_BUCKET: process.env.SUPABASE_BUCKET,
-  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
-  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+  CLOUDINARY_CLOUD_NAME: envTrim(process.env.CLOUDINARY_CLOUD_NAME),
+  CLOUDINARY_API_KEY: envTrim(process.env.CLOUDINARY_API_KEY),
+  CLOUDINARY_API_SECRET: envTrim(process.env.CLOUDINARY_API_SECRET),
 });
