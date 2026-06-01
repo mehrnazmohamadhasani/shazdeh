@@ -52,6 +52,8 @@ export function SiteNav({
   // scrolled we always sit on warm-white (per the editorial system).
   const tone: "dark" | "light" = scrolled ? "light" : initialTone;
 
+  const mobileScrolled = scrolled;
+
   return (
     <>
       <motion.header
@@ -59,20 +61,30 @@ export function SiteNav({
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-[background-color,border-color,color] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "fixed top-0 left-0 right-0 z-50 border-b transition-[background-color,border-color,color] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          /* Mobile: transparent at top → terracotta on scroll */
+          mobileScrolled
+            ? "max-md:border-black-iron/10 max-md:bg-[var(--color-terracotta)] max-md:text-warm-white"
+            : "max-md:border-transparent max-md:bg-transparent max-md:text-black-iron",
+          /* Desktop: transparent → frosted warm-white */
+          mobileScrolled
+            ? "md:border-black-iron/[0.06] md:bg-warm-white/85 md:text-black-iron md:backdrop-blur-xl"
+            : "md:border-transparent md:bg-transparent",
+          !scrolled && tone !== "light" && "max-md:bg-transparent max-md:text-warm-white",
           scrolled
-            ? "bg-warm-white/85 backdrop-blur-xl border-b border-black-iron/[0.06]"
-            : "bg-transparent border-b border-transparent",
-          tone === "light" ? "text-black-iron" : "text-warm-white",
+            ? "md:text-black-iron"
+            : tone === "light"
+              ? "md:text-black-iron"
+              : "md:text-warm-white",
         )}
       >
         <div className="container-shazdeh flex items-center justify-between h-[70px] md:h-[84px]">
           <Link
             href="/"
-            className="relative z-10 transition-opacity hover:opacity-70"
+            className="relative z-10 text-inherit transition-opacity hover:opacity-70"
             aria-label="SHĀZDEH home"
           >
-            <Wordmark size="md" />
+            <Wordmark size="md" className="text-inherit" />
           </Link>
 
           <nav className="hidden md:flex items-center gap-10">
@@ -119,9 +131,9 @@ export function SiteNav({
           <button
             className={cn(
               "md:hidden grid place-items-center h-10 w-10 rounded-full border transition-colors",
-              tone === "light"
-                ? "border-black-iron/15 hover:bg-black-iron/[0.04]"
-                : "border-warm-white/15 hover:bg-warm-white/[0.06]",
+              mobileScrolled
+                ? "border-warm-white/30 text-warm-white hover:bg-warm-white/10"
+                : "border-black-iron/15 text-black-iron hover:bg-black-iron/[0.04]",
             )}
             aria-label={open ? "Close menu" : "Open menu"}
             onClick={() => setOpen((v) => !v)}
@@ -142,8 +154,12 @@ export function SiteNav({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
-            className="fixed inset-0 z-40 md:hidden"
-            style={{ backgroundColor: "#fdf6ec" }}
+            className={cn(
+              "fixed inset-0 z-40 md:hidden transition-colors duration-700",
+              mobileScrolled
+                ? "bg-[var(--color-terracotta)] text-warm-white"
+                : "bg-warm-white text-black-iron",
+            )}
           >
             <div className="flex flex-col h-full pt-28 px-6">
               <nav className="flex flex-col">
@@ -163,8 +179,17 @@ export function SiteNav({
                       <Link
                         href={link.href}
                         className={cn(
-                          "block py-5 font-bold text-5xl tracking-[-0.04em] border-b border-black-iron/[0.08]",
-                          active ? "text-terracotta" : "text-black-iron",
+                          "block py-5 font-bold text-5xl tracking-[-0.04em] border-b",
+                          mobileScrolled
+                            ? "border-warm-white/15"
+                            : "border-black-iron/[0.08]",
+                          active
+                            ? mobileScrolled
+                              ? "text-warm-white"
+                              : "text-terracotta"
+                            : mobileScrolled
+                              ? "text-warm-white/75"
+                              : "text-black-iron",
                         )}
                       >
                         {link.label}
@@ -185,11 +210,23 @@ export function SiteNav({
               >
                 <Link
                   href="/contact"
-                  className="flex items-center justify-center h-14 w-full rounded-pill bg-terracotta text-warm-white text-[12px] tracking-[0.22em] uppercase font-medium"
+                  className={cn(
+                    "flex items-center justify-center h-14 w-full rounded-pill text-[12px] tracking-[0.22em] uppercase font-medium",
+                    mobileScrolled
+                      ? "border border-warm-white/40 bg-warm-white text-[var(--color-terracotta)]"
+                      : "bg-terracotta text-warm-white",
+                  )}
                 >
                   Order Online
                 </Link>
-                <p className="mt-6 text-center text-[10px] tracking-[0.32em] uppercase text-black-iron/50">
+                <p
+                  className={cn(
+                    "mt-6 text-center text-[10px] tracking-[0.32em] uppercase",
+                    mobileScrolled
+                      ? "text-warm-white/55"
+                      : "text-black-iron/50",
+                  )}
+                >
                   Persian Cuisine · Dubai
                 </p>
               </motion.div>

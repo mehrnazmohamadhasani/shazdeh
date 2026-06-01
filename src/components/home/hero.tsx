@@ -2,7 +2,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "motion/react";
+import { motion, useScroll, useSpring, useTransform } from "motion/react";
 import { ArrowDown } from "lucide-react";
 
 /*
@@ -25,9 +25,14 @@ export function HomeHero({
     target: ref,
     offset: ["start start", "end start"],
   });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "22%"]);
+  const smoothScroll = useSpring(scrollYProgress, {
+    stiffness: 70,
+    damping: 28,
+    mass: 0.35,
+  });
+  const y = useTransform(smoothScroll, [0, 1], ["0%", "16%"]);
   const opacity = useTransform(scrollYProgress, [0, 0.7, 1], [1, 0.4, 0]);
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 1.06]);
+  const scale = useTransform(smoothScroll, [0, 1], [1, 1.1]);
 
   const hasCustomTitle = !!title;
 
@@ -39,7 +44,7 @@ export function HomeHero({
       {/* Background image — full opacity, no wash overlay */}
       <motion.div
         style={{ y, scale }}
-        className="absolute inset-0 will-change-transform"
+        className="absolute inset-0 max-sm:-top-10 max-sm:h-[calc(100%+2.5rem)] will-change-transform"
       >
         <Image
           src={imageUrl}
@@ -47,7 +52,7 @@ export function HomeHero({
           fill
           priority
           sizes="100vw"
-          className="object-cover"
+          className="object-cover object-[50%_22%] sm:object-center"
         />
       </motion.div>
 
@@ -74,17 +79,14 @@ export function HomeHero({
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, delay: 0.45, ease: EASE }}
-            className="mx-auto w-full translate-y-[15px] text-center font-medium text-[6vw] leading-[0.95] tracking-[-0.04em] drop-shadow-[0_1px_12px_rgba(250,248,245,0.85)] sm:mx-0 sm:max-w-4xl sm:translate-y-0 sm:text-left sm:text-[5.5vw] lg:text-[4.5vw] xl:text-[3.25rem]"
+            className="mx-auto w-full translate-y-[25px] whitespace-nowrap font-sans text-[12px] font-medium uppercase leading-none tracking-[0.22em] text-black-iron/50 text-center sm:mx-0 sm:max-w-none sm:translate-y-0 sm:text-left"
           >
             {hasCustomTitle ? (
               title
             ) : (
               <>
-                <span className="block">From our</span>
-                <span className="block">
-                  <span className="text-terracotta">heart</span> to your
-                </span>
-                <span className="block">home.</span>
+                From our{" "}
+                <span className="text-terracotta/90">heart</span> to your home.
               </>
             )}
           </motion.h1>
