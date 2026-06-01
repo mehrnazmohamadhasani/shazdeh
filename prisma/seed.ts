@@ -503,8 +503,6 @@ async function main() {
     data: [
       {
         title: "From our heart to your home.",
-        subtitle:
-          "A contemporary Persian table set in Dubai — plated with the calm precision of an editorial kitchen.",
         ctaLabel: "View the menu",
         ctaHref: "/menu",
         imageUrl: IMG("ghormeh-sabzi.jpg"),

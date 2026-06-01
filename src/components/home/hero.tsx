@@ -6,9 +6,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import { ArrowDown } from "lucide-react";
 
 /*
- * Home hero — Light style. Warm-white background with full-bleed
- * food photography at reduced opacity, dark text on top. The parallax
- * and fade animations remain identical; only the colour palette flips.
+ * Home hero — Full-opacity food photography with compact headline type.
  */
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -38,7 +36,7 @@ export function HomeHero({
       ref={ref}
       className="relative h-[100svh] min-h-[680px] w-full overflow-hidden bg-warm-white text-black-iron"
     >
-      {/* Background image — Light style photography, warm overlay */}
+      {/* Background image — full opacity, no wash overlay */}
       <motion.div
         style={{ y, scale }}
         className="absolute inset-0 will-change-transform"
@@ -49,10 +47,8 @@ export function HomeHero({
           fill
           priority
           sizes="100vw"
-          className="object-cover opacity-60 sm:opacity-55"
+          className="object-cover"
         />
-        {/* Warm-white gradient keeps text crisp at the bottom */}
-        <div className="absolute inset-0 bg-gradient-to-b from-warm-white/5 via-warm-white/20 to-warm-white/80" />
       </motion.div>
 
       {/* Foreground content */}
@@ -78,7 +74,7 @@ export function HomeHero({
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, delay: 0.45, ease: EASE }}
-            className="font-bold text-[14vw] sm:text-[12vw] lg:text-[9vw] xl:text-[8.5rem] leading-[0.9] tracking-[-0.05em] max-w-6xl"
+            className="mx-auto w-full translate-y-[15px] text-center font-medium text-[6vw] leading-[0.95] tracking-[-0.04em] drop-shadow-[0_1px_12px_rgba(250,248,245,0.85)] sm:mx-0 sm:max-w-4xl sm:translate-y-0 sm:text-left sm:text-[5.5vw] lg:text-[4.5vw] xl:text-[3.25rem]"
           >
             {hasCustomTitle ? (
               title

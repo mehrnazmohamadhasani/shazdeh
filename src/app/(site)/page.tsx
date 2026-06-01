@@ -32,10 +32,7 @@ export default async function HomePage() {
       <HomeHero
         imageUrl={banner?.imageUrl ?? "/menu/ghormeh-sabzi.jpg"}
         title={banner?.title}
-        subtitle={
-          banner?.subtitle ??
-          "A contemporary Persian table set in Dubai, plated with the calm precision of an editorial kitchen."
-        }
+        subtitle={banner?.subtitle}
       />
       <HomeManifesto />
       <FeaturedDishes dishes={featured} whatsapp={whatsapp} />
