@@ -49,10 +49,10 @@ export function HomeHero({
           fill
           priority
           sizes="100vw"
-          className="object-cover opacity-25"
+          className="object-cover opacity-60 sm:opacity-55"
         />
         {/* Warm-white gradient keeps text crisp at the bottom */}
-        <div className="absolute inset-0 bg-gradient-to-b from-warm-white/20 via-warm-white/50 to-warm-white" />
+        <div className="absolute inset-0 bg-gradient-to-b from-warm-white/5 via-warm-white/20 to-warm-white/80" />
       </motion.div>
 
       {/* Foreground content */}
