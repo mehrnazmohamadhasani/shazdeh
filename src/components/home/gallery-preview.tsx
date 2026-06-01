@@ -5,12 +5,13 @@ import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
 import { Reveal } from "@/components/shared/reveal";
+import { cn } from "@/lib/utils";
 
 /*
- * Gallery preview — a horizontal scroll-driven track. As the user
- * scrolls the section, the strip of editorial photography drifts
- * sideways. Set on warm white per the Light style.
+ * Gallery preview — desktop: scroll-driven horizontal strip.
+ * Mobile: vertical editorial stack (no scroll-jacked sideways drift).
  */
+
 export function GalleryPreview({
   images,
 }: {
@@ -24,6 +25,8 @@ export function GalleryPreview({
   const x = useTransform(scrollYProgress, [0, 1], ["8%", "-22%"]);
 
   if (images.length === 0) return null;
+
+  const mobileImages = images.slice(0, 6);
 
   return (
     <section
@@ -61,7 +64,32 @@ export function GalleryPreview({
         </div>
       </div>
 
-      <div className="mt-20 overflow-hidden">
+      {/* Mobile — vertical editorial rhythm, scroll naturally */}
+      <div className="mt-16 flex flex-col gap-10 px-6 md:hidden">
+        {mobileImages.map((img, i) => (
+          <Reveal key={img.id} delay={i * 0.06} amount={0.15}>
+            <figure className={cn(i % 2 === 0 ? "mr-10" : "ml-10")}>
+              <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-cream">
+                <Image
+                  src={img.url}
+                  alt={img.alt}
+                  fill
+                  sizes="85vw"
+                  className="object-cover"
+                />
+              </div>
+              {img.title ? (
+                <figcaption className="mt-3 text-[10px] tracking-[0.28em] uppercase text-black-iron/45">
+                  {img.title}
+                </figcaption>
+              ) : null}
+            </figure>
+          </Reveal>
+        ))}
+      </div>
+
+      {/* Desktop — horizontal scroll-linked strip */}
+      <div className="mt-20 hidden overflow-hidden md:block">
         <motion.div
           style={{ x }}
           className="flex gap-6 md:gap-10 will-change-transform pl-6 md:pl-12 lg:pl-20"
