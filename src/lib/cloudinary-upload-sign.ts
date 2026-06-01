@@ -1,5 +1,5 @@
 import "server-only";
-import crypto from "node:crypto";
+import { cloudinaryUploadSignature } from "@/lib/cloudinary-sign";
 import { env } from "@/lib/env";
 
 function sanitizeFolder(input?: string) {
@@ -37,14 +37,19 @@ function assertPlausibleCloudinaryApiKey(key: string) {
 /** Params for browser → Cloudinary direct upload (avoids Vercel ~4.5MB body limit). */
 export function createCloudinarySignedUploadPayload(folderInput: string) {
   if (!isCloudinaryDirectUploadAvailable()) {
-    throw new Error("Cloudinary is not configured for uploads");
+    throw new Error(
+      "Cloudinary is not configured for uploads. Set STORAGE_DRIVER=cloudinary and CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your environment, then restart the dev server.",
+    );
   }
   const apiKey = env.CLOUDINARY_API_KEY!;
   assertPlausibleCloudinaryApiKey(apiKey);
   const folderPath = `shazdeh/${sanitizeFolder(folderInput)}`;
   const timestamp = Math.round(Date.now() / 1000).toString();
-  const sigParams = `folder=${folderPath}&timestamp=${timestamp}${env.CLOUDINARY_API_SECRET}`;
-  const signature = crypto.createHash("sha1").update(sigParams).digest("hex");
+  const signature = cloudinaryUploadSignature(
+    folderPath,
+    timestamp,
+    env.CLOUDINARY_API_SECRET!,
+  );
   return {
     cloudName: env.CLOUDINARY_CLOUD_NAME!,
     apiKey,

@@ -33,7 +33,12 @@ export async function generateMetadata(): Promise<Metadata> {
       description: s.metaDesc ?? "Contemporary Persian cuisine in Dubai.",
       images: s.ogImageUrl ? [s.ogImageUrl] : undefined,
     },
-    icons: s.faviconUrl ? { icon: s.faviconUrl } : undefined,
+    icons: s.faviconUrl
+      ? { icon: s.faviconUrl, apple: s.faviconUrl }
+      : {
+          icon: [{ url: "/brand/favicon.png", sizes: "32x32", type: "image/png" }],
+          apple: [{ url: "/brand/apple-icon.png", sizes: "180x180", type: "image/png" }],
+        },
     keywords: [
       "Shazdeh",
       "SHĀZDEH",

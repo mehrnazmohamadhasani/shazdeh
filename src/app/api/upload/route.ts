@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth, serverError } from "@/lib/api";
 import { uploadImage } from "@/lib/storage";
-import { MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
+import { getMaxServerUploadBytes } from "@/lib/upload-limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -21,11 +21,25 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
+    const name = file.name.toLowerCase();
+    const looksLikeImage =
+      file.type.startsWith("image/") ||
+      /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
+    if (!looksLikeImage) {
       return NextResponse.json(
         {
           error:
-            "File too large (max 3MB on this host). Resize or compress the image, then try again.",
+            "Unsupported image type. Use JPG or PNG (on iPhone: Settings → Camera → Formats → Most Compatible).",
+        },
+        { status: 400 },
+      );
+    }
+    const maxBytes = getMaxServerUploadBytes();
+    if (file.size > maxBytes) {
+      const maxMb = Math.round(maxBytes / (1024 * 1024));
+      return NextResponse.json(
+        {
+          error: `File too large (max ${maxMb}MB on this host). Resize or compress the image, or use Cloudinary for larger files.`,
         },
         { status: 413 },
       );

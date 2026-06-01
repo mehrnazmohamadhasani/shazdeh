@@ -2,6 +2,7 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { cloudinaryUploadSignature } from "@/lib/cloudinary-sign";
 import { env } from "@/lib/env";
 
 export type UploadResult = {
@@ -62,10 +63,25 @@ async function uploadToLocal(
   folder: string,
   info: sharp.OutputInfo,
 ): Promise<UploadResult> {
+  if (process.env.VERCEL === "1") {
+    throw new Error(
+      "Local file storage does not work on Vercel. Set STORAGE_DRIVER=cloudinary and add CLOUDINARY_* env vars, then redeploy.",
+    );
+  }
   const dir = path.join(UPLOADS_DIR, folder);
-  await fs.mkdir(dir, { recursive: true });
-  const filepath = path.join(dir, filename);
-  await fs.writeFile(filepath, data);
+  try {
+    await fs.mkdir(dir, { recursive: true });
+    const filepath = path.join(dir, filename);
+    await fs.writeFile(filepath, data);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "EROFS" || code === "EACCES") {
+      throw new Error(
+        "Cannot write uploads to disk in this environment. Use STORAGE_DRIVER=cloudinary on Vercel.",
+      );
+    }
+    throw e;
+  }
   return {
     url: `${PUBLIC_PREFIX}/${folder}/${filename}`,
     width: info.width,
@@ -132,8 +148,11 @@ async function uploadToCloudinary(
 
   const timestamp = Math.round(Date.now() / 1000).toString();
   const folderPath = `shazdeh/${folder}`;
-  const sigParams = `folder=${folderPath}&timestamp=${timestamp}${env.CLOUDINARY_API_SECRET}`;
-  const signature = await sha1Hex(sigParams);
+  const signature = cloudinaryUploadSignature(
+    folderPath,
+    timestamp,
+    env.CLOUDINARY_API_SECRET,
+  );
 
   const form = new FormData();
   const blob = new Blob([new Uint8Array(data)], { type: "image/jpeg" });
@@ -162,7 +181,3 @@ async function uploadToCloudinary(
   };
 }
 
-async function sha1Hex(input: string) {
-  const crypto = await import("node:crypto");
-  return crypto.createHash("sha1").update(input).digest("hex");
-}

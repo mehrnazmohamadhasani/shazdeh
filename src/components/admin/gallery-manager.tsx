@@ -7,6 +7,7 @@ import { Plus, Trash2, Upload, Loader2, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { uploadAdminImage } from "@/lib/upload-admin-image";
 
 type Img = {
   id: string;
@@ -16,6 +17,17 @@ type Img = {
   order: number;
   isActive: boolean;
 };
+
+async function apiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: string; issues?: unknown };
+    if (body.error) return body.error;
+    if (body.issues) return `${fallback} (validation failed)`;
+  } catch {
+    /* non-JSON body */
+  }
+  return `${fallback} (${res.status})`;
+}
 
 export function GalleryManager({ initial }: { initial: Img[] }) {
   const router = useRouter();
@@ -29,32 +41,33 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("folder", "gallery");
-        const upRes = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!upRes.ok) continue;
-        const upData = (await upRes.json()) as {
-          url: string;
-          width: number;
-          height: number;
-        };
+        const upData = await uploadAdminImage(file, "gallery");
         const createRes = await fetch("/api/gallery", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageUrl: upData.url,
-            width: upData.width,
-            height: upData.height,
+            ...(upData.width && upData.width > 0 ? { width: upData.width } : {}),
+            ...(upData.height && upData.height > 0
+              ? { height: upData.height }
+              : {}),
             order: initial.length + i,
             title: file.name.replace(/\.[a-z]+$/i, "").replace(/[-_]/g, " "),
           }),
         });
-        if (createRes.ok) success += 1;
+        if (!createRes.ok) {
+          throw new Error(await apiError(createRes, "Could not save to gallery"));
+        }
+        success += 1;
       }
-      toast.success(
-        `${success} of ${files.length} image${files.length === 1 ? "" : "s"} uploaded`,
-      );
+      if (success > 0) {
+        toast.success(
+          `${success} of ${files.length} image${files.length === 1 ? "" : "s"} uploaded`,
+        );
+      } else {
+        toast.error("Upload failed — no images were saved.");
+      }
       router.refresh();
     } catch (e) {
       toast.error((e as Error).message);
