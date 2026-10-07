@@ -42,7 +42,7 @@ export function HomeHero({
   return (
     <section
       ref={ref}
-      className="relative h-[100svh] min-h-[680px] w-full overflow-hidden bg-black-iron text-warm-white"
+      className="relative h-[100svh] min-h-[680px] w-full overflow-hidden bg-cream text-warm-white"
     >
       {/* Background video — mobile: zoom + bias toward dish (right/lower) */}
       <motion.div
@@ -56,18 +56,32 @@ export function HomeHero({
           playsInline
           preload="auto"
           aria-hidden
-          className="absolute inset-0 h-full w-full origin-center scale-[1.38] object-cover object-[72%_52%] sm:scale-100 sm:object-center"
+          className="absolute inset-0 h-full w-full origin-center scale-[1.38] object-cover object-[72%_52%] brightness-[1.14] saturate-[1.1] contrast-[0.97] sm:scale-100 sm:object-center sm:brightness-[1.12] sm:saturate-[1.08]"
         >
           <source src={videoSrc} type="video/mp4" />
         </video>
+        {/* Warm luminous wash */}
         <div
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-t from-black-iron/80 via-black-iron/40 to-black-iron/30 sm:from-black-iron/75 sm:via-black-iron/35 sm:to-black-iron/25"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_15%,rgba(253,246,236,0.42),transparent_62%)]"
         />
-        {/* Soft left wash so empty beige never reads as a flat void on mobile */}
         <div
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-r from-black-iron/45 via-transparent to-transparent sm:hidden"
+          className="absolute inset-0 bg-gradient-to-b from-warm-white/18 via-transparent to-transparent"
+        />
+        {/* Legibility at bottom only — keeps video bright above */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-[58%] bg-gradient-to-t from-black-iron/48 via-black-iron/12 to-transparent sm:h-[52%] sm:from-black-iron/42"
+        />
+        {/* Nav readability without darkening the whole frame */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black-iron/25 to-transparent sm:h-28 sm:from-black-iron/18"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-r from-warm-white/12 via-transparent to-transparent sm:hidden"
         />
       </motion.div>
 
