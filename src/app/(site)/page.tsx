@@ -30,7 +30,6 @@ export default async function HomePage() {
   return (
     <>
       <HomeHero
-        imageUrl={banner?.imageUrl ?? "/menu/ghormeh-sabzi.jpg"}
         title={banner?.title}
         subtitle={banner?.subtitle}
       />

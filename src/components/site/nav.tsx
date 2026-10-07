@@ -45,8 +45,9 @@ export function SiteNav({
 
   React.useEffect(() => setOpen(false), [pathname]);
 
-  // All pages now open on the light warm-white tone.
-  const initialTone = heroTone ?? "light";
+  // Home opens on a video hero — start in dark tone so the nav stays readable.
+  const initialTone =
+    heroTone ?? (pathname === "/" ? "dark" : "light");
 
   // Effective tone: when not scrolled we follow the hero; once
   // scrolled we always sit on warm-white (per the editorial system).

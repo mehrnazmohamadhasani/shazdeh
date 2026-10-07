@@ -1,24 +1,27 @@
 "use client";
 import * as React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useSpring, useTransform } from "motion/react";
 import { ArrowDown } from "lucide-react";
 
 /*
- * Home hero — Full-opacity food photography with compact headline type.
+ * Home hero — Full-bleed video with mobile crop bias toward the dish,
+ * and display-scale type that occupies the empty frame on small screens.
  */
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
+const HERO_VIDEO =
+  "https://d8j0ntlcm91z4.cloudfront.net/user_3KMJxreDoLWfE2avXYNCuzD8geX/hf_20261007_121509_a24fd74c-b626-400d-bcba-4023a46c2dff.mp4";
+
 export function HomeHero({
-  imageUrl,
   title,
   subtitle,
+  videoSrc = HERO_VIDEO,
 }: {
-  imageUrl: string;
   title?: string;
   subtitle?: string | null;
+  videoSrc?: string;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -39,20 +42,32 @@ export function HomeHero({
   return (
     <section
       ref={ref}
-      className="relative h-[100svh] min-h-[680px] w-full overflow-hidden bg-warm-white text-black-iron"
+      className="relative h-[100svh] min-h-[680px] w-full overflow-hidden bg-black-iron text-warm-white"
     >
-      {/* Background image — full opacity, no wash overlay */}
+      {/* Background video — mobile: zoom + bias toward dish (right/lower) */}
       <motion.div
         style={{ y, scale }}
-        className="absolute inset-0 max-sm:-top-10 max-sm:h-[calc(100%+2.5rem)] will-change-transform"
+        className="absolute inset-0 will-change-transform"
       >
-        <Image
-          src={imageUrl}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[50%_22%] sm:object-center"
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          aria-hidden
+          className="absolute inset-0 h-full w-full origin-center scale-[1.38] object-cover object-[72%_52%] sm:scale-100 sm:object-center"
+        >
+          <source src={videoSrc} type="video/mp4" />
+        </video>
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-black-iron/80 via-black-iron/40 to-black-iron/30 sm:from-black-iron/75 sm:via-black-iron/35 sm:to-black-iron/25"
+        />
+        {/* Soft left wash so empty beige never reads as a flat void on mobile */}
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-r from-black-iron/45 via-transparent to-transparent sm:hidden"
         />
       </motion.div>
 
@@ -67,26 +82,27 @@ export function HomeHero({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, delay: 0.3, ease: EASE }}
-            className="text-[10px] tracking-[0.32em] uppercase text-black-iron/50"
+            className="text-center text-[10px] tracking-[0.32em] uppercase text-warm-white/55 sm:text-left"
           >
             Persian Cuisine · Dubai
           </motion.p>
         </div>
 
-        {/* Main headline */}
-        <div className="flex-1 container-shazdeh flex flex-col justify-end pb-20 md:pb-32">
+        {/* Main headline — mobile: display type fills the open frame */}
+        <div className="flex flex-1 flex-col container-shazdeh justify-center pb-24 pt-6 sm:justify-end sm:pb-32 sm:pt-0">
           <motion.h1
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, delay: 0.45, ease: EASE }}
-            className="mx-auto w-full translate-y-[25px] whitespace-nowrap font-sans text-[12px] font-medium uppercase leading-none tracking-[0.22em] text-black-iron/50 text-center sm:mx-0 sm:max-w-none sm:translate-y-0 sm:text-left"
+            className="mx-auto w-full max-w-[16ch] text-center font-bold text-[12.5vw] leading-[0.92] tracking-[-0.045em] text-warm-white sm:mx-0 sm:max-w-3xl sm:text-left sm:text-5xl md:text-6xl lg:text-7xl"
           >
             {hasCustomTitle ? (
               title
             ) : (
               <>
                 From our{" "}
-                <span className="text-terracotta/90">heart</span> to your home.
+                <span className="text-terracotta">heart</span>
+                <br className="sm:hidden" /> to your home.
               </>
             )}
           </motion.h1>
@@ -96,7 +112,7 @@ export function HomeHero({
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1.0, delay: 0.75, ease: EASE }}
-              className="mt-10 max-w-md text-[15px] md:text-[17px] font-light text-black-iron/65 leading-[1.55]"
+              className="mx-auto mt-6 max-w-md text-center text-[15px] font-light leading-[1.55] text-warm-white/70 sm:mx-0 sm:mt-8 sm:text-left md:text-[17px]"
             >
               {subtitle}
             </motion.p>
@@ -106,17 +122,17 @@ export function HomeHero({
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.0, delay: 0.95, ease: EASE }}
-            className="mt-12 flex flex-col sm:flex-row gap-3 sm:items-center"
+            className="mt-10 flex flex-col gap-3 sm:mt-12 sm:flex-row sm:items-center"
           >
             <Link
               href="/menu"
-              className="inline-flex items-center justify-center h-14 px-9 rounded-pill bg-terracotta text-warm-white text-[12px] tracking-[0.22em] uppercase font-medium glow-terracotta transition-all duration-500 hover:bg-[oklch(from_#ce4927_calc(l-0.04)_c_h)]"
+              className="inline-flex h-14 items-center justify-center rounded-pill bg-terracotta px-9 text-[12px] font-medium uppercase tracking-[0.22em] text-warm-white glow-terracotta transition-all duration-500 hover:bg-[oklch(from_#ce4927_calc(l-0.04)_c_h)]"
             >
               View the menu
             </Link>
             <Link
               href="/about"
-              className="inline-flex items-center justify-center h-14 px-9 rounded-pill border border-black-iron/25 text-black-iron text-[12px] tracking-[0.22em] uppercase font-medium hover:border-terracotta hover:text-terracotta transition-all duration-500"
+              className="inline-flex h-14 items-center justify-center rounded-pill border border-warm-white/35 px-9 text-[12px] font-medium uppercase tracking-[0.22em] text-warm-white transition-all duration-500 hover:border-terracotta hover:text-terracotta"
             >
               Our story
             </Link>
@@ -128,7 +144,7 @@ export function HomeHero({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5, duration: 1.2 }}
-          className="absolute bottom-7 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 text-black-iron/45"
+          className="absolute bottom-7 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-warm-white/45"
         >
           <span className="text-[9px] tracking-[0.32em] uppercase">
             Scroll
