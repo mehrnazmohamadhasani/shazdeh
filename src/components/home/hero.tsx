@@ -1,180 +1,165 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { motion, useScroll, useSpring, useTransform } from "motion/react";
-import { ArrowDown } from "lucide-react";
+import { motion, useScroll, useTransform } from "motion/react";
+import { Pause, Play } from "lucide-react";
+import { EASE } from "@/lib/motion";
 
 /*
- * Home hero — Full-bleed video with mobile crop bias toward the dish,
- * and display-scale type that occupies the empty frame on small screens.
+ * Home hero — full-bleed film of the kitchen with the brand line set
+ * large. Mobile crops toward the dish and lets the type fill the frame.
+ *
+ *   – A dark base + poster frame keep the headline legible before the
+ *     video arrives (slow networks, Save-Data, Low Power Mode).
+ *   – Reduced-motion visitors get the still frame, and everyone gets a
+ *     pause control (WCAG 2.2.2 for auto-playing media).
  */
-
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const HERO_VIDEO =
   "https://d8j0ntlcm91z4.cloudfront.net/user_3KMJxreDoLWfE2avXYNCuzD8geX/hf_20261007_121509_a24fd74c-b626-400d-bcba-4023a46c2dff.mp4";
+const HERO_POSTER = "/menu/shazdeh-mix.jpg";
 
 export function HomeHero({
   title,
   subtitle,
-  videoSrc = HERO_VIDEO,
+  videoSrc,
 }: {
   title?: string;
   subtitle?: string | null;
-  videoSrc?: string;
+  videoSrc?: string | null;
 }) {
-  const ref = React.useRef<HTMLDivElement>(null);
+  const sectionRef = React.useRef<HTMLElement>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [paused, setPaused] = React.useState(false);
+
   const { scrollYProgress } = useScroll({
-    target: ref,
+    target: sectionRef,
     offset: ["start start", "end start"],
   });
-  const smoothScroll = useSpring(scrollYProgress, {
-    stiffness: 70,
-    damping: 28,
-    mass: 0.35,
-  });
-  const y = useTransform(smoothScroll, [0, 1], ["0%", "16%"]);
-  const opacity = useTransform(scrollYProgress, [0, 0.7, 1], [1, 0.4, 0]);
-  const scale = useTransform(smoothScroll, [0, 1], [1, 1.1]);
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "12%"]);
+  const scale = useTransform(scrollYProgress, [0, 1], [1, 1.06]);
+  const fade = useTransform(scrollYProgress, [0, 0.65], [1, 0]);
 
-  const hasCustomTitle = !!title;
+  // Respect reduced motion: hold the poster frame instead of playing.
+  React.useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mq.matches) videoRef.current?.pause();
+  }, []);
+
+  const toggle = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) void v.play();
+    else v.pause();
+  };
 
   return (
     <section
-      ref={ref}
-      className="relative h-[100svh] min-h-[680px] w-full overflow-hidden bg-cream text-warm-white"
+      ref={sectionRef}
+      aria-label="Introduction"
+      className="relative h-[100svh] min-h-[620px] w-full overflow-hidden bg-[#2a1d16] text-warm-white"
     >
-      {/* Background video — mobile: zoom + bias toward dish (right/lower) */}
-      <motion.div
-        style={{ y, scale }}
-        className="absolute inset-0 will-change-transform"
-      >
+      <motion.div style={{ y, scale }} className="absolute inset-0 will-change-transform">
         <video
+          ref={videoRef}
           autoPlay
           muted
           loop
           playsInline
           preload="auto"
+          poster={HERO_POSTER}
           aria-hidden
-          className="absolute inset-0 h-full w-full origin-center scale-[1.38] object-cover object-[72%_52%] brightness-[1.14] saturate-[1.1] contrast-[0.97] sm:scale-100 sm:object-center sm:brightness-[1.12] sm:saturate-[1.08]"
+          onPlay={() => setPaused(false)}
+          onPause={() => setPaused(true)}
+          className="absolute inset-0 h-full w-full origin-center scale-[1.38] object-cover object-[72%_52%] brightness-[1.1] saturate-[1.08] sm:scale-100 sm:object-center"
         >
-          <source src={videoSrc} type="video/mp4" />
+          <source src={videoSrc || HERO_VIDEO} type="video/mp4" />
         </video>
-        {/* Warm luminous wash */}
+        {/* Warm luminous wash at the top */}
         <div
           aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_15%,rgba(253,246,236,0.42),transparent_62%)]"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_10%,rgba(253,246,236,0.28),transparent_60%)]"
         />
+        {/* Nav legibility */}
         <div
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-b from-warm-white/18 via-transparent to-transparent"
+          className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black-iron/35 to-transparent"
         />
-        {/* Legibility at bottom only — keeps video bright above */}
+        {/* Type legibility — strong enough for AA on any frame */}
         <div
           aria-hidden
-          className="absolute inset-x-0 bottom-0 h-[58%] bg-gradient-to-t from-black-iron/48 via-black-iron/12 to-transparent sm:h-[52%] sm:from-black-iron/42"
-        />
-        {/* Nav readability without darkening the whole frame */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black-iron/25 to-transparent sm:h-28 sm:from-black-iron/18"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-gradient-to-r from-warm-white/12 via-transparent to-transparent sm:hidden"
+          className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black-iron/75 via-black-iron/30 to-transparent"
         />
       </motion.div>
 
-      {/* Foreground content */}
       <motion.div
-        style={{ opacity }}
-        className="relative z-10 flex h-full flex-col"
+        style={{ opacity: fade }}
+        className="relative z-10 flex h-full flex-col justify-end pb-24 sm:pb-28 md:pb-32"
       >
-        {/* Top-of-page brand row */}
-        <div className="container-shazdeh pt-28 md:pt-36">
+        <div className="container-shazdeh">
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.3, ease: EASE }}
-            className="text-center text-[10px] tracking-[0.32em] uppercase text-warm-white/55 sm:text-left"
+            transition={{ duration: 0.8, delay: 0.15, ease: EASE }}
+            className="text-center text-[11px] font-medium uppercase tracking-[0.3em] text-warm-white/85 sm:text-left"
           >
             Persian Cuisine · Dubai
           </motion.p>
-        </div>
 
-        {/* Main headline — mobile: display type fills the open frame */}
-        <div className="flex flex-1 flex-col container-shazdeh justify-center pb-24 pt-6 sm:justify-end sm:pb-32 sm:pt-0">
-          <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2, delay: 0.45, ease: EASE }}
-            className="mx-auto w-full max-w-[16ch] text-center font-bold text-[12.5vw] leading-[0.92] tracking-[-0.045em] text-warm-white sm:mx-0 sm:max-w-3xl sm:text-left sm:text-5xl md:text-6xl lg:text-7xl"
-          >
-            {hasCustomTitle ? (
+          <h1 className="t-display mx-auto mt-5 max-w-[13ch] animate-rise text-center [animation-delay:120ms] max-sm:text-[13vw] sm:mx-0 sm:max-w-[14ch] sm:text-left">
+            {title ? (
               title
             ) : (
               <>
-                From our{" "}
-                <span className="text-terracotta">heart</span>
-                <br className="sm:hidden" /> to your home.
+                From our heart to your <span className="text-apricot-clay">home</span>.
               </>
             )}
-          </motion.h1>
+          </h1>
 
-          {subtitle && (
-            <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1.0, delay: 0.75, ease: EASE }}
-              className="mx-auto mt-6 max-w-md text-center text-[15px] font-light leading-[1.55] text-warm-white/70 sm:mx-0 sm:mt-8 sm:text-left md:text-[17px]"
-            >
-              {subtitle}
-            </motion.p>
-          )}
+          <motion.p
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.45, ease: EASE }}
+            className="t-lead mx-auto mt-6 max-w-md text-center text-warm-white/85 sm:mx-0 sm:text-left"
+          >
+            {subtitle ??
+              "Contemporary Persian cuisine — slow-cooked, saffron-bright, and delivered across Dubai."}
+          </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, delay: 0.95, ease: EASE }}
-            className="mt-10 flex flex-col gap-3 sm:mt-12 sm:flex-row sm:items-center"
+            transition={{ duration: 0.9, delay: 0.6, ease: EASE }}
+            className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center"
           >
             <Link
-              href="/menu"
-              className="inline-flex h-14 items-center justify-center rounded-pill bg-terracotta px-9 text-[12px] font-medium uppercase tracking-[0.22em] text-warm-white glow-terracotta transition-all duration-500 hover:bg-[oklch(from_#ce4927_calc(l-0.04)_c_h)]"
+              href="/order"
+              className="inline-flex h-14 items-center justify-center rounded-pill bg-terracotta px-9 text-[12px] font-medium uppercase tracking-[0.22em] text-white glow-terracotta hover:bg-terracotta-ink"
             >
-              View the menu
+              Order now
             </Link>
             <Link
-              href="/about"
-              className="inline-flex h-14 items-center justify-center rounded-pill border border-warm-white/35 px-9 text-[12px] font-medium uppercase tracking-[0.22em] text-warm-white transition-all duration-500 hover:border-terracotta hover:text-terracotta"
+              href="/menu"
+              className="inline-flex h-14 items-center justify-center rounded-pill border border-warm-white/50 px-9 text-[12px] font-medium uppercase tracking-[0.22em] text-warm-white transition-colors duration-500 hover:border-warm-white hover:bg-warm-white/10"
             >
-              Our story
+              Explore the menu
             </Link>
           </motion.div>
         </div>
-
-        {/* Scroll cue */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 1.2 }}
-          className="absolute bottom-7 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-warm-white/45"
-        >
-          <span className="text-[9px] tracking-[0.32em] uppercase">
-            Scroll
-          </span>
-          <motion.div
-            animate={{ y: [0, 5, 0] }}
-            transition={{
-              duration: 2.4,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          >
-            <ArrowDown className="h-3 w-3" strokeWidth={1.5} />
-          </motion.div>
-        </motion.div>
       </motion.div>
+
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={paused ? "Play background video" : "Pause background video"}
+        className="absolute bottom-6 right-5 z-20 grid h-11 w-11 place-items-center rounded-full border border-warm-white/35 text-warm-white/85 backdrop-blur-sm transition-colors hover:bg-warm-white/10 sm:right-8 md:bottom-8"
+      >
+        {paused ? (
+          <Play className="h-4 w-4" strokeWidth={1.5} />
+        ) : (
+          <Pause className="h-4 w-4" strokeWidth={1.5} />
+        )}
+      </button>
     </section>
   );
 }

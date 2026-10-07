@@ -5,6 +5,7 @@ import {
   ok,
   parseJson,
   requireAuth,
+  revalidateSite,
   serverError,
 } from "@/lib/api";
 
@@ -12,13 +13,17 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await ctx.params;
-  const cat = await prisma.category.findUnique({
-    where: { id },
-    include: { _count: { select: { items: true } } },
-  });
-  if (!cat) return notFound();
-  return ok(cat);
+  try {
+    const { id } = await ctx.params;
+    const cat = await prisma.category.findUnique({
+      where: { id },
+      include: { _count: { select: { items: true } } },
+    });
+    if (!cat) return notFound();
+    return ok(cat);
+  } catch (e) {
+    return serverError(e);
+  }
 }
 
 export async function PATCH(
@@ -36,6 +41,7 @@ export async function PATCH(
       where: { id },
       data: parsed.data,
     });
+    revalidateSite();
     return ok(cat);
   } catch (e) {
     return serverError(e);
@@ -51,6 +57,7 @@ export async function DELETE(
   const { id } = await ctx.params;
   try {
     await prisma.category.delete({ where: { id } });
+    revalidateSite();
     return ok({ ok: true });
   } catch (e) {
     return serverError(e);

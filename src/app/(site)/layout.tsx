@@ -1,16 +1,44 @@
 import { SiteNav } from "@/components/site/nav";
 import { SiteFooter } from "@/components/site/footer";
+import { MotionProvider } from "@/components/shared/motion-provider";
+import { getSettings } from "@/lib/settings";
+import { deliveryPartners, findPlatform, getSocialLinks } from "@/lib/social";
+import { whatsappHref } from "@/lib/links";
 
-export default function SiteLayout({
+export default async function SiteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [settings, socials] = await Promise.all([
+    getSettings(),
+    getSocialLinks(),
+  ]);
+
+  const whatsapp = whatsappHref(
+    settings.whatsapp ?? findPlatform(socials, "whatsapp")?.url,
+  );
+
   return (
-    <div className="relative min-h-screen flex flex-col">
-      <SiteNav />
-      <main className="flex-1">{children}</main>
-      <SiteFooter />
-    </div>
+    <MotionProvider>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-pill focus:bg-black-iron focus:px-5 focus:py-3 focus:text-[12px] focus:font-medium focus:uppercase focus:tracking-[0.2em] focus:text-warm-white"
+      >
+        Skip to content
+      </a>
+      <div className="relative flex min-h-screen flex-col">
+        <SiteNav logoUrl={settings.logoUrl} />
+        <main id="main" className="flex-1">
+          {children}
+        </main>
+        <SiteFooter
+          settings={settings}
+          socials={socials}
+          partners={deliveryPartners(socials)}
+          whatsapp={whatsapp}
+        />
+      </div>
+    </MotionProvider>
   );
 }

@@ -2,239 +2,216 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  motion,
-  useScroll,
-  useMotionValueEvent,
-  AnimatePresence,
-} from "motion/react";
-import { Menu, X } from "lucide-react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { motion } from "motion/react";
+import { ArrowUpRight, Menu, X } from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
+import { ArchLines } from "@/components/brand/arch";
+import { EASE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /*
  * SHĀZDEH navigation.
  *
- * Per the brand book — minimal, floating, transparent over the hero,
- * elegantly transitioning to the warm-white surface on scroll. Inter
- * Medium, brand 6% tracking on labels, generous spacing.
- *
- * The `tone` prop lets pages override the at-rest tone (e.g. menu
- * pages without a dark hero start in light tone).
+ * Transparent over the home video, settling onto a frosted warm-white
+ * bar on scroll (desktop) or the brand terracotta bar (mobile, per the
+ * guidelines' mobile header). "Order" is the single primary action —
+ * SHĀZDEH is delivery-only, so ordering is the conversion that matters.
  */
 
 const NAV_LINKS = [
   { href: "/menu", label: "Menu" },
   { href: "/about", label: "Story" },
   { href: "/gallery", label: "Gallery" },
-  { href: "/contact", label: "Contact" },
 ] as const;
 
-export function SiteNav({
-  tone: heroTone,
-}: {
-  /** Tone of the page area immediately under the navbar before scroll */
-  tone?: "dark" | "light";
-}) {
+function subscribeScroll(cb: () => void) {
+  window.addEventListener("scroll", cb, { passive: true });
+  return () => window.removeEventListener("scroll", cb);
+}
+
+function useScrolled(threshold = 24) {
+  return React.useSyncExternalStore(
+    subscribeScroll,
+    () => window.scrollY > threshold,
+    () => false,
+  );
+}
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function SiteNav({ logoUrl }: { logoUrl?: string | null }) {
   const pathname = usePathname();
-  const [scrolled, setScrolled] = React.useState(false);
+  const scrolled = useScrolled();
   const [open, setOpen] = React.useState(false);
-  const { scrollY } = useScroll();
 
-  useMotionValueEvent(scrollY, "change", (v) => setScrolled(v > 32));
-
-  React.useEffect(() => setOpen(false), [pathname]);
-
-  // Home opens on a video hero — start in dark tone so the nav stays readable.
-  const initialTone =
-    heroTone ?? (pathname === "/" ? "dark" : "light");
-
-  // Effective tone: when not scrolled we follow the hero; once
-  // scrolled we always sit on warm-white (per the editorial system).
-  const tone: "dark" | "light" = scrolled ? "light" : initialTone;
-
-  const mobileScrolled = scrolled;
+  // Only the home page opens on a full-bleed video.
+  const overMedia = pathname === "/" && !scrolled;
 
   return (
-    <>
-      <motion.header
-        initial={{ y: -16, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        className={cn(
-          "fixed top-0 left-0 right-0 z-50 border-b transition-[background-color,border-color,color] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          /* Mobile: transparent at top → terracotta on scroll */
-          mobileScrolled
-            ? "max-md:border-black-iron/10 max-md:bg-[var(--color-terracotta)] max-md:text-warm-white"
-            : "max-md:border-transparent max-md:bg-transparent max-md:text-black-iron",
-          /* Desktop: transparent → frosted warm-white */
-          mobileScrolled
-            ? "md:border-black-iron/[0.06] md:bg-warm-white/85 md:text-black-iron md:backdrop-blur-xl"
-            : "md:border-transparent md:bg-transparent",
-          !scrolled && tone !== "light" && "max-md:bg-transparent max-md:text-warm-white",
-          scrolled
-            ? "md:text-black-iron"
-            : tone === "light"
-              ? "md:text-black-iron"
-              : "md:text-warm-white",
-        )}
-      >
-        <div className="container-shazdeh flex items-center justify-between h-[70px] md:h-[84px]">
+    <header
+      className={cn(
+        "fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color,color,backdrop-filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        overMedia
+          ? "border-transparent bg-transparent text-warm-white"
+          : scrolled
+            ? "border-black-iron/[0.07] max-md:border-transparent max-md:bg-terracotta max-md:text-white md:glass-soft md:text-black-iron"
+            : "border-transparent bg-transparent text-black-iron",
+      )}
+    >
+      <div className="container-shazdeh flex h-[68px] items-center justify-between md:h-[84px]">
+        <Link
+          href="/"
+          aria-label="SHĀZDEH — home"
+          className="relative -my-2 py-2 transition-opacity duration-300 hover:opacity-75"
+        >
+          <Wordmark size="md" logoUrl={logoUrl} />
+        </Link>
+
+        <nav aria-label="Primary" className="hidden items-center gap-11 md:flex">
+          {NAV_LINKS.map((link) => {
+            const active = isActive(pathname, link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative py-2 text-[11px] font-medium uppercase tracking-[0.22em] transition-opacity duration-300",
+                  active ? "opacity-100" : "opacity-70 hover:opacity-100",
+                )}
+              >
+                {link.label}
+                {active && (
+                  <motion.span
+                    layoutId="nav-underline"
+                    className="absolute inset-x-0 bottom-0 h-px bg-current"
+                    transition={{ duration: 0.6, ease: EASE }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2">
           <Link
-            href="/"
-            className="relative z-10 text-inherit transition-opacity hover:opacity-70"
-            aria-label="SHĀZDEH home"
+            href="/order"
+            className={cn(
+              "hidden h-11 items-center rounded-pill px-6 text-[11px] font-medium uppercase tracking-[0.22em] transition-all duration-500 md:inline-flex",
+              overMedia
+                ? "bg-warm-white text-black-iron hover:bg-white"
+                : "bg-terracotta text-white glow-terracotta hover:bg-terracotta-ink",
+            )}
           >
-            <Wordmark size="md" className="text-inherit" />
+            Order now
           </Link>
 
-          <nav className="hidden md:flex items-center gap-10">
-            {NAV_LINKS.map((link) => {
-              const active = pathname.startsWith(link.href);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "relative text-[11px] tracking-[0.22em] uppercase font-medium transition-opacity duration-300",
-                    active
-                      ? "opacity-100"
-                      : "opacity-65 hover:opacity-100",
-                  )}
-                >
-                  {link.label}
-                  {active && (
-                    <motion.span
-                      layoutId="nav-underline"
-                      className="absolute -bottom-2 left-0 right-0 h-px bg-terracotta"
-                      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="hidden md:block">
-            <Link
-              href="/contact"
+          <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
+            <DialogPrimitive.Trigger
+              aria-label="Open menu"
               className={cn(
-                "inline-flex items-center h-10 px-6 rounded-pill text-[11px] tracking-[0.22em] uppercase font-medium border transition-all duration-500",
-                tone === "light"
-                  ? "border-black-iron/30 hover:border-terracotta hover:text-terracotta"
-                  : "border-warm-white/30 hover:border-terracotta hover:text-terracotta",
+                "grid h-11 w-11 place-items-center rounded-full border transition-colors md:hidden",
+                overMedia || scrolled
+                  ? "border-white/40 hover:bg-white/10"
+                  : "border-black-iron/20 hover:bg-black-iron/[0.04]",
               )}
             >
-              Order Online
-            </Link>
-          </div>
+              <Menu className="h-[18px] w-[18px]" strokeWidth={1.5} />
+            </DialogPrimitive.Trigger>
 
-          <button
-            className={cn(
-              "md:hidden grid place-items-center h-10 w-10 rounded-full border transition-colors",
-              mobileScrolled
-                ? "border-warm-white/30 text-warm-white hover:bg-warm-white/10"
-                : "border-black-iron/15 text-black-iron hover:bg-black-iron/[0.04]",
-            )}
-            aria-label={open ? "Close menu" : "Open menu"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? (
-              <X className="h-4 w-4" strokeWidth={1.5} />
-            ) : (
-              <Menu className="h-4 w-4" strokeWidth={1.5} />
-            )}
-          </button>
-        </div>
-      </motion.header>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className={cn(
-              "fixed inset-0 z-40 md:hidden transition-colors duration-700",
-              mobileScrolled
-                ? "bg-[var(--color-terracotta)] text-warm-white"
-                : "bg-warm-white text-black-iron",
-            )}
-          >
-            <div className="flex flex-col h-full pt-28 px-6">
-              <nav className="flex flex-col">
-                {NAV_LINKS.map((link, i) => {
-                  const active = pathname.startsWith(link.href);
-                  return (
-                    <motion.div
-                      key={link.href}
-                      initial={{ opacity: 0, y: 16 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        delay: 0.1 + i * 0.08,
-                        duration: 0.7,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
-                    >
-                      <Link
-                        href={link.href}
-                        className={cn(
-                          "block py-5 font-bold text-5xl tracking-[-0.04em] border-b",
-                          mobileScrolled
-                            ? "border-warm-white/15"
-                            : "border-black-iron/[0.08]",
-                          active
-                            ? mobileScrolled
-                              ? "text-warm-white"
-                              : "text-terracotta"
-                            : mobileScrolled
-                              ? "text-warm-white/75"
-                              : "text-black-iron",
-                        )}
-                      >
-                        {link.label}
-                      </Link>
-                    </motion.div>
-                  );
-                })}
-              </nav>
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: 0.5,
-                  duration: 0.7,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="mt-auto pb-12"
+            <DialogPrimitive.Portal>
+              <DialogPrimitive.Content
+                aria-describedby={undefined}
+                className="sheet-anim fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-warm-white text-black-iron md:hidden"
               >
-                <Link
-                  href="/contact"
-                  className={cn(
-                    "flex items-center justify-center h-14 w-full rounded-pill text-[12px] tracking-[0.22em] uppercase font-medium",
-                    mobileScrolled
-                      ? "border border-warm-white/40 bg-warm-white text-[var(--color-terracotta)]"
-                      : "bg-terracotta text-warm-white",
-                  )}
+                <DialogPrimitive.Title className="sr-only">
+                  Site menu
+                </DialogPrimitive.Title>
+
+                <ArchLines
+                  count={2}
+                  className="absolute -bottom-10 left-1/2 h-[62vh] w-[78vw] -translate-x-1/2 text-terracotta/20"
+                />
+
+                <div className="container-shazdeh flex h-[68px] shrink-0 items-center justify-between">
+                  <Link
+                    href="/"
+                    onClick={() => setOpen(false)}
+                    aria-label="SHĀZDEH — home"
+                  >
+                    <Wordmark size="md" logoUrl={logoUrl} />
+                  </Link>
+                  <DialogPrimitive.Close
+                    aria-label="Close menu"
+                    className="grid h-11 w-11 place-items-center rounded-full border border-black-iron/20 transition-colors hover:bg-black-iron/[0.04]"
+                  >
+                    <X className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  </DialogPrimitive.Close>
+                </div>
+
+                <nav
+                  aria-label="Primary"
+                  className="container-shazdeh relative mt-10 flex flex-col"
                 >
-                  Order Online
-                </Link>
-                <p
-                  className={cn(
-                    "mt-6 text-center text-[10px] tracking-[0.32em] uppercase",
-                    mobileScrolled
-                      ? "text-warm-white/55"
-                      : "text-black-iron/50",
+                  {[{ href: "/", label: "Home" }, ...NAV_LINKS, { href: "/order", label: "Order" }].map(
+                    (link, i) => {
+                      const active =
+                        link.href === "/"
+                          ? pathname === "/"
+                          : isActive(pathname, link.href);
+                      return (
+                        <motion.div
+                          key={link.href}
+                          initial={{ opacity: 0, y: 14 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.08 + i * 0.06, duration: 0.6, ease: EASE }}
+                        >
+                          <Link
+                            href={link.href}
+                            onClick={() => setOpen(false)}
+                            aria-current={active ? "page" : undefined}
+                            className={cn(
+                              "flex items-baseline justify-between border-b border-black-iron/[0.08] py-4 text-[2.5rem] font-bold leading-none tracking-[-0.04em]",
+                              active ? "text-terracotta-ink" : "text-black-iron",
+                            )}
+                          >
+                            {link.label}
+                            <span className="text-[11px] font-medium tracking-[0.2em] text-dark-grey tabular-nums">
+                              0{i + 1}
+                            </span>
+                          </Link>
+                        </motion.div>
+                      );
+                    },
                   )}
+                </nav>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, duration: 0.6, ease: EASE }}
+                  className="container-shazdeh relative mt-auto pb-10 pt-12"
                 >
-                  Persian Cuisine · Dubai
-                </p>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+                  <Link
+                    href="/order"
+                    onClick={() => setOpen(false)}
+                    className="flex h-14 w-full items-center justify-center gap-2 rounded-pill bg-terracotta text-[12px] font-medium uppercase tracking-[0.22em] text-white"
+                  >
+                    Order delivery
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
+                  </Link>
+                  <p className="mt-6 text-center text-[10.5px] uppercase tracking-[0.3em] text-dark-grey">
+                    Persian Cuisine · Dubai
+                  </p>
+                </motion.div>
+              </DialogPrimitive.Content>
+            </DialogPrimitive.Portal>
+          </DialogPrimitive.Root>
+        </div>
+      </div>
+    </header>
   );
 }

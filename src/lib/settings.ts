@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 export type RestaurantSettingsView = {
@@ -24,53 +25,97 @@ const FALLBACK: RestaurantSettingsView = {
   tagline: "Persian Cuisine",
   description:
     "A contemporary Persian food brand rooted in heritage and expressed through a modern visual language. From our heart to your home.",
-  email: "hello@shazdeh.ae",
-  phone: "+971 4 000 0000",
-  whatsapp: "+971500000000",
+  email: null,
+  phone: null,
+  whatsapp: null,
   address: "Dubai, United Arab Emirates",
-  mapUrl: "https://maps.google.com/?q=Dubai",
-  openingHours: JSON.stringify({
-    mon: "12:00 — 23:00",
-    tue: "12:00 — 23:00",
-    wed: "12:00 — 23:00",
-    thu: "12:00 — 23:00",
-    fri: "12:00 — 00:00",
-    sat: "12:00 — 00:00",
-    sun: "12:00 — 23:00",
-  }),
+  mapUrl: null,
+  openingHours: null,
   heroVideoUrl: null,
   logoUrl: null,
   faviconUrl: null,
   metaTitle: "SHĀZDEH — Persian Cuisine · Dubai",
   metaDesc:
-    "SHĀZDEH — a contemporary Persian food brand in Dubai. Persian cuisine, refined hospitality, editorial dining.",
+    "SHĀZDEH — contemporary Persian cuisine, delivered across Dubai. Slow-cooked khoresh, saffron rice and golden tahdig, from our heart to your home.",
   ogImageUrl: null,
 };
 
-export async function getSettings(): Promise<RestaurantSettingsView> {
+/**
+ * Settings are read by the root metadata, the site layout and most
+ * pages in the same request — `cache` collapses those into one query.
+ */
+export const getSettings = cache(
+  async (): Promise<RestaurantSettingsView> => {
+    try {
+      const row = await prisma.restaurantSettings.findUnique({
+        where: { id: "default" },
+      });
+      if (!row) return FALLBACK;
+      return {
+        brandName: row.brandName,
+        tagline: row.tagline,
+        description: row.description,
+        email: row.email,
+        phone: row.phone,
+        whatsapp: row.whatsapp,
+        address: row.address,
+        mapUrl: row.mapUrl,
+        openingHours: row.openingHours,
+        heroVideoUrl: row.heroVideoUrl,
+        logoUrl: row.logoUrl,
+        faviconUrl: row.faviconUrl,
+        metaTitle: row.metaTitle,
+        metaDesc: row.metaDesc,
+        ogImageUrl: row.ogImageUrl,
+      };
+    } catch (e) {
+      console.error("[settings] falling back to defaults:", e);
+      return FALLBACK;
+    }
+  },
+);
+
+export type OpeningHours = { day: string; label: string; hours: string }[];
+
+const DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const DAY_LABEL: Record<string, string> = {
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+  sun: "Sunday",
+};
+
+/** Opening hours are stored as a JSON object keyed by day. */
+export function parseOpeningHours(raw: string | null): OpeningHours | null {
+  if (!raw) return null;
   try {
-    const row = await prisma.restaurantSettings.findUnique({
-      where: { id: "default" },
-    });
-    if (!row) return FALLBACK;
-    return {
-      brandName: row.brandName,
-      tagline: row.tagline,
-      description: row.description,
-      email: row.email,
-      phone: row.phone,
-      whatsapp: row.whatsapp,
-      address: row.address,
-      mapUrl: row.mapUrl,
-      openingHours: row.openingHours,
-      heroVideoUrl: row.heroVideoUrl,
-      logoUrl: row.logoUrl,
-      faviconUrl: row.faviconUrl,
-      metaTitle: row.metaTitle,
-      metaDesc: row.metaDesc,
-      ogImageUrl: row.ogImageUrl,
-    };
+    const obj = JSON.parse(raw) as unknown;
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+    const entries = Object.entries(obj as Record<string, unknown>)
+      .filter(([, v]) => typeof v === "string" && v.trim() !== "")
+      .map(([day, hours]) => ({
+        day: day.toLowerCase(),
+        label: DAY_LABEL[day.toLowerCase()] ?? day,
+        hours: String(hours),
+      }));
+    entries.sort(
+      (a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day),
+    );
+    return entries.length > 0 ? entries : null;
   } catch {
-    return FALLBACK;
+    return null;
   }
+}
+
+/**
+ * Collapses a week into ranges when every day shares the same hours
+ * ("Daily · 11:00 — 22:45"), which reads far better than seven rows.
+ */
+export function summariseHours(hours: OpeningHours): string | null {
+  const unique = new Set(hours.map((h) => h.hours));
+  if (hours.length === 7 && unique.size === 1) return hours[0].hours;
+  return null;
 }

@@ -1,19 +1,15 @@
 "use client";
 import * as React from "react";
-import Link from "next/link";
-import { motion } from "motion/react";
-import { ArrowUpRight } from "lucide-react";
-import type { DishCardData } from "@/components/menu/dish-card";
+import type { DishCardData } from "@/lib/dish";
 import { DishCard } from "@/components/menu/dish-card";
 import { DishDialog } from "@/components/menu/dish-dialog";
-import { Reveal } from "@/components/shared/reveal";
-
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+import { RevealItem, RevealStagger } from "@/components/shared/reveal";
+import { SectionHeading } from "@/components/shared/section-heading";
 
 /*
- * Popular dishes — four customer favourites in an equal 4-up grid
- * on a Cream ground. No hierarchy, no hero card — every dish gets
- * the same quiet editorial weight.
+ * Signature dishes — arch-framed plates on a cream ground. Phones get
+ * a snap carousel with a visible "peek" so the plates stay large; the
+ * grid takes over from tablet up.
  */
 export function FeaturedDishes({
   dishes,
@@ -24,72 +20,46 @@ export function FeaturedDishes({
 }) {
   const [active, setActive] = React.useState<DishCardData | null>(null);
 
+  if (dishes.length === 0) return null;
+
   return (
     <section
       data-theme="cream"
-      className="relative bg-cream text-black-iron py-28 md:py-44"
+      aria-labelledby="signature-heading"
+      className="section bg-cream"
     >
       <div className="container-shazdeh">
-        <div className="grid grid-cols-12 gap-y-10 lg:gap-x-10 items-end">
-          <div className="col-span-12 lg:col-span-8">
-            <Reveal>
-              <p className="eyebrow eyebrow-accent">Most Loved</p>
-            </Reveal>
-            <Reveal delay={0.08}>
-              <h2 className="mt-6 font-bold text-5xl md:text-7xl lg:text-[6rem] leading-[0.94] tracking-[-0.045em]">
-                The dishes our
-                <br />
-                <span className="text-terracotta">guests keep ordering</span>.
-              </h2>
-            </Reveal>
-          </div>
-          <div className="col-span-12 lg:col-span-4 lg:text-right">
-            <Reveal delay={0.18}>
-              <Link
-                href="/menu"
-                className="inline-flex items-center gap-3 text-[11px] tracking-[0.22em] uppercase font-medium text-black-iron group"
-              >
-                <span className="border-b border-black-iron/40 group-hover:border-terracotta group-hover:text-terracotta transition-colors pb-1">
-                  Full menu
-                </span>
-                <ArrowUpRight
-                  className="h-4 w-4 transition-transform duration-500 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-terracotta"
-                  strokeWidth={1.5}
-                />
-              </Link>
-            </Reveal>
-          </div>
-        </div>
-
-        {dishes.length > 0 && (
-          <div className="mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 md:gap-x-8 gap-y-14">
-            {dishes.map((dish, i) => (
-              <motion.div
-                key={dish.id}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.15 }}
-                transition={{
-                  duration: 1.0,
-                  delay: 0.04 + i * 0.08,
-                  ease: EASE,
-                }}
-              >
-                <DishCard
-                  dish={dish}
-                  layout="feature"
-                  onClick={() => setActive(dish)}
-                />
-              </motion.div>
-            ))}
-          </div>
-        )}
+        <SectionHeading
+          eyebrow="Signature dishes"
+          id="signature-heading"
+          title="The plates our guests return for."
+          link={{ href: "/menu", label: "Full menu" }}
+        />
       </div>
 
+      <RevealStagger
+        as="ul"
+        className="no-scrollbar mt-14 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-2 sm:container-shazdeh sm:grid sm:snap-none sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 sm:overflow-visible md:mt-20 lg:grid-cols-4"
+      >
+        {dishes.map((dish, i) => (
+          <RevealItem
+            as="li"
+            key={dish.id}
+            className="w-[72vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none"
+          >
+            <DishCard
+              dish={dish}
+              layout="feature"
+              onSelect={setActive}
+              imagePriority={i === 0}
+            />
+          </RevealItem>
+        ))}
+      </RevealStagger>
+
       <DishDialog
-        open={!!active}
-        onOpenChange={(o) => !o && setActive(null)}
         dish={active}
+        onOpenChange={(o) => !o && setActive(null)}
         whatsapp={whatsapp}
       />
     </section>

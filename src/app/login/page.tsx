@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const sp = await searchParams;
 
@@ -56,7 +56,7 @@ export default async function LoginPage({
           </p>
 
           <div className="mt-10">
-            <LoginForm redirectTo={sp.from ?? "/admin"} />
+            <LoginForm redirectTo={safeAdminPath(sp.from)} />
           </div>
 
           <p className="mt-12 text-[10px] tracking-[0.32em] uppercase text-black-iron/45">
@@ -66,4 +66,12 @@ export default async function LoginPage({
       </div>
     </div>
   );
+}
+
+/** Only ever return to an admin path — never an external URL. */
+function safeAdminPath(from: string | string[] | undefined) {
+  if (typeof from !== "string" || !from.startsWith("/admin") || from.startsWith("//")) {
+    return "/admin";
+  }
+  return from;
 }

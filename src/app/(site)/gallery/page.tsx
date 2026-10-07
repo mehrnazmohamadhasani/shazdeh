@@ -8,7 +8,8 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Gallery",
   description:
-    "An editorial visual journal of saffron rice, slow stews and the Persian table — by SHĀZDEH.",
+    "An editorial journal of saffron rice, slow-cooked khoresh and golden tahdig — photographs from the SHĀZDEH kitchen in Dubai.",
+  alternates: { canonical: "/gallery" },
 };
 
 export default async function GalleryPage() {
@@ -17,15 +18,14 @@ export default async function GalleryPage() {
   return (
     <>
       <PageHero
+        size="compact"
         eyebrow="Gallery"
         title={
           <>
-            Where food
-            <br />
-            <span className="text-terracotta">becomes art</span>.
+            Where food becomes <span className="text-terracotta">art</span>.
           </>
         }
-        description="Slow stews, saffron rice, the gold crackle of fresh tahdig — an editorial journal from inside the SHĀZDEH kitchen."
+        description="Slow stews, saffron rice, the golden crackle of tahdig — a visual journal from inside the SHĀZDEH kitchen."
       />
       <GalleryGrid images={images} />
     </>

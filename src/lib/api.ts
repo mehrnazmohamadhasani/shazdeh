@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { getSessionUser } from "@/lib/auth";
 
 export async function requireAuth() {
@@ -7,10 +9,7 @@ export async function requireAuth() {
   if (!user) {
     return {
       user: null,
-      response: NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      ),
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
   return { user, response: null };
@@ -20,8 +19,7 @@ export async function parseJson<T extends z.ZodType>(
   req: Request,
   schema: T,
 ): Promise<
-  | { ok: true; data: z.infer<T> }
-  | { ok: false; response: NextResponse }
+  { ok: true; data: z.infer<T> } | { ok: false; response: NextResponse }
 > {
   let body: unknown;
   try {
@@ -34,10 +32,16 @@ export async function parseJson<T extends z.ZodType>(
   }
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
+    const first = parsed.error.issues[0];
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Validation failed", issues: parsed.error.flatten() },
+        {
+          error: first
+            ? `${first.path.join(".") || "Input"}: ${first.message}`
+            : "Validation failed",
+          issues: z.flattenError(parsed.error),
+        },
         { status: 422 },
       ),
     };
@@ -57,12 +61,59 @@ export function notFound(message = "Not found") {
   return NextResponse.json({ error: message }, { status: 404 });
 }
 
-export function serverError(err: unknown) {
+/**
+ * Maps known database errors to meaningful statuses; everything else
+ * is logged server-side and returned as a generic 500 so internals
+ * (queries, hostnames, stack details) never reach the client.
+ */
+export function serverError(
+  err: unknown,
+  opts?: {
+    /** Admin-only endpoints may surface actionable config messages. */
+    expose?: boolean;
+  },
+) {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (err.code) {
+      case "P2002": {
+        const target = (err.meta?.target as string[] | string | undefined) ?? "";
+        const field = Array.isArray(target) ? target.join(", ") : target;
+        return NextResponse.json(
+          {
+            error: field
+              ? `That ${field} is already in use.`
+              : "That record already exists.",
+          },
+          { status: 409 },
+        );
+      }
+      case "P2003":
+        return NextResponse.json(
+          { error: "A related record is missing or still in use." },
+          { status: 409 },
+        );
+      case "P2025":
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+  }
   console.error(err);
+  if (opts?.expose && err instanceof Error && err.message) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
   return NextResponse.json(
-    {
-      error: err instanceof Error ? err.message : "Internal server error",
-    },
+    { error: "Something went wrong on our side. Please try again." },
     { status: 500 },
   );
+}
+
+/**
+ * Public pages are statically regenerated; refresh them right after an
+ * admin change instead of waiting for the revalidate window.
+ */
+export function revalidateSite() {
+  try {
+    revalidatePath("/", "layout");
+  } catch (e) {
+    console.error("[revalidate]", e);
+  }
 }

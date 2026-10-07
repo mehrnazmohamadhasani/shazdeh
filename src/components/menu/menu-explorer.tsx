@@ -1,28 +1,29 @@
 "use client";
 import * as React from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { Search, Leaf, Sparkles, Star, X, Grid2x2, Rows3 } from "lucide-react";
+import { Grid2x2, Rows3, Search, X } from "lucide-react";
 import type { MenuCategoryWithItems } from "@/lib/menu";
-import type { DishCardData } from "@/components/menu/dish-card";
+import type { DishCardData } from "@/lib/dish";
 import { DishCard } from "@/components/menu/dish-card";
 import { DishDialog } from "@/components/menu/dish-dialog";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /*
- * Menu explorer — Light style. Warm-white ground, hairline borders,
- * sticky filter rail, soft fades on category change. Built for the
- * Aesop / luxury hospitality feel: lots of whitespace, restrained
- * filter chips, no heavy chrome.
+ * Menu explorer.
+ *
+ * Phones: only a slim category rail is sticky (search & filters sit in
+ * the flow above the dishes) so the plates keep the screen. Dishes are
+ * a two-up grid — photography stays the hero while a 30-dish menu
+ * remains a comfortable scroll.
+ * Desktop: one sticky bar carrying categories, search and filters.
  */
 
-type Filter = "all" | "veg" | "signature" | "bestseller";
+type Filter = "all" | "signature" | "veg" | "loved";
 
-const FILTERS: { id: Filter; label: string; icon?: React.ElementType }[] = [
-  { id: "all", label: "Everything" },
-  { id: "signature", label: "Signature", icon: Sparkles },
-  { id: "bestseller", label: "Bestseller", icon: Star },
-  { id: "veg", label: "Vegetarian", icon: Leaf },
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "signature", label: "Signature" },
+  { id: "loved", label: "Most loved" },
+  { id: "veg", label: "Vegetarian" },
 ];
 
 export function MenuExplorer({
@@ -32,25 +33,29 @@ export function MenuExplorer({
   categories: MenuCategoryWithItems[];
   whatsapp?: string;
 }) {
-  const [active, setActive] = React.useState<string>(categories[0]?.slug ?? "");
+  const [active, setActive] = React.useState(categories[0]?.slug ?? "");
   const [filter, setFilter] = React.useState<Filter>("all");
   const [query, setQuery] = React.useState("");
   const [layout, setLayout] = React.useState<"grid" | "list">("grid");
   const [selected, setSelected] = React.useState<DishCardData | null>(null);
 
   const sectionRefs = React.useRef<Record<string, HTMLElement | null>>({});
+  const chipRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const filteredCategories = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
+  const deferredQuery = React.useDeferredValue(query);
+
+  const filtered = React.useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
     return categories
       .map((c) => ({
         ...c,
         items: c.items.filter((i) => {
           if (filter === "veg" && !i.isVegetarian) return false;
           if (filter === "signature" && !i.isSignature) return false;
-          if (filter === "bestseller" && !i.isBestseller) return false;
-          if (q.length > 0) {
-            const hay = [i.name, i.nameFa, i.description]
+          if (filter === "loved" && !i.isBestseller && !i.isSignature)
+            return false;
+          if (q) {
+            const hay = [i.name, i.nameFa, i.description, i.ingredients]
               .filter(Boolean)
               .join(" ")
               .toLowerCase();
@@ -60,208 +65,230 @@ export function MenuExplorer({
         }),
       }))
       .filter((c) => c.items.length > 0);
-  }, [categories, filter, query]);
+  }, [categories, filter, deferredQuery]);
 
-  const totalShown = filteredCategories.reduce(
-    (acc, c) => acc + c.items.length,
-    0,
-  );
+  const total = filtered.reduce((n, c) => n + c.items.length, 0);
+  const isFiltering = filter !== "all" || deferredQuery.trim() !== "";
 
   const scrollToCategory = (slug: string) => {
-    const el = sectionRefs.current[slug];
-    if (el) {
-      const top = el.getBoundingClientRect().top + window.scrollY - 180;
-      window.scrollTo({ top, behavior: "smooth" });
-    }
+    sectionRefs.current[slug]?.scrollIntoView({ block: "start" });
     setActive(slug);
   };
 
+  // Track the category in view; keep its chip visible in the rail.
   React.useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
           .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible[0]) {
-          const slug = (visible[0].target as HTMLElement).dataset.slug;
-          if (slug) setActive(slug);
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const slug = (visible[0]?.target as HTMLElement | undefined)?.dataset
+          .slug;
+        if (slug) {
+          setActive(slug);
+          chipRefs.current[slug]?.scrollIntoView({
+            block: "nearest",
+            inline: "center",
+          });
         }
       },
-      { rootMargin: "-30% 0px -55% 0px", threshold: [0, 0.25, 0.5, 0.75] },
+      { rootMargin: "-35% 0px -55% 0px" },
     );
-    Object.values(sectionRefs.current).forEach((el) => {
-      if (el) observer.observe(el);
-    });
+    Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
     return () => observer.disconnect();
-  }, [filteredCategories]);
+  }, [filtered]);
+
+  const reset = () => {
+    setFilter("all");
+    setQuery("");
+  };
+
+  const search = (idSuffix: string, className?: string) => (
+    <div className={cn("relative", className)}>
+      <label htmlFor={`menu-search-${idSuffix}`} className="sr-only">
+        Search the menu
+      </label>
+      <Search
+        aria-hidden
+        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey"
+        strokeWidth={1.5}
+      />
+      <input
+        id={`menu-search-${idSuffix}`}
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search — saffron, lamb, herbs…"
+        autoComplete="off"
+        className="h-11 w-full rounded-pill border border-black-iron/15 bg-white/60 pl-11 pr-11 text-[14px] font-normal text-black-iron placeholder:text-dark-grey/80 transition-colors focus:border-terracotta/60 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-terracotta/30 [&::-webkit-search-cancel-button]:hidden"
+      />
+      {query && (
+        <button
+          type="button"
+          onClick={() => setQuery("")}
+          aria-label="Clear search"
+          className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-dark-grey hover:bg-black-iron/5 hover:text-black-iron"
+        >
+          <X className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <div className="relative bg-warm-white text-black-iron">
-      {/* Sticky filter bar */}
-      <div className="sticky top-[70px] md:top-[84px] z-30 bg-warm-white/85 backdrop-blur-xl border-b border-black-iron/[0.06]">
-        <div className="container-shazdeh py-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-xl">
-              <Search
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-black-iron/40"
-                strokeWidth={1.5}
-              />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search dishes — saffron, lamb, herbs…"
-                className="pl-11 pr-10 h-11 bg-cream/40 border-black-iron/10"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 grid place-items-center h-6 w-6 rounded-full text-black-iron/50 hover:text-black-iron hover:bg-black-iron/5"
-                  aria-label="Clear search"
-                >
-                  <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-                </button>
-              )}
-            </div>
-
-            <div className="hidden md:flex items-center gap-1 p-1 rounded-pill bg-cream/40 border border-black-iron/10">
-              <LayoutToggle
-                active={layout === "grid"}
-                onClick={() => setLayout("grid")}
-                icon={Grid2x2}
-                label="Grid"
-              />
-              <LayoutToggle
-                active={layout === "list"}
-                onClick={() => setLayout("list")}
-                icon={Rows3}
-                label="List"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {FILTERS.map((f) => {
-              const Icon = f.icon;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3.5 h-8 rounded-pill text-[10px] tracking-[0.22em] uppercase font-medium transition-all duration-300 border",
-                    filter === f.id
-                      ? "bg-terracotta text-warm-white border-terracotta"
-                      : "bg-transparent text-black-iron/65 hover:text-black-iron border-black-iron/15 hover:border-black-iron/30",
-                  )}
-                >
-                  {Icon && <Icon className="h-3 w-3" strokeWidth={1.6} />}
-                  {f.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Category nav */}
-          <div className="flex gap-1 overflow-x-auto pt-1 no-scrollbar -mx-2 px-2">
-            {filteredCategories.map((c) => (
+    <div className="relative">
+      {/* Sticky category rail (+ desktop controls) */}
+      <div className="glass-soft sticky top-[68px] z-30 border-y border-black-iron/[0.07] md:top-[84px]">
+        <div className="container-shazdeh flex items-center gap-6">
+          <nav
+            aria-label="Menu categories"
+            className="no-scrollbar -mx-2 flex min-w-0 flex-1 gap-1 overflow-x-auto px-2 py-2.5"
+          >
+            {filtered.map((c) => (
               <button
                 key={c.id}
+                ref={(el) => {
+                  chipRefs.current[c.slug] = el;
+                }}
+                type="button"
+                aria-current={active === c.slug ? "true" : undefined}
                 onClick={() => scrollToCategory(c.slug)}
                 className={cn(
-                  "shrink-0 px-4 h-9 rounded-pill text-[11px] tracking-[0.22em] uppercase font-medium transition-colors",
+                  "relative h-10 shrink-0 rounded-pill px-4 text-[11px] font-medium uppercase tracking-[0.2em] transition-colors duration-300",
                   active === c.slug
-                    ? "text-terracotta"
-                    : "text-black-iron/55 hover:text-black-iron",
+                    ? "bg-terracotta text-white"
+                    : "text-dark-grey hover:text-black-iron",
                 )}
               >
                 {c.name}
-                <span className="ml-1.5 text-black-iron/35 tabular-nums">
+                <span
+                  className={cn(
+                    "ml-2 tabular-nums",
+                    active === c.slug ? "text-white/75" : "text-dark-grey/70",
+                  )}
+                >
                   {c.items.length}
                 </span>
               </button>
             ))}
-          </div>
+          </nav>
+          {search("desktop", "hidden w-72 shrink-0 py-2.5 lg:block")}
         </div>
       </div>
 
-      {/* Sections */}
-      <div className="container-shazdeh pt-16 md:pt-24 pb-32">
-        {totalShown === 0 ? (
-          <div className="py-32 text-center">
-            <p className="font-bold text-4xl tracking-[-0.03em] text-black-iron/70">
-              No dishes found.
+      {/* Search (phones/tablets), filters and layout — in the flow */}
+      <div className="container-shazdeh flex flex-col gap-3 pt-8 sm:flex-row sm:items-center sm:justify-between md:pt-10">
+        {search("mobile", "sm:w-80 lg:hidden")}
+        <div
+          role="group"
+          aria-label="Filter dishes"
+          className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1"
+        >
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              aria-pressed={filter === f.id}
+              onClick={() => setFilter(f.id)}
+              className={cn(
+                "h-10 shrink-0 rounded-pill border px-4 text-[10.5px] font-medium uppercase tracking-[0.18em] transition-colors duration-300",
+                filter === f.id
+                  ? "border-black-iron bg-black-iron text-warm-white"
+                  : "border-black-iron/15 text-dark-grey hover:border-black-iron/40 hover:text-black-iron",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div
+          role="group"
+          aria-label="Layout"
+          className="hidden items-center gap-1 rounded-pill border border-black-iron/15 p-1 sm:flex"
+        >
+          <LayoutToggle
+            active={layout === "grid"}
+            onClick={() => setLayout("grid")}
+            icon={Grid2x2}
+            label="Grid view"
+          />
+          <LayoutToggle
+            active={layout === "list"}
+            onClick={() => setLayout("list")}
+            icon={Rows3}
+            label="List view"
+          />
+        </div>
+      </div>
+
+      <div className="container-shazdeh pb-28 pt-12 md:pt-16">
+        <p aria-live="polite" className="sr-only">
+          {isFiltering ? `${total} ${total === 1 ? "dish" : "dishes"} shown` : ""}
+        </p>
+
+        {total === 0 ? (
+          <div className="mx-auto max-w-md py-24 text-center">
+            <p className="t-h3">Nothing matches that — yet.</p>
+            <p className="t-body mt-3 text-dark-grey">
+              Try another ingredient, or browse the full menu.
             </p>
-            <p className="mt-3 text-black-iron/50 text-sm font-light">
-              Try a different search or filter.
-            </p>
+            <button
+              type="button"
+              onClick={reset}
+              className="mt-8 h-12 rounded-pill border border-black-iron/25 px-7 text-[11px] font-medium uppercase tracking-[0.2em] hover:border-terracotta hover:text-terracotta-ink"
+            >
+              Show all dishes
+            </button>
           </div>
         ) : (
-          <div className="space-y-32 md:space-y-44">
-            {filteredCategories.map((cat, ci) => (
+          <div className="space-y-24 md:space-y-36">
+            {filtered.map((cat, ci) => (
               <section
                 key={cat.id}
+                id={cat.slug}
                 data-slug={cat.slug}
                 ref={(el) => {
                   sectionRefs.current[cat.slug] = el;
                 }}
-                className="scroll-mt-44"
+                aria-labelledby={`cat-${cat.slug}`}
+                className="scroll-mt-[150px] md:scroll-mt-[190px]"
               >
-                <div className="grid grid-cols-12 gap-y-6 lg:gap-x-10 mb-14 md:mb-20 items-end">
-                  <div className="col-span-12 lg:col-span-8">
-                    <p className="text-[10px] tracking-[0.32em] uppercase text-terracotta">
-                      {String(ci + 1).padStart(2, "0")} ·{" "}
-                      {cat.tagline ?? "Course"}
+                <header className="mb-10 grid gap-5 border-b border-black-iron/10 pb-8 md:mb-14 lg:grid-cols-12 lg:items-end">
+                  <div className="lg:col-span-7">
+                    <p className="eyebrow eyebrow-accent">
+                      <span className="tabular-nums">
+                        {String(ci + 1).padStart(2, "0")}
+                      </span>
+                      {cat.tagline ? ` · ${cat.tagline}` : ""}
                     </p>
-                    <h2 className="mt-5 font-bold text-4xl md:text-6xl lg:text-7xl tracking-[-0.045em] leading-[0.94]">
+                    <h2 id={`cat-${cat.slug}`} className="t-h2 mt-4">
                       {cat.name}
                     </h2>
-                    {cat.description && (
-                      <p className="mt-6 max-w-2xl text-black-iron/65 text-[15px] md:text-[17px] font-light leading-[1.6]">
-                        {cat.description}
-                      </p>
-                    )}
                   </div>
-                  <div className="col-span-12 lg:col-span-4 lg:text-right">
-                    <p className="text-[10px] tracking-[0.32em] uppercase text-black-iron/45">
-                      {cat.items.length}{" "}
-                      {cat.items.length === 1 ? "Dish" : "Dishes"}
+                  {cat.description && (
+                    <p className="t-body max-w-md text-dark-grey lg:col-span-5 lg:justify-self-end lg:text-right">
+                      {cat.description}
                     </p>
-                  </div>
-                </div>
+                  )}
+                </header>
 
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={`${cat.id}-${layout}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                    className={cn(
-                      layout === "grid"
-                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-8 gap-y-14"
-                        : "",
-                    )}
-                  >
-                    {cat.items.map((item, i) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{
-                          duration: 0.7,
-                          delay: i * 0.04,
-                          ease: [0.22, 1, 0.36, 1],
-                        }}
-                      >
-                        <DishCard
-                          dish={item}
-                          layout={layout === "grid" ? "card" : "row"}
-                          onClick={() => setSelected(item)}
-                        />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </AnimatePresence>
+                <div
+                  className={cn(
+                    layout === "grid"
+                      ? "grid grid-cols-2 gap-x-3 gap-y-12 sm:gap-x-6 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-16"
+                      : "border-b border-[var(--color-border)]",
+                  )}
+                >
+                  {cat.items.map((item, i) => (
+                    <DishCard
+                      key={item.id}
+                      dish={item}
+                      layout={layout === "grid" ? "card" : "row"}
+                      onSelect={setSelected}
+                      imagePriority={ci === 0 && i < 2}
+                    />
+                  ))}
+                </div>
               </section>
             ))}
           </div>
@@ -269,9 +296,8 @@ export function MenuExplorer({
       </div>
 
       <DishDialog
-        open={!!selected}
-        onOpenChange={(o) => !o && setSelected(null)}
         dish={selected}
+        onOpenChange={(o) => !o && setSelected(null)}
         whatsapp={whatsapp}
       />
     </div>
@@ -291,17 +317,19 @@ function LayoutToggle({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={active}
+      aria-label={label}
+      title={label}
       className={cn(
-        "h-7 px-3 rounded-pill text-[10px] tracking-[0.22em] uppercase font-medium flex items-center gap-1.5 transition-colors",
+        "grid h-8 w-10 place-items-center rounded-pill transition-colors",
         active
           ? "bg-black-iron text-warm-white"
-          : "text-black-iron/60 hover:text-black-iron",
+          : "text-dark-grey hover:text-black-iron",
       )}
-      aria-label={label}
     >
-      <Icon className="h-3 w-3" strokeWidth={1.6} />
-      <span className="hidden lg:inline">{label}</span>
+      <Icon className="h-3.5 w-3.5" strokeWidth={1.6} />
     </button>
   );
 }

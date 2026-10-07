@@ -5,6 +5,7 @@ import {
   ok,
   parseJson,
   requireAuth,
+  revalidateSite,
   serverError,
 } from "@/lib/api";
 
@@ -12,10 +13,14 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await ctx.params;
-  const img = await prisma.galleryImage.findUnique({ where: { id } });
-  if (!img) return notFound();
-  return ok(img);
+  try {
+    const { id } = await ctx.params;
+    const img = await prisma.galleryImage.findUnique({ where: { id } });
+    if (!img) return notFound();
+    return ok(img);
+  } catch (e) {
+    return serverError(e);
+  }
 }
 
 export async function PATCH(
@@ -32,6 +37,7 @@ export async function PATCH(
       where: { id },
       data: parsed.data,
     });
+    revalidateSite();
     return ok(img);
   } catch (e) {
     return serverError(e);
@@ -47,6 +53,7 @@ export async function DELETE(
   const { id } = await ctx.params;
   try {
     await prisma.galleryImage.delete({ where: { id } });
+    revalidateSite();
     return ok({ ok: true });
   } catch (e) {
     return serverError(e);

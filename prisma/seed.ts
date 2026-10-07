@@ -1,8 +1,8 @@
-/* eslint-disable no-console */
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { pgConnectionString } from "../src/lib/pg-connection";
 import "dotenv/config";
 
 const connectionString = process.env.DATABASE_URL;
@@ -10,7 +10,9 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const pool = new Pool({ connectionString });
+const pool = new Pool({
+  connectionString: pgConnectionString(connectionString),
+});
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
@@ -514,7 +516,7 @@ async function main() {
         subtitle:
           "Three rotating khoresh, saffron rice, golden tahdig.",
         ctaLabel: "Discover",
-        ctaHref: "/menu/mains/shazdeh-mix",
+        ctaHref: "/menu/shazdeh-mix",
         imageUrl: IMG("shazdeh-mix.jpg"),
         position: "home_secondary",
         order: 1,

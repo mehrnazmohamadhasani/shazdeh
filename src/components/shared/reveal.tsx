@@ -1,51 +1,50 @@
 "use client";
 import * as React from "react";
-import { motion, useInView, type Variants } from "motion/react";
+import { motion, type Variants } from "motion/react";
+import { EASE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /*
- * Reveal — calm, slow, editorial. Per the brand guidelines:
- * smooth scrolling · fade reveals · soft hover. Avoid flashy.
+ * Reveal — calm fade-up on scroll. Per the brand guidelines: smooth
+ * scrolling, fade reveals, soft hover; nothing flashy. Travel is kept
+ * short (16px) and durations under a second so content never feels
+ * like it is waiting to appear.
  */
 
 const defaultVariants: Variants = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0 },
 };
-
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export function Reveal({
   children,
   className,
   delay = 0,
   amount = 0.2,
-  once = true,
   variants = defaultVariants,
-  duration = 1.0,
+  duration = 0.85,
+  as = "div",
 }: {
   children: React.ReactNode;
   className?: string;
   delay?: number;
   amount?: number;
-  once?: boolean;
   variants?: Variants;
   duration?: number;
+  as?: "div" | "li" | "figure";
 }) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { amount, once });
-
+  const Comp = motion[as];
   return (
-    <motion.div
-      ref={ref}
+    <Comp
       initial="hidden"
-      animate={inView ? "visible" : "hidden"}
+      whileInView="visible"
+      viewport={{ once: true, amount }}
       variants={variants}
       transition={{ duration, delay, ease: EASE }}
       className={cn(className)}
     >
       {children}
-    </motion.div>
+    </Comp>
   );
 }
 
@@ -54,24 +53,22 @@ export function RevealStagger({
   className,
   delay = 0,
   stagger = 0.08,
-  once = true,
-  amount = 0.2,
+  amount = 0.15,
+  as = "div",
 }: {
   children: React.ReactNode;
   className?: string;
   delay?: number;
   stagger?: number;
-  once?: boolean;
   amount?: number;
+  as?: "div" | "ul" | "ol";
 }) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { amount, once });
-
+  const Comp = motion[as];
   return (
-    <motion.div
-      ref={ref}
+    <Comp
       initial="hidden"
-      animate={inView ? "visible" : "hidden"}
+      whileInView="visible"
+      viewport={{ once: true, amount }}
       variants={{
         hidden: {},
         visible: {
@@ -81,29 +78,29 @@ export function RevealStagger({
       className={cn(className)}
     >
       {children}
-    </motion.div>
+    </Comp>
   );
 }
 
 export function RevealItem({
   children,
   className,
-  duration = 1.0,
+  duration = 0.85,
+  as = "div",
 }: {
   children: React.ReactNode;
   className?: string;
   duration?: number;
+  as?: "div" | "li" | "article";
 }) {
+  const Comp = motion[as];
   return (
-    <motion.div
-      variants={{
-        hidden: { opacity: 0, y: 24 },
-        visible: { opacity: 1, y: 0 },
-      }}
+    <Comp
+      variants={defaultVariants}
       transition={{ duration, ease: EASE }}
       className={cn(className)}
     >
       {children}
-    </motion.div>
+    </Comp>
   );
 }

@@ -4,12 +4,20 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
+import {
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  SESSION_COOKIE,
+  getAuthSecret,
+} from "@/lib/auth-secret";
 
-const COOKIE_NAME = "shazdeh_session";
 const SESSION_DURATION_DAYS = 7;
 
-const secret = new TextEncoder().encode(env.AUTH_SECRET);
+// A real bcrypt hash (cost 12) of a random string. Comparing against it
+// when the email is unknown keeps response time constant, so timing
+// can't be used to discover which admin emails exist.
+const TIMING_DUMMY_HASH =
+  "$2b$12$QBwXyIi1cRKQb3FPqWQf2eVZKXOoEX708pv9CjNwgrX1QDpBYCa6K";
 
 export type SessionUser = {
   id: string;
@@ -19,6 +27,8 @@ export type SessionUser = {
 };
 
 export async function signSession(user: SessionUser): Promise<string> {
+  const secret = getAuthSecret();
+  if (!secret) throw new Error("Admin sign-in is not configured");
   return new SignJWT({
     sub: user.id,
     email: user.email,
@@ -28,16 +38,19 @@ export async function signSession(user: SessionUser): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION_DAYS}d`)
-    .setIssuer("shazdeh.ae")
-    .setAudience("shazdeh.admin")
+    .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
     .sign(secret);
 }
 
 export async function verifySession(token: string): Promise<SessionUser | null> {
+  const secret = getAuthSecret();
+  if (!secret) return null;
   try {
     const { payload } = await jwtVerify(token, secret, {
-      issuer: "shazdeh.ae",
-      audience: "shazdeh.admin",
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+      algorithms: ["HS256"],
     });
     if (!payload.sub || !payload.email || !payload.role) return null;
     return {
@@ -53,7 +66,7 @@ export async function verifySession(token: string): Promise<SessionUser | null> 
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   return verifySession(token);
 }
@@ -68,10 +81,14 @@ export async function authenticate(
   email: string,
   password: string,
 ): Promise<SessionUser | null> {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return null;
+  const user = await prisma.user.findUnique({
+    where: { email: email.trim() },
+  });
+  const ok = await bcrypt.compare(
+    password,
+    user?.passwordHash ?? TIMING_DUMMY_HASH,
+  );
+  if (!user || !ok) return null;
   return {
     id: user.id,
     email: user.email,
@@ -83,7 +100,7 @@ export async function authenticate(
 export async function setSessionCookie(token: string) {
   const store = await cookies();
   store.set({
-    name: COOKIE_NAME,
+    name: SESSION_COOKIE,
     value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -95,7 +112,7 @@ export async function setSessionCookie(token: string) {
 
 export async function clearSessionCookie() {
   const store = await cookies();
-  store.delete(COOKIE_NAME);
+  store.delete(SESSION_COOKIE);
 }
 
-export const SESSION_COOKIE = COOKIE_NAME;
+export { SESSION_COOKIE };

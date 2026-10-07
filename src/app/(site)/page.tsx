@@ -1,50 +1,60 @@
+import type { Metadata } from "next";
 import { HomeHero } from "@/components/home/hero";
-import { HomeManifesto } from "@/components/home/manifesto";
 import { FeaturedDishes } from "@/components/home/featured-dishes";
-import { HomeValues } from "@/components/home/values";
+import { HomeManifesto } from "@/components/home/manifesto";
+import { HomeCraft } from "@/components/home/craft";
 import { GalleryPreview } from "@/components/home/gallery-preview";
-import { HomeCta } from "@/components/home/cta";
-import {
-  getActiveBanner,
-  getPopularDishes,
-  getGalleryImages,
-} from "@/lib/menu";
+import { OrderBand } from "@/components/home/order-band";
+import { JsonLd } from "@/components/shared/json-ld";
+import { getActiveBanner, getFeaturedDishes, getGalleryImages } from "@/lib/menu";
 import { getSettings } from "@/lib/settings";
-import { prisma } from "@/lib/prisma";
+import { deliveryPartners, findPlatform, getSocialLinks } from "@/lib/social";
+import { whatsappHref } from "@/lib/links";
+import { restaurantJsonLd } from "@/lib/seo";
 
 export const revalidate = 60;
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default async function HomePage() {
   const [banner, featured, gallery, settings, socials] = await Promise.all([
     getActiveBanner("home_hero"),
-    getPopularDishes(["Makaroni", "Loobia Polo", "Gheimeh Bademjan", "Ghormeh Sabzi"]),
+    getFeaturedDishes(4),
     getGalleryImages(8),
     getSettings(),
-    prisma.socialLink
-      .findMany({ where: { platform: "whatsapp", isActive: true } })
-      .catch(() => []),
+    getSocialLinks(),
   ]);
 
-  const whatsapp = settings.whatsapp ?? socials[0]?.url;
+  const whatsappNumber =
+    settings.whatsapp ?? findPlatform(socials, "whatsapp")?.url ?? undefined;
 
   return (
     <>
+      <JsonLd data={restaurantJsonLd(settings, socials)} />
       <HomeHero
         title={banner?.title}
         subtitle={banner?.subtitle}
+        videoSrc={settings.heroVideoUrl}
       />
+      <FeaturedDishes dishes={featured} whatsapp={whatsappNumber} />
       <HomeManifesto />
-      <FeaturedDishes dishes={featured} whatsapp={whatsapp} />
-      <HomeValues />
+      <HomeCraft />
       <GalleryPreview
-        images={gallery.map((g) => ({
+        images={gallery.map((g, i) => ({
           id: g.id,
           url: g.imageUrl,
-          alt: g.title ?? "",
-          title: g.title,
+          alt: g.title ?? `A SHĀZDEH plate, photograph ${i + 1}`,
         }))}
       />
-      <HomeCta imageUrl="/menu/baghali-polo-mahiche.jpg" whatsapp={whatsapp} />
+      <OrderBand
+        partners={deliveryPartners(socials)}
+        whatsapp={whatsappHref(
+          whatsappNumber,
+          "Hello SHĀZDEH — I'd like to place an order.",
+        )}
+      />
     </>
   );
 }

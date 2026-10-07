@@ -1,206 +1,215 @@
 "use client";
 import * as React from "react";
 import Image from "next/image";
-import { motion } from "motion/react";
-import { Sparkles, Leaf, Flame } from "lucide-react";
+import Link from "next/link";
+import { Flame, Leaf } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { spiceLabel, type DishCardData } from "@/lib/dish";
 import { formatPrice, cn } from "@/lib/utils";
+
+export type { DishCardData } from "@/lib/dish";
 
 /*
  * Editorial dish card. Three layouts:
- *   – card    : image on top, name + price below (Aesop product card)
- *   – row     : horizontal magazine-style row for list view
- *   – feature : tall hero card, used on the home signature grid
+ *   – card    : 4:5 photograph, name + price beneath (menu grid)
+ *   – row     : magazine-style row with a small thumbnail (list view)
+ *   – feature : arch-framed photograph — the brand's iwan motif —
+ *               used for the home page signature dishes
  *
- * Cards stay quiet: hairline borders, no harsh shadows, restrained
- * type. Terracotta only as a single accent (price color, signature).
+ * Each card is an <article>; the dish name is a real heading whose
+ * button is stretched over the whole card, so the card is one large
+ * target while screen readers get a clean "heading → button" pair.
  */
-
-export type DishCardData = {
-  id: string;
-  slug: string;
-  name: string;
-  nameFa?: string | null;
-  description?: string | null;
-  price: number;
-  currency: string;
-  imageUrl?: string | null;
-  spicyLevel: number;
-  isVegetarian: boolean;
-  isBestseller: boolean;
-  isNew: boolean;
-  isSignature: boolean;
-  isAvailable: boolean;
-  category: { name: string; slug: string };
-};
-
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export function DishCard({
   dish,
   layout = "card",
-  onClick,
-  priority = false,
+  onSelect,
+  href,
+  imagePriority = false,
 }: {
   dish: DishCardData;
   layout?: "card" | "row" | "feature";
-  onClick?: () => void;
-  priority?: boolean;
+  /** Opens a quick view (menu) … */
+  onSelect?: (dish: DishCardData) => void;
+  /** … or navigates (related dishes on a dish page). */
+  href?: string;
+  imagePriority?: boolean;
 }) {
+  const soldOut = !dish.isAvailable;
+
+  const nameButton = href ? (
+    <Link href={href} className="stretched focus-visible:outline-none">
+      {dish.title}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      onClick={() => onSelect?.(dish)}
+      className="stretched [text-align:inherit] focus-visible:outline-none"
+    >
+      {dish.title}
+    </button>
+  );
+
+  const focusRing =
+    "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-terracotta";
+
   if (layout === "row") {
     return (
-      <motion.button
-        type="button"
-        onClick={onClick}
-        whileHover={{ x: 4 }}
-        transition={{ duration: 0.5, ease: EASE }}
-        className="group/row w-full text-left flex items-start gap-6 md:gap-8 py-7 border-t border-[var(--color-border)] first:border-t-0"
+      <article
+        className={cn(
+          "group relative flex items-start gap-5 rounded-sm border-t border-[var(--color-border)] py-6 md:gap-8 md:py-7",
+          focusRing,
+        )}
       >
-        {dish.imageUrl ? (
-          <div className="relative h-20 w-20 md:h-24 md:w-24 overflow-hidden rounded-sm shrink-0 bg-[var(--color-card)]">
+        <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-sm bg-[var(--color-card)] md:h-28 md:w-24">
+          {dish.imageUrl && (
             <Image
               src={dish.imageUrl}
-              alt={dish.name}
+              alt=""
               fill
               sizes="96px"
-              className="object-cover transition-transform duration-1000 group-hover/row:scale-110"
+              className={cn("img-zoom object-cover", soldOut && "opacity-50 grayscale")}
             />
-          </div>
-        ) : (
-          <div className="h-20 w-20 md:h-24 md:w-24 shrink-0 rounded-sm border border-[var(--color-border)]" />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-4 justify-between">
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h3 className="font-bold text-2xl md:text-[28px] text-[var(--color-foreground)] leading-tight tracking-[-0.03em]">
-                {dish.name}
+              <h3 className="t-h3 transition-colors duration-300 group-hover:text-terracotta-ink">
+                {nameButton}
               </h3>
-              {dish.nameFa && (
-                <p className="text-[var(--color-foreground)]/45 text-sm mt-1 font-light">
-                  {dish.nameFa}
-                </p>
-              )}
+              <DishSubtitle dish={dish} className="mt-1.5" />
             </div>
-            <div className="text-right shrink-0">
-              <p className="font-bold text-lg md:text-xl text-terracotta tabular-nums">
-                {formatPrice(dish.price, dish.currency)}
-              </p>
-            </div>
+            <Price dish={dish} className="mt-1 text-base md:text-lg" />
           </div>
           {dish.description && (
-            <p className="mt-3 text-[var(--color-foreground)]/65 text-[14px] md:text-[15px] leading-[1.55] line-clamp-2 max-w-2xl font-light">
+            <p className="t-body mt-3 line-clamp-2 max-w-2xl text-dark-grey">
               {dish.description}
             </p>
           )}
           <DishBadges dish={dish} className="mt-4" />
         </div>
-      </motion.button>
+      </article>
     );
   }
 
   if (layout === "feature") {
     return (
-      <motion.button
-        type="button"
-        onClick={onClick}
-        whileHover={{ y: -2 }}
-        transition={{ duration: 0.6, ease: EASE }}
-        className="group/feat block w-full text-left"
-      >
-        <div className="relative aspect-[4/5] overflow-hidden bg-[var(--color-card)] rounded-sm">
+      <article className={cn("group relative", focusRing)}>
+        <div className="arch relative aspect-[4/5] overflow-hidden bg-[var(--color-card)]">
           {dish.imageUrl && (
             <Image
               src={dish.imageUrl}
-              alt={dish.name}
+              alt=""
               fill
-              priority={priority}
-              sizes="(min-width: 1024px) 50vw, 100vw"
-              className="object-cover transition-transform duration-[1500ms] ease-out group-hover/feat:scale-[1.04]"
+              preload={imagePriority}
+              sizes="(min-width: 1024px) 22vw, (min-width: 640px) 45vw, 88vw"
+              className="img-zoom object-cover"
             />
           )}
+          {dish.isSignature && (
+            <span className="absolute inset-x-0 bottom-4 z-[2] flex justify-center">
+              <Badge variant="solid">Signature</Badge>
+            </span>
+          )}
         </div>
-        <div className="mt-5 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] tracking-[0.22em] uppercase text-[var(--color-foreground)]/50">
-              {dish.category.name}
-            </p>
-            <h3 className="mt-2 font-bold text-2xl md:text-3xl text-[var(--color-foreground)] tracking-[-0.03em] leading-tight">
-              {dish.name}
-            </h3>
-          </div>
-          <span className="font-bold text-base md:text-lg text-terracotta tabular-nums shrink-0 mt-1">
-            {formatPrice(dish.price, dish.currency)}
-          </span>
+        <div className="mt-6 text-center">
+          <p className="caption">{dish.category.name}</p>
+          <h3 className="t-h3 mt-3 transition-colors duration-300 group-hover:text-terracotta-ink">
+            {nameButton}
+          </h3>
+          <DishSubtitle dish={dish} className="mt-2 justify-center" />
+          <Price dish={dish} className="mt-3 block text-[15px]" />
         </div>
-      </motion.button>
+      </article>
     );
   }
 
-  // card (default)
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.6, ease: EASE }}
-      className="group/card block w-full text-left"
-    >
-      <div className="relative overflow-hidden rounded-sm bg-[var(--color-card)] aspect-[4/5]">
+    <article className={cn("group relative rounded-sm", focusRing)}>
+      <div className="relative aspect-[4/5] overflow-hidden rounded-sm bg-[var(--color-card)]">
         {dish.imageUrl ? (
           <Image
             src={dish.imageUrl}
-            alt={dish.name}
+            alt=""
             fill
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            className={cn(
-              "object-cover transition-transform duration-[1200ms] ease-out group-hover/card:scale-[1.05]",
-              !dish.isAvailable && "grayscale opacity-50",
-            )}
+            preload={imagePriority}
+            sizes="(min-width: 1280px) 26vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+            className={cn("img-zoom object-cover", soldOut && "opacity-50 grayscale")}
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center text-[var(--color-foreground)]/15">
-            <span className="font-bold text-6xl">{dish.name[0]}</span>
+          <div className="absolute inset-0 grid place-items-center">
+            <span className="font-[family-name:var(--font-logo)] text-7xl text-black-iron/15">
+              {dish.title[0]}
+            </span>
           </div>
         )}
-        {!dish.isAvailable && (
-          <div className="absolute top-4 left-4">
-            <Badge variant="outline" className="bg-warm-white/85">
-              Sold out
-            </Badge>
-          </div>
-        )}
-        {dish.isSignature && (
-          <div className="absolute top-4 right-4">
-            <Badge variant="terracotta">Signature</Badge>
-          </div>
-        )}
-      </div>
-      <div className="mt-4 flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="font-bold text-lg md:text-xl text-[var(--color-foreground)] tracking-[-0.025em] leading-tight">
-            {dish.name}
-          </h3>
-          {dish.nameFa && (
-            <p className="mt-1 text-[var(--color-foreground)]/45 text-xs font-light">
-              {dish.nameFa}
-            </p>
-          )}
+        <div className="absolute left-3 top-3 z-[2] flex flex-wrap gap-1.5">
+          {soldOut && <Badge variant="solid">Sold out</Badge>}
+          {dish.isSignature && <Badge variant="terracotta">Signature</Badge>}
         </div>
-        <span className="font-bold text-sm md:text-base text-terracotta tabular-nums shrink-0 mt-1">
-          {formatPrice(dish.price, dish.currency)}
-        </span>
+      </div>
+      <div className="mt-4 flex flex-col gap-1.5 sm:mt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-bold leading-tight tracking-[-0.02em] transition-colors duration-300 group-hover:text-terracotta-ink sm:text-[1.1875rem] sm:tracking-[-0.025em] md:text-xl">
+            {nameButton}
+          </h3>
+          <DishSubtitle dish={dish} className="mt-1.5" />
+        </div>
+        <Price dish={dish} className="text-[14px] sm:mt-0.5 sm:text-[15px]" />
       </div>
       {dish.description && (
-        <p className="mt-2 text-[13px] font-light text-[var(--color-foreground)]/55 leading-[1.55] line-clamp-2">
+        <p className="mt-2.5 line-clamp-2 text-[14px] leading-[1.6] text-dark-grey max-sm:hidden">
           {dish.description}
         </p>
       )}
-      <DishBadges dish={dish} className="mt-3" hideSignature />
-    </motion.button>
+      <DishBadges dish={dish} className="mt-3 sm:mt-3.5" hideSignature />
+    </article>
   );
 }
 
-function DishBadges({
+/** Portion · Persian name, e.g. "Large · فسنجان" */
+export function DishSubtitle({
+  dish,
+  className,
+}: {
+  dish: DishCardData;
+  className?: string;
+}) {
+  if (!dish.portion && !dish.nameFa) return null;
+  return (
+    <p className={cn("flex items-baseline gap-2 text-[13px] text-dark-grey", className)}>
+      {dish.portion && (
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.18em]">
+          {dish.portion}
+        </span>
+      )}
+      {dish.portion && dish.nameFa && <span aria-hidden>·</span>}
+      {dish.nameFa && (
+        <span lang="fa" dir="rtl" className="text-[14px]">
+          {dish.nameFa}
+        </span>
+      )}
+    </p>
+  );
+}
+
+function Price({ dish, className }: { dish: DishCardData; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 font-semibold tabular-nums tracking-[-0.01em] text-terracotta-ink",
+        className,
+      )}
+    >
+      {formatPrice(dish.price, dish.currency)}
+    </span>
+  );
+}
+
+export function DishBadges({
   dish,
   className,
   hideSignature,
@@ -209,32 +218,38 @@ function DishBadges({
   className?: string;
   hideSignature?: boolean;
 }) {
+  const spice = spiceLabel(dish.spicyLevel);
   const items: React.ReactNode[] = [];
   if (dish.isSignature && !hideSignature)
     items.push(
       <Badge key="sig" variant="signature">
-        <Sparkles className="h-2.5 w-2.5" strokeWidth={1.6} />
         Signature
       </Badge>,
     );
   if (dish.isBestseller && !dish.isSignature)
-    items.push(<Badge key="best" variant="default">Bestseller</Badge>);
-  if (dish.isNew) items.push(<Badge key="new" variant="new">New</Badge>);
+    items.push(
+      <Badge key="best" variant="outline">
+        Most loved
+      </Badge>,
+    );
+  if (dish.isNew)
+    items.push(
+      <Badge key="new" variant="new">
+        New
+      </Badge>,
+    );
   if (dish.isVegetarian)
     items.push(
       <Badge key="veg" variant="veg">
-        <Leaf className="h-2.5 w-2.5" strokeWidth={1.6} /> Veg
+        <Leaf className="h-2.5 w-2.5" strokeWidth={1.8} aria-hidden />
+        Vegetarian
       </Badge>,
     );
-  if (dish.spicyLevel > 0)
+  if (spice)
     items.push(
       <Badge key="spi" variant="spicy">
-        <Flame className="h-2.5 w-2.5" strokeWidth={1.6} />
-        {dish.spicyLevel >= 3
-          ? "Hot"
-          : dish.spicyLevel >= 2
-            ? "Medium"
-            : "Mild"}
+        <Flame className="h-2.5 w-2.5" strokeWidth={1.8} aria-hidden />
+        {spice}
       </Badge>,
     );
   if (items.length === 0) return null;

@@ -1,9 +1,9 @@
 # Shazdeh — A Persian Kitchen, Reimagined in Dubai
 
-A premium, production-ready digital menu platform for **Shazdeh**, a modern
-Iranian-inspired kitchen brand based in Dubai. This is not a restaurant
-template — it is a luxury lifestyle digital food platform with a
-cinematic public site and a full admin atelier (CMS) behind it.
+A premium digital platform for **SHĀZDEH**, a contemporary Persian food
+brand in Dubai. SHĀZDEH is **delivery-only** — every primary action on the
+public site leads to ordering (delivery partners or WhatsApp). Behind it
+sits a full admin atelier (CMS).
 
 ```
 shazdeh ── public site (cinematic, mobile-first, SEO-ready)
@@ -41,6 +41,8 @@ npm install
 cp .env.example .env
 
 # 3. Migrate + seed (creates the Shazdeh menu, admin user, banners…)
+#    ⚠ Point DATABASE_URL at a local/dev database first — seeding deletes
+#    and recreates banners, gallery images and social links.
 npm run db:migrate
 npm run db:seed
 
@@ -51,11 +53,9 @@ npm run dev
 Open `http://localhost:3000` — the public site.
 Open `http://localhost:3000/login` — the admin atelier.
 
-Default admin credentials (from `.env`):
-
-```
-admin@shazdeh.ae / shazdeh-admin
-```
+Default admin credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
+`.env` (seed only). **Change the password before deploying** — the example
+value is public.
 
 ---
 
@@ -76,17 +76,21 @@ shazdeh/
 ├── scripts/
 │   └── optimize-images.ts       # One-shot Sharp pipeline
 └── src/
-    ├── middleware.ts            # /admin auth gate
+    ├── proxy.ts                 # /admin auth gate (Next 16 "proxy")
     ├── app/
     │   ├── layout.tsx           # Root: fonts, theme, toaster, metadata
     │   ├── (site)/              # Route group · public website
-    │   │   ├── layout.tsx       # SiteNav + SiteFooter
-    │   │   ├── page.tsx         # Cinematic home
-    │   │   ├── menu/page.tsx    # Dynamic menu w/ filters & item dialog
-    │   │   ├── about/page.tsx   # Editorial brand story
-    │   │   ├── gallery/page.tsx # Editorial masonry + lightbox
-    │   │   ├── contact/page.tsx # WhatsApp / Instagram / delivery / map
+    │   │   ├── layout.tsx       # SiteNav + SiteFooter + skip link
+    │   │   ├── page.tsx         # Home: hero film, signature dishes, story,
+    │   │   │                    #   craft, gallery strip, order band
+    │   │   ├── menu/page.tsx    # Menu explorer (filters, search, quick view)
+    │   │   ├── menu/[slug]/     # Dish pages (SSG + ISR, MenuItem JSON-LD)
+    │   │   ├── order/page.tsx   # Delivery partners, WhatsApp, hours, FAQ
+    │   │   ├── about/page.tsx   # Brand story, values, hospitality
+    │   │   ├── gallery/page.tsx # Editorial masonry + accessible lightbox
+    │   │   ├── error.tsx        # Friendly error state
     │   │   └── not-found.tsx
+    │   ├── not-found.tsx        # Branded 404 for unmatched URLs
     │   ├── login/page.tsx       # Admin sign-in
     │   ├── admin/               # Auth-gated atelier
     │   │   ├── layout.tsx
@@ -106,8 +110,9 @@ shazdeh/
     │   │   ├── social/[id]/
     │   │   ├── settings/
     │   │   └── upload/
-    │   ├── sitemap.ts
-    │   └── robots.ts
+    │   ├── sitemap.ts           # Static pages + every dish page
+    │   ├── robots.ts
+    │   └── opengraph-image.jpg  # Default social card
     ├── components/
     │   ├── ui/                  # Primitives (Button, Input, Dialog, …)
     │   ├── brand/               # Wordmark
@@ -136,29 +141,33 @@ shazdeh/
 
 ## Design system
 
-A bespoke **Persian-luxury** palette defined in `src/app/globals.css`:
+Built to the official brand guidelines (`brand-assets/BrandGuidelines-SHAZDEH.pdf`)
+and defined in `src/app/globals.css`.
 
-| Token        | Value                                         | Use                |
-| ------------ | --------------------------------------------- | ------------------ |
-| `--color-onyx`        | warm near-black                       | base background    |
-| `--color-ink`         | deep ink                              | sections / cards   |
-| `--color-bone`        | warm bone                             | primary text       |
-| `--color-cream`       | soft cream                            | accents            |
-| `--color-saffron`     | Iranian saffron gold                  | brand accent       |
-| `--color-brass`       | deep brass                            | gradients          |
-| `--color-pomegranate` | deep pomegranate red                  | destructive        |
-| `--color-pistachio`   | pistachio green                       | vegetarian tag     |
+**Colour** — Terracotta `#ce4927`, Warm White `#fdf6ec`, Black, Dark Grey
+`#494e54`, Iron `#dbdee3`, plus the spice palette used sparingly.
+`terracotta-ink` (`#b0391b`) is the AA-compliant terracotta for small text;
+the brand terracotta is used for fills and large type.
 
-Type stack:
+**Type** — Inter (variable) for everything: Bold headlines, Light body.
+Persian script is set in Vazirmatn (`lang="fa"`). The logotype fallback is
+set in Bodoni Moda until the official SVG is uploaded (Settings → Logo URL).
+Fluid scale utilities: `t-display`, `t-h1`, `t-h2`, `t-h3`, `t-lead`,
+`t-body`, `eyebrow`, `caption`.
 
-| Family           | Use                              |
-| ---------------- | -------------------------------- |
-| Cormorant Garamond (serif) | display, editorial headings |
-| Inter (sans)     | UI, body, eyebrows               |
-| Allura (script)  | brand flourishes                 |
+**Layout** — `container-shazdeh` (12-col desktop / 4-col mobile margins),
+`section` / `section-sm` for vertical rhythm.
 
-Motion — easing `cubic-bezier(0.22, 1, 0.36, 1)` for a slow, cinematic feel.
-Reveal-on-scroll, parallax, and shared-layout transitions throughout.
+**Motif** — the Persian arch from the brand's social templates: `arch`
+(image frame) and `<ArchLines />` (hairline drawing). Used with restraint.
+
+**Components** — `Button` (primary · outline · light · outline-light …),
+`Badge`, `Dialog` (bottom sheet on phones), `SectionHeading`, `TextLink`,
+`PageHero`, `Reveal`, `DishCard` (card · row · feature).
+
+**Motion** — one easing curve (`lib/motion.ts`), short reveals, CSS-driven
+hero entrances (no LCP delay). `MotionConfig reducedMotion="user"` plus a
+CSS reduced-motion guard; the hero video has a pause control.
 
 ---
 
@@ -206,7 +215,12 @@ All routes live under `/api/*` and respond JSON. Mutating routes
 | PATCH  | `/api/settings`              | admin                          |
 | POST   | `/api/upload`                | admin · multipart `file`       |
 
-Validation is enforced with Zod; bad payloads get `422` with details.
+Validation is enforced with Zod; bad payloads get `422` with a readable
+first-issue message. Links are restricted to http(s)/mailto/tel/relative
+paths. Unique-constraint and not-found DB errors map to `409` / `404`; other
+server errors return a generic message (details are logged, never sent).
+Every successful mutation revalidates the public site immediately.
+Sign-in is rate-limited (per instance) and timing-safe.
 
 ---
 
@@ -226,26 +240,12 @@ Add new backends by extending the switch in `storage.ts`.
 
 ---
 
-## Animation strategy
-
-- **Cinematic, never busy.** Slow easing curves, long durations, generous
-  whitespace.
-- **Hero parallax** with `useScroll` + `useTransform` for foreground /
-  background drift.
-- **Stagger reveal** for grids of dishes / pillars / values via the
-  `<Reveal>` and `<RevealStagger>` helpers.
-- **Layout transitions** for nav underline (`layoutId="nav-underline"`).
-- **Lightbox** with keyboard nav (arrows, esc).
-- **Marquee** style horizontal scroll for the home gallery preview.
-- All animations respect `prefers-reduced-motion` (browser default).
-
----
-
 ## Responsive strategy
 
-Mobile-first — every section starts at full-bleed mobile and grows into
-multi-column desktop layouts. Sticky filter bar on the menu, full-screen
-mobile nav drawer, and collapsible admin sidebar for ≥ lg breakpoints.
+Designed per breakpoint rather than shrunk: phones get a two-up dish grid,
+a snap carousel of arch-framed signature dishes, a slim sticky category
+rail (search and filters stay in the flow), bottom-sheet dish details and
+a full-screen accessible menu. 44px minimum touch targets throughout.
 
 ---
 
@@ -296,7 +296,7 @@ sure the host has access to `node_modules/.prisma` and the
 | Command                  | What it does                              |
 | ------------------------ | ----------------------------------------- |
 | `npm run dev`            | Local dev server                          |
-| `npm run build`          | Production build (also runs `prisma generate`) |
+| `npm run build`          | `prisma generate` + **`prisma db push`** + `next build` — note the push runs against whatever `DATABASE_URL` points at |
 | `npm run start`          | Run production build                      |
 | `npm run lint`           | ESLint                                    |
 | `npm run db:migrate`     | Create + apply a new dev migration        |

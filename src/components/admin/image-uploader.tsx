@@ -4,6 +4,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { Upload, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { messageFromUnknown } from "@/lib/error-message";
 import { uploadAdminImage } from "@/lib/upload-admin-image";
 
 export function ImageUploader({
@@ -33,7 +34,7 @@ export function ImageUploader({
       onChange(data.url);
       toast.success("Image uploaded");
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(messageFromUnknown(e, "Upload failed"));
     } finally {
       setPending(false);
       if (inputRef.current) inputRef.current.value = "";

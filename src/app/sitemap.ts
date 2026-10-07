@@ -1,38 +1,39 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
+import { absoluteUrl } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    "",
-    "/menu",
-    "/about",
-    "/gallery",
-    "/contact",
-  ].map((path) => ({
-    url: `${base}${path}`,
+    { path: "/", priority: 1, changeFrequency: "weekly" as const },
+    { path: "/menu", priority: 0.9, changeFrequency: "weekly" as const },
+    { path: "/order", priority: 0.8, changeFrequency: "monthly" as const },
+    { path: "/about", priority: 0.6, changeFrequency: "yearly" as const },
+    { path: "/gallery", priority: 0.5, changeFrequency: "monthly" as const },
+  ].map((r) => ({
+    url: absoluteUrl(r.path),
     lastModified: now,
-    changeFrequency: path === "" ? "daily" : "weekly",
-    priority: path === "" ? 1 : 0.8,
+    changeFrequency: r.changeFrequency,
+    priority: r.priority,
   }));
 
   try {
     const items = await prisma.menuItem.findMany({
-      where: { isAvailable: true },
-      select: { slug: true, updatedAt: true, category: { select: { slug: true } } },
+      where: { category: { isActive: true } },
+      select: { slug: true, updatedAt: true, imageUrl: true },
+      orderBy: { order: "asc" },
     });
-    const itemRoutes: MetadataRoute.Sitemap = items.map((i) => ({
-      url: `${base}/menu#${i.slug}`,
+    const dishRoutes: MetadataRoute.Sitemap = items.map((i) => ({
+      url: absoluteUrl(`/menu/${i.slug}`),
       lastModified: i.updatedAt,
-      changeFrequency: "weekly",
-      priority: 0.6,
+      changeFrequency: "monthly",
+      priority: 0.7,
+      ...(i.imageUrl ? { images: [absoluteUrl(i.imageUrl)] } : {}),
     }));
-    return [...staticRoutes, ...itemRoutes];
+    return [...staticRoutes, ...dishRoutes];
   } catch {
     return staticRoutes;
   }

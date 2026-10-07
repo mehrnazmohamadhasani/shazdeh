@@ -1,3 +1,4 @@
+import { messageFromApiJson } from "@/lib/error-message";
 import { MAX_DIRECT_CLOUDINARY_BYTES } from "@/lib/upload-limits";
 
 export type AdminUploadResult = {
@@ -17,8 +18,9 @@ let uploadConfigCache: UploadConfig | null = null;
 async function readApiError(res: Response, fallback: string): Promise<string> {
   const text = await res.text();
   try {
-    const body = text ? (JSON.parse(text) as { error?: string }) : null;
-    if (body?.error) return body.error;
+    const body = text ? JSON.parse(text) : null;
+    const msg = messageFromApiJson(body, fallback);
+    if (msg) return msg;
   } catch {
     if (text) return `${fallback}: ${text.slice(0, 200)}`;
   }

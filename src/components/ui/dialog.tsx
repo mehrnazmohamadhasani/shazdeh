@@ -4,6 +4,12 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/*
+ * Dialog — a centred card on larger screens, a bottom sheet on phones
+ * (thumb-reachable close, natural swipe-to-scroll). Focus trap, Escape
+ * and scroll lock come from Radix.
+ */
+
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
@@ -16,9 +22,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black-iron/85 backdrop-blur-md",
-      "data-[state=open]:animate-in data-[state=open]:fade-in-0",
-      "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+      "overlay-anim fixed inset-0 z-50 bg-black-iron/70 backdrop-blur-[6px]",
       className,
     )}
     {...props}
@@ -28,26 +32,32 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    closeClassName?: string;
+  }
+>(({ className, children, closeClassName, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 w-full max-w-3xl translate-x-[-50%] translate-y-[-50%]",
-        "bg-warm-white text-black-iron shadow-[0_30px_120px_-20px_rgba(0,0,0,0.4)]",
-        "rounded-2xl overflow-hidden",
-        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]",
-        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98]",
-        "duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "dialog-anim fixed z-50 w-full overflow-y-auto overscroll-contain bg-warm-white text-black-iron shadow-[0_30px_120px_-20px_rgba(0,0,0,0.45)] focus:outline-none",
+        // phone: bottom sheet
+        "inset-x-0 bottom-0 max-h-[92svh] rounded-t-[22px]",
+        // tablet+: centred card
+        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[88svh] sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[18px]",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-5 top-5 z-10 grid h-9 w-9 place-items-center rounded-full bg-warm-white/80 text-black-iron/70 backdrop-blur transition-colors hover:bg-warm-white hover:text-black-iron">
-        <X className="h-4 w-4" strokeWidth={1.5} />
+      <DialogPrimitive.Close
+        className={cn(
+          "absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-warm-white/90 text-black-iron/80 backdrop-blur transition-colors hover:bg-warm-white hover:text-black-iron",
+          closeClassName,
+        )}
+      >
+        <X className="h-[18px] w-[18px]" strokeWidth={1.5} />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -82,7 +92,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "font-bold text-3xl text-black-iron leading-[0.96] tracking-[-0.04em]",
+      "text-3xl font-bold leading-[0.98] tracking-[-0.04em] text-black-iron",
       className,
     )}
     {...props}
@@ -97,7 +107,7 @@ const DialogDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     className={cn(
-      "text-[15px] font-light text-dark-grey leading-[1.55]",
+      "text-[15px] font-light leading-[1.6] text-dark-grey",
       className,
     )}
     {...props}

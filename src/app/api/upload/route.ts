@@ -48,6 +48,6 @@ export async function POST(req: Request) {
     const result = await uploadImage(file, { folder });
     return NextResponse.json(result, { status: 201 });
   } catch (e) {
-    return serverError(e);
+    return serverError(e, { expose: true });
   }
 }

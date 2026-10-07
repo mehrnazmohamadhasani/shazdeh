@@ -120,9 +120,7 @@ export function AdminSidebar({
   );
 }
 
-export function AdminMobileBar({
-  user: _user,
-}: {
+export function AdminMobileBar({}: {
   user: { email: string; name: string | null };
 }) {
   const pathname = usePathname();

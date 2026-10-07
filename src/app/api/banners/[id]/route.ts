@@ -5,6 +5,7 @@ import {
   ok,
   parseJson,
   requireAuth,
+  revalidateSite,
   serverError,
 } from "@/lib/api";
 
@@ -12,10 +13,14 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await ctx.params;
-  const banner = await prisma.banner.findUnique({ where: { id } });
-  if (!banner) return notFound();
-  return ok(banner);
+  try {
+    const { id } = await ctx.params;
+    const banner = await prisma.banner.findUnique({ where: { id } });
+    if (!banner) return notFound();
+    return ok(banner);
+  } catch (e) {
+    return serverError(e);
+  }
 }
 
 export async function PATCH(
@@ -32,6 +37,7 @@ export async function PATCH(
       where: { id },
       data: parsed.data,
     });
+    revalidateSite();
     return ok(b);
   } catch (e) {
     return serverError(e);
@@ -47,6 +53,7 @@ export async function DELETE(
   const { id } = await ctx.params;
   try {
     await prisma.banner.delete({ where: { id } });
+    revalidateSite();
     return ok({ ok: true });
   } catch (e) {
     return serverError(e);

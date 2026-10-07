@@ -1,10 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { menuItemSchema } from "@/lib/validators";
-import { created, ok, parseJson, requireAuth, serverError } from "@/lib/api";
+import { getSessionUser } from "@/lib/auth";
+import {
+  created,
+  ok,
+  parseJson,
+  requireAuth,
+  revalidateSite,
+  serverError,
+} from "@/lib/api";
 
 export async function GET() {
   try {
+    // Hidden / inactive records are only listed for signed-in admins.
+    const isAdmin = Boolean(await getSessionUser());
     const items = await prisma.menuItem.findMany({
+      where: isAdmin ? undefined : { category: { isActive: true } },
       orderBy: [{ category: { order: "asc" } }, { order: "asc" }],
       include: { category: true, variants: true },
     });
@@ -24,6 +35,7 @@ export async function POST(req: Request) {
       data: parsed.data,
       include: { category: true },
     });
+    revalidateSite();
     return created(item);
   } catch (e) {
     return serverError(e);

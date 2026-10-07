@@ -26,6 +26,6 @@ export async function POST(req: Request) {
     );
     return NextResponse.json(payload);
   } catch (e) {
-    return serverError(e);
+    return serverError(e, { expose: true });
   }
 }

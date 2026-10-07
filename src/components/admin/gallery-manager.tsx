@@ -7,6 +7,7 @@ import { Plus, Trash2, Upload, Loader2, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { messageFromApiJson, messageFromUnknown } from "@/lib/error-message";
 import { uploadAdminImage } from "@/lib/upload-admin-image";
 
 type Img = {
@@ -20,9 +21,9 @@ type Img = {
 
 async function apiError(res: Response, fallback: string): Promise<string> {
   try {
-    const body = (await res.json()) as { error?: string; issues?: unknown };
-    if (body.error) return body.error;
-    if (body.issues) return `${fallback} (validation failed)`;
+    const body = await res.json();
+    const msg = messageFromApiJson(body, fallback);
+    if (msg) return msg;
   } catch {
     /* non-JSON body */
   }
@@ -70,7 +71,7 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
       }
       router.refresh();
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(messageFromUnknown(e, "Upload failed"));
     } finally {
       setPending(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -87,7 +88,7 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
       if (!res.ok) throw new Error("Failed to update");
       router.refresh();
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(messageFromUnknown(e, "Update failed"));
     }
   }
 
@@ -99,7 +100,7 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
       toast.success("Image deleted");
       router.refresh();
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(messageFromUnknown(e, "Delete failed"));
     }
   }
 

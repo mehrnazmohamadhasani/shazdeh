@@ -1,57 +1,83 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Bodoni_Moda, Inter, Vazirmatn } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
+import { env } from "@/lib/env";
 
-// Inter is the only typeface in the SHĀZDEH system.
-// Light + Bold are the workhorse weights per the brand book;
-// medium/semibold are loaded for UI labels and CTAs.
+// Inter is the brand typeface — loaded as a single variable file so
+// Light (body) and Bold (headlines) cost one request, not six.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+// Persian dish names (نام فارسی) — Vazirmatn pairs with Inter's
+// proportions. Not preloaded: only menu surfaces use it.
+const vazirmatn = Vazirmatn({
+  variable: "--font-vazirmatn",
+  subsets: ["arabic"],
+  display: "swap",
+  preload: false,
+});
+
+// The SHĀZDEH logotype is a high-contrast Didone. Until the official
+// SVG is uploaded in Settings → Logo, the wordmark is set in Bodoni
+// Moda (optical sizes on) as the closest open-licence match.
+const bodoni = Bodoni_Moda({
+  variable: "--font-bodoni",
+  subsets: ["latin", "latin-ext"],
+  axes: ["opsz"],
   display: "swap",
 });
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings();
+  const title = s.metaTitle ?? `${s.brandName} — Persian Cuisine · Dubai`;
+  const description =
+    s.metaDesc ??
+    "Contemporary Persian cuisine, delivered across Dubai. Slow-cooked khoresh, saffron rice and golden tahdig — from our heart to your home.";
+
   return {
-    title: {
-      default: s.metaTitle ?? `${s.brandName} — Persian Cuisine`,
-      template: `%s · ${s.brandName}`,
-    },
-    description:
-      s.metaDesc ??
-      "SHĀZDEH — a contemporary Persian food brand rooted in heritage, expressed through a modern visual language. From our heart to your home, in Dubai.",
-    metadataBase: new URL(
-      process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-    ),
+    metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL),
+    title: { default: title, template: `%s · ${s.brandName}` },
+    description,
+    applicationName: s.brandName,
+    keywords: [
+      "SHĀZDEH",
+      "Shazdeh",
+      "Persian food Dubai",
+      "Persian food delivery Dubai",
+      "Iranian food Dubai",
+      "Ghormeh Sabzi Dubai",
+      "Fesenjan",
+      "Tahdig",
+      "Persian cuisine",
+    ],
     openGraph: {
       type: "website",
-      title: s.metaTitle ?? s.brandName,
-      description: s.metaDesc ?? "Contemporary Persian cuisine in Dubai.",
-      images: s.ogImageUrl ? [s.ogImageUrl] : undefined,
+      siteName: s.brandName,
+      locale: "en_AE",
+      title,
+      description,
+      ...(s.ogImageUrl ? { images: [{ url: s.ogImageUrl }] } : {}),
     },
-    icons: s.faviconUrl
-      ? { icon: s.faviconUrl, apple: s.faviconUrl }
-      : {
-          icon: [{ url: "/brand/favicon.png", sizes: "32x32", type: "image/png" }],
-          apple: [{ url: "/brand/apple-icon.png", sizes: "180x180", type: "image/png" }],
-        },
-    keywords: [
-      "Shazdeh",
-      "SHĀZDEH",
-      "Persian cuisine Dubai",
-      "Contemporary Persian food",
-      "Iranian restaurant Dubai",
-      "Premium Persian dining",
-    ],
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      ...(s.ogImageUrl ? { images: [s.ogImageUrl] } : {}),
+    },
+    ...(s.faviconUrl
+      ? { icons: { icon: s.faviconUrl, apple: s.faviconUrl } }
+      : {}),
+    formatDetection: { telephone: false, email: false, address: false },
   };
 }
 
 export const viewport: Viewport = {
-  themeColor: "#FDF6EC",
+  themeColor: "#fdf6ec",
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
@@ -64,7 +90,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${vazirmatn.variable} ${bodoni.variable} h-full antialiased`}
     >
       <body className="min-h-full">
         {children}

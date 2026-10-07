@@ -3,118 +3,78 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
-import { ArrowUpRight } from "lucide-react";
+import { SectionHeading } from "@/components/shared/section-heading";
 import { Reveal } from "@/components/shared/reveal";
-import { cn } from "@/lib/utils";
+
+export type GalleryPreviewImage = { id: string; url: string; alt: string };
 
 /*
- * Gallery preview — desktop: scroll-driven horizontal strip.
- * Mobile: vertical editorial stack (no scroll-jacked sideways drift).
+ * Gallery preview — desktop: a scroll-linked horizontal strip of
+ * uniform 4:5 photographs. Phones: a compact two-column mosaic (no
+ * sideways scroll-jacking, and no endless vertical stack).
  */
-
-export function GalleryPreview({
-  images,
-}: {
-  images: { id: string; url: string; alt: string; title?: string | null }[];
-}) {
-  const ref = React.useRef<HTMLDivElement>(null);
+export function GalleryPreview({ images }: { images: GalleryPreviewImage[] }) {
+  const ref = React.useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", "end start"],
   });
-  const x = useTransform(scrollYProgress, [0, 1], ["8%", "-22%"]);
+  const x = useTransform(scrollYProgress, [0, 1], ["4%", "-18%"]);
 
   if (images.length === 0) return null;
-
-  const mobileImages = images.slice(0, 6);
 
   return (
     <section
       ref={ref}
-      className="relative bg-warm-white text-black-iron py-28 md:py-44 overflow-hidden"
+      aria-labelledby="gallery-heading"
+      className="section overflow-hidden"
     >
       <div className="container-shazdeh">
-        <div className="grid grid-cols-12 gap-y-8 lg:gap-x-10 items-end">
-          <div className="col-span-12 lg:col-span-8">
-            <Reveal>
-              <p className="eyebrow eyebrow-accent">Gallery</p>
-            </Reveal>
-            <Reveal delay={0.08}>
-              <h2 className="mt-6 font-bold text-5xl md:text-7xl lg:text-[6rem] leading-[0.94] tracking-[-0.045em] max-w-3xl">
-                A closer look at the table.
-              </h2>
-            </Reveal>
-          </div>
-          <div className="col-span-12 lg:col-span-4 lg:text-right">
-            <Reveal delay={0.18}>
-              <Link
-                href="/gallery"
-                className="inline-flex items-center gap-3 text-[11px] tracking-[0.22em] uppercase font-medium text-black-iron group"
-              >
-                <span className="border-b border-black-iron/40 group-hover:border-terracotta group-hover:text-terracotta transition-colors pb-1">
-                  Open gallery
-                </span>
-                <ArrowUpRight
-                  className="h-4 w-4 transition-transform duration-500 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-terracotta"
-                  strokeWidth={1.5}
-                />
-              </Link>
-            </Reveal>
-          </div>
-        </div>
+        <SectionHeading
+          id="gallery-heading"
+          eyebrow="Gallery"
+          title="A closer look at the table."
+          link={{ href: "/gallery", label: "Open the gallery" }}
+        />
       </div>
 
-      {/* Mobile — vertical editorial rhythm, scroll naturally */}
-      <div className="mt-16 flex flex-col gap-10 px-6 md:hidden">
-        {mobileImages.map((img, i) => (
-          <Reveal key={img.id} delay={i * 0.06} amount={0.15}>
-            <figure className={cn(i % 2 === 0 ? "mr-10" : "ml-10")}>
-              <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-cream">
-                <Image
-                  src={img.url}
-                  alt={img.alt}
-                  fill
-                  sizes="85vw"
-                  className="object-cover"
-                />
-              </div>
-              {img.title ? (
-                <figcaption className="mt-3 text-[10px] tracking-[0.28em] uppercase text-black-iron/45">
-                  {img.title}
-                </figcaption>
-              ) : null}
-            </figure>
+      {/* Phones — mosaic */}
+      <div className="container-shazdeh mt-12 grid grid-cols-2 gap-3 md:hidden">
+        {images.slice(0, 4).map((img, i) => (
+          <Reveal key={img.id} delay={i * 0.05}>
+            <Link
+              href="/gallery"
+              tabIndex={-1}
+              aria-hidden
+              className="relative block aspect-[3/4] overflow-hidden rounded-sm bg-cream"
+            >
+              <Image src={img.url} alt="" fill sizes="45vw" className="object-cover" />
+            </Link>
           </Reveal>
         ))}
       </div>
 
-      {/* Desktop — horizontal scroll-linked strip */}
-      <div className="mt-20 hidden overflow-hidden md:block">
-        <motion.div
+      {/* Tablet & desktop — scroll-linked strip */}
+      <div className="mt-20 hidden md:block">
+        <motion.ul
           style={{ x }}
-          className="flex gap-6 md:gap-10 will-change-transform pl-6 md:pl-12 lg:pl-20"
+          className="flex gap-8 pl-12 will-change-transform lg:gap-10 lg:pl-20"
         >
-          {images.slice(0, 8).map((img, i) => (
-            <div
+          {images.slice(0, 8).map((img) => (
+            <li
               key={img.id}
-              className={`relative shrink-0 overflow-hidden rounded-sm bg-cream ${
-                i % 3 === 0
-                  ? "h-[520px] w-[380px]"
-                  : i % 3 === 1
-                    ? "h-[440px] w-[440px]"
-                    : "h-[480px] w-[340px]"
-              }`}
+              className="relative aspect-[4/5] w-[340px] shrink-0 overflow-hidden rounded-sm bg-cream lg:w-[380px]"
             >
               <Image
                 src={img.url}
                 alt={img.alt}
                 fill
-                sizes="(min-width: 768px) 440px, 340px"
+                sizes="380px"
                 className="object-cover"
               />
-            </div>
+            </li>
           ))}
-        </motion.div>
+        </motion.ul>
       </div>
     </section>
   );

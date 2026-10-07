@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { getSocialIcon } from "@/components/icons/social";
+import { messageFromApiJson } from "@/lib/error-message";
 
 type Link = {
   id: string;
@@ -25,6 +26,7 @@ const PLATFORMS = [
   "deliveroo",
   "careem",
   "noon",
+  "keeta",
   "other",
 ];
 
@@ -33,7 +35,13 @@ export function SocialManager({ initial }: { initial: Link[] }) {
   const [links, setLinks] = React.useState(initial);
   const [pending, setPending] = React.useState(false);
 
-  React.useEffect(() => setLinks(initial), [initial]);
+  // Re-sync local edits when the server sends a fresh list (after
+  // router.refresh()) — adjusted during render, not in an effect.
+  const [synced, setSynced] = React.useState(initial);
+  if (synced !== initial) {
+    setSynced(initial);
+    setLinks(initial);
+  }
 
   function update(id: string, patch: Partial<Link>) {
     setLinks((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
@@ -41,7 +49,7 @@ export function SocialManager({ initial }: { initial: Link[] }) {
 
   async function persist(link: Link) {
     try {
-      await fetch(`/api/social/${link.id}`, {
+      const res = await fetch(`/api/social/${link.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -52,6 +60,14 @@ export function SocialManager({ initial }: { initial: Link[] }) {
           isActive: link.isActive,
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        toast.error(messageFromApiJson(body, "Failed to save") ?? "Failed to save");
+        // Show the stored value again rather than an unsaved edit.
+        router.refresh();
+        return;
+      }
+      router.refresh();
     } catch {
       toast.error("Failed to save");
     }

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * One-off image optimization for the brand asset pack. Resizes JPGs to a
  * reasonable max width and re-encodes at high quality, dropping ~90% of
