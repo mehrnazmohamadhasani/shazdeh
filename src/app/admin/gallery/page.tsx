@@ -1,4 +1,4 @@
-import { AdminPageHeader } from "@/components/admin/page-header";
+import { AdminPage } from "@/components/admin/ui";
 import { GalleryManager } from "@/components/admin/gallery-manager";
 import { prisma } from "@/lib/prisma";
 
@@ -8,15 +8,11 @@ export const metadata = { title: "Gallery" };
 export default async function GalleryAdminPage() {
   const images = await prisma.galleryImage.findMany({
     orderBy: { order: "asc" },
+    select: { id: true, imageUrl: true },
   });
   return (
-    <div className="container-shazdeh py-10 md:py-14 space-y-10">
-      <AdminPageHeader
-        eyebrow="Visual"
-        title="Gallery"
-        description="The lookbook for the kitchen. Upload as many images as you like — drag the order with the sort number."
-      />
+    <AdminPage title="Gallery">
       <GalleryManager initial={images} />
-    </div>
+    </AdminPage>
   );
 }

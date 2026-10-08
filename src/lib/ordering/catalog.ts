@@ -16,11 +16,7 @@ const ITEM_SELECT = {
   allergens: true,
   price: true,
   imageUrl: true,
-  spicyLevel: true,
   isVegetarian: true,
-  isBestseller: true,
-  isNew: true,
-  isSignature: true,
   isAvailable: true,
   isActive: true,
   order: true,
@@ -87,7 +83,6 @@ async function loadOrderMenu(): Promise<OrderCategory[]> {
     select: {
       slug: true,
       name: true,
-      tagline: true,
       items: {
         where: { isActive: true },
         orderBy: { order: "asc" },
@@ -113,10 +108,6 @@ async function loadOrderMenu(): Promise<OrderCategory[]> {
             allergens: item.allergens,
             imageUrl: item.imageUrl,
             isVegetarian: item.isVegetarian,
-            isSignature: item.isSignature,
-            isBestseller: item.isBestseller,
-            isNew: item.isNew,
-            spicyLevel: item.spicyLevel,
             categorySlug: c.slug,
             categoryName: c.name,
             fromPriceFils: toFils(item.price),
@@ -126,8 +117,6 @@ async function loadOrderMenu(): Promise<OrderCategory[]> {
         }
         product.imageUrl ??= item.imageUrl;
         product.description ??= item.description;
-        product.isSignature ||= item.isSignature;
-        product.isBestseller ||= item.isBestseller;
         product.variants.push({
           itemId: item.id,
           slug: item.slug,
@@ -147,7 +136,7 @@ async function loadOrderMenu(): Promise<OrderCategory[]> {
         p.fromPriceFils = prices.length ? Math.min(...prices) : p.variants[0].priceFils;
         return p;
       });
-      return { slug: c.slug, name: c.name, tagline: c.tagline, products };
+      return { slug: c.slug, name: c.name, products };
     })
     .filter((c) => c.products.length > 0);
 }

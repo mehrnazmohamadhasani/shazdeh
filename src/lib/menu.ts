@@ -9,9 +9,6 @@ export type MenuCategoryWithItems = {
   id: string;
   slug: string;
   name: string;
-  tagline: string | null;
-  description: string | null;
-  imageUrl: string | null;
   order: number;
   items: DishCardData[];
 };
@@ -22,17 +19,11 @@ const DISH_SELECT = {
   name: true,
   nameFa: true,
   description: true,
-  story: true,
   ingredients: true,
   allergens: true,
   price: true,
-  currency: true,
   imageUrl: true,
-  spicyLevel: true,
   isVegetarian: true,
-  isBestseller: true,
-  isNew: true,
-  isSignature: true,
   isAvailable: true,
 } as const;
 
@@ -51,9 +42,6 @@ export const getMenuTree = cache(
         id: c.id,
         slug: c.slug,
         name: c.name,
-        tagline: c.tagline,
-        description: c.description,
-        imageUrl: c.imageUrl,
         order: c.order,
         items: c.items.map((i) =>
           toDishCard(i, { name: c.name, slug: c.slug }),
@@ -64,9 +52,8 @@ export const getMenuTree = cache(
 );
 
 /**
- * Signature & bestselling dishes for the home page. Driven by the
- * admin flags (not hard-coded names) so the section never renders
- * half-empty when a dish is renamed.
+ * Dishes for the home page: the first photographed, in-stock dishes in
+ * menu order — so staff choose them simply by ordering the menu.
  */
 export async function getFeaturedDishes(limit = 4): Promise<DishCardData[]> {
   try {
@@ -76,18 +63,12 @@ export async function getFeaturedDishes(limit = 4): Promise<DishCardData[]> {
         isActive: true,
         imageUrl: { not: null },
         category: { isActive: true },
-        OR: [{ isSignature: true }, { isBestseller: true }],
       },
       select: {
         ...DISH_SELECT,
         category: { select: { name: true, slug: true, order: true } },
       },
-      orderBy: [
-        { isSignature: "desc" },
-        { isBestseller: "desc" },
-        { category: { order: "asc" } },
-        { order: "asc" },
-      ],
+      orderBy: [{ category: { order: "asc" } }, { order: "asc" }],
       take: limit * 3,
     });
 
@@ -118,17 +99,11 @@ export const getMenuItemBySlug = cache(async (slug: string) => {
       isActive: true,
       updatedAt: true,
       category: { select: { name: true, slug: true, isActive: true } },
-      variants: {
-        where: { isAvailable: true },
-        orderBy: { order: "asc" },
-        select: { id: true, label: true, price: true },
-      },
     },
   });
   if (!item || !item.isActive || !item.category.isActive) return null;
   return {
     dish: toDishCard(item, item.category),
-    variants: item.variants,
     updatedAt: item.updatedAt,
   };
 });
@@ -151,7 +126,7 @@ export async function getRelatedDishes(
         ...DISH_SELECT,
         category: { select: { name: true, slug: true } },
       },
-      orderBy: [{ isSignature: "desc" }, { order: "asc" }],
+      orderBy: { order: "asc" },
       take: limit,
     });
     return items.map((i) => toDishCard(i, i.category));
@@ -160,27 +135,13 @@ export async function getRelatedDishes(
   }
 }
 
-export async function getActiveBanner(position: string) {
-  try {
-    return await prisma.banner.findFirst({
-      where: { isActive: true, position },
-      orderBy: { order: "asc" },
-    });
-  } catch {
-    return null;
-  }
-}
-
 export async function getGalleryImages(limit?: number) {
   try {
     return await prisma.galleryImage.findMany({
-      where: { isActive: true },
       orderBy: { order: "asc" },
       take: limit,
       select: {
         id: true,
-        title: true,
-        caption: true,
         imageUrl: true,
         width: true,
         height: true,

@@ -112,7 +112,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
 
   const [method, setMethod] = React.useState(config.paymentMethods[0] ?? "CASH_ON_DELIVERY");
   const [notes, setNotes] = React.useState("");
-  const [cutlery, setCutlery] = React.useState(config.cutleryDefault);
+  const [cutlery, setCutlery] = React.useState(false);
 
   const [couponInput, setCouponInput] = React.useState("");
   const [coupon, setCoupon] = React.useState<string | null>(null);

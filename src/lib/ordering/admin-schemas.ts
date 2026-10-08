@@ -41,9 +41,7 @@ export const orderingSettingsSchema = z.object({
   serviceFee: money.optional(),
   paymentMethods: z.array(z.enum(["CASH_ON_DELIVERY", "CARD_ON_DELIVERY", "ONLINE"])).max(3).optional(),
   deliveryModel: z.enum(["OWN_FLEET", "THIRD_PARTY", "HYBRID"]).optional(),
-  prepMinutes: z.number().int().min(0).max(240).optional(),
   autoAccept: z.boolean().optional(),
-  cutleryDefault: z.boolean().optional(),
   notifyEmail: z.email().nullable().optional().or(z.literal("").transform(() => null)),
   legalName: nullableText(160),
   tradeLicenseNo: nullableText(60),
@@ -66,7 +64,6 @@ export const areaInputSchema = z.object({
 export const zoneSchema = z
   .object({
     name: text(80).min(1),
-    description: nullableText(300),
     fee: money,
     minOrder: money,
     freeDeliveryOver: money.nullable().optional(),

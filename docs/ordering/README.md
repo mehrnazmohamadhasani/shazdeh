@@ -1,6 +1,6 @@
 # SHĀZDEH direct ordering — architecture & runbook
 
-Customers order from SHĀZDEH's own website (`/order`) with no marketplace in between. Staff run orders from the Atelier (`/admin/orders`). This document covers how it fits together and what is needed to go live.
+Customers order from SHĀZDEH's own website (`/order`) with no marketplace in between. Staff run orders from the admin (`/admin/orders`). This document covers how it fits together and what is needed to go live.
 
 Related: [legal-dubai.md](./legal-dubai.md) (regulatory research) · [owner-checklist.md](./owner-checklist.md) (what to request from the restaurant).
 
@@ -89,7 +89,7 @@ Mobile-first: area sheet on first visit, sticky category rail with scroll-spy, t
 
 ## 11. Going live — runbook
 
-1. **Database**: `npx prisma migrate deploy` (or let the existing `npm run build` `db push` apply it — the change is additive, no drops). Ordering is **off** by default.
+1. **Database**: run `npx prisma db push` against the production `DATABASE_URL` (the build no longer touches the schema). Ordering is **off** by default.
 2. Admin → **Ordering settings**: legal name, licence, authority, TRN; delivery hours; payment methods; kitchen email; delivery model.
 3. Admin → **Delivery zones**: real zones, fees, minimums, ETAs (≤ 30 min transit per DM guideline unless temperature-controlled), areas (+ coordinates for "use my location").
 4. Admin → **Menu items**: allergens + ingredients for every dish; options & add-ons; hide anything not sold online.

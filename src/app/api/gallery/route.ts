@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { galleryImageSchema } from "@/lib/validators";
-import { getSessionUser } from "@/lib/auth";
 import {
   created,
   ok,
@@ -12,12 +11,7 @@ import {
 
 export async function GET() {
   try {
-    // Hidden / inactive records are only listed for signed-in admins.
-    const isAdmin = Boolean(await getSessionUser());
-    const list = await prisma.galleryImage.findMany({
-      where: isAdmin ? undefined : { isActive: true },
-      orderBy: { order: "asc" },
-    });
+    const list = await prisma.galleryImage.findMany({ orderBy: { order: "asc" } });
     return ok(list);
   } catch (e) {
     return serverError(e);
@@ -30,7 +24,11 @@ export async function POST(req: Request) {
   const parsed = await parseJson(req, galleryImageSchema);
   if (!parsed.ok) return parsed.response;
   try {
-    const img = await prisma.galleryImage.create({ data: parsed.data });
+    // New photos go to the end of the gallery.
+    const last = await prisma.galleryImage.aggregate({ _max: { order: true } });
+    const img = await prisma.galleryImage.create({
+      data: { ...parsed.data, order: (last._max.order ?? 0) + 1 },
+    });
     revalidateSite();
     return created(img);
   } catch (e) {

@@ -2,343 +2,142 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, X, Loader2 } from "lucide-react";
-import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { ImageUploader } from "@/components/admin/image-uploader";
+import { Card, EmptyState, TextInput, IconButton } from "@/components/admin/ui";
 import { slugify } from "@/lib/utils";
 
-type Cat = {
-  id: string;
-  slug: string;
-  name: string;
-  tagline: string | null;
-  description: string | null;
-  imageUrl: string | null;
-  order: number;
-  isActive: boolean;
-  _count: { items: number };
-};
+type Cat = { id: string; name: string; order: number; isActive: boolean; _count: { items: number } };
 
-type DraftCat = Omit<Cat, "id" | "_count"> & { id?: string };
-
-const EMPTY: DraftCat = {
-  slug: "",
-  name: "",
-  tagline: "",
-  description: "",
-  imageUrl: null,
-  order: 0,
-  isActive: true,
-};
+async function request(url: string, method: string, body?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error ?? "Something went wrong");
+  }
+}
 
 export function CategoriesManager({ initial }: { initial: Cat[] }) {
   const router = useRouter();
-  const [editing, setEditing] = React.useState<DraftCat | null>(null);
-  const [pending, setPending] = React.useState(false);
+  const [names, setNames] = React.useState<Record<string, string>>(() => Object.fromEntries(initial.map((c) => [c.id, c.name])));
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [newName, setNewName] = React.useState("");
 
-  async function save() {
-    if (!editing) return;
-    setPending(true);
+  // Pick up fresh names after a refresh without clobbering an edit in progress.
+  const [synced, setSynced] = React.useState(initial);
+  if (synced !== initial) {
+    setSynced(initial);
+    setNames(Object.fromEntries(initial.map((c) => [c.id, c.name])));
+  }
+
+  async function run(id: string, fn: () => Promise<void>, ok?: string) {
+    setBusy(id);
     try {
-      const payload = {
-        ...editing,
-        slug: editing.slug || slugify(editing.name),
-        tagline: editing.tagline || null,
-        description: editing.description || null,
-      };
-      const res = await fetch(
-        editing.id ? `/api/categories/${editing.id}` : "/api/categories",
-        {
-          method: editing.id ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "Failed to save");
-      }
-      toast.success(editing.id ? "Category updated" : "Category created");
-      setEditing(null);
+      await fn();
+      if (ok) toast.success(ok);
       router.refresh();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setPending(false);
+      setBusy(null);
     }
   }
 
-  async function remove(c: Cat) {
+  function rename(c: Cat) {
+    const name = names[c.id]?.trim();
+    if (!name || name === c.name) return setNames((n) => ({ ...n, [c.id]: c.name }));
+    run(c.id, () => request(`/api/categories/${c.id}`, "PATCH", { name }), "Category renamed");
+  }
+
+  function move(index: number, dir: -1 | 1) {
+    const list = [...initial];
+    const to = index + dir;
+    if (to < 0 || to >= list.length) return;
+    [list[index], list[to]] = [list[to], list[index]];
+    run(list[to].id, () =>
+      Promise.all(
+        list
+          .map((c, i) => ({ c, order: i + 1 }))
+          .filter(({ c, order }) => c.order !== order)
+          .map(({ c, order }) => request(`/api/categories/${c.id}`, "PATCH", { order })),
+      ).then(() => undefined),
+    );
+  }
+
+  function remove(c: Cat) {
     if (c._count.items > 0) {
-      toast.error(
-        `Move or delete the ${c._count.items} dishes in this category first.`,
-      );
+      toast.error(`Move or delete the ${c._count.items} dishes in “${c.name}” first.`);
       return;
     }
-    if (!confirm(`Delete category "${c.name}"?`)) return;
-    try {
-      const res = await fetch(`/api/categories/${c.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
-      toast.success("Category deleted");
-      router.refresh();
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
+    if (!confirm(`Delete the category “${c.name}”?`)) return;
+    run(c.id, () => request(`/api/categories/${c.id}`, "DELETE"), "Category deleted");
+  }
+
+  function add(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    run("new", async () => {
+      await request("/api/categories", "POST", { name, slug: slugify(name), order: initial.length + 1, isActive: true });
+      setNewName("");
+    }, "Category added");
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={() => setEditing({ ...EMPTY, order: initial.length })}>
-          <Plus className="h-4 w-4" /> New category
-        </Button>
-      </div>
-
-      <div className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] overflow-hidden">
-        <div className="divide-y divide-warm-white/[0.06]">
-          {initial.map((c) => (
-            <button
-              key={c.id}
-              onClick={() =>
-                setEditing({
-                  id: c.id,
-                  slug: c.slug,
-                  name: c.name,
-                  tagline: c.tagline ?? "",
-                  description: c.description ?? "",
-                  imageUrl: c.imageUrl,
-                  order: c.order,
-                  isActive: c.isActive,
-                })
-              }
-              className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-warm-white/[0.04] transition-colors"
-            >
-              <span className="font-mono text-warm-white/45 text-[11px] w-6 text-right tabular-nums">
-                {c.order}
+    <Card bodyClassName="p-0 md:p-0">
+      {initial.length === 0 ? (
+        <EmptyState title="No categories yet" description="Add one below — every dish belongs to a category." />
+      ) : (
+        <ul className="divide-y divide-black-iron/[0.06]">
+          {initial.map((c, i) => (
+            <li key={c.id} className="flex items-center gap-3 px-4 py-3 md:px-6">
+              <TextInput
+                value={names[c.id] ?? ""}
+                onChange={(e) => setNames((n) => ({ ...n, [c.id]: e.target.value }))}
+                onBlur={() => rename(c)}
+                onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                aria-label="Category name"
+                className="h-10 max-w-xs font-medium"
+              />
+              <span className="hidden flex-1 text-[13px] text-dark-grey sm:block">
+                {c._count.items} {c._count.items === 1 ? "dish" : "dishes"}
               </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-warm-white text-[13px] font-medium truncate">
-                  {c.name}
-                </p>
-                <p className="text-warm-white/55 text-[11px] truncate font-light">
-                  {c.tagline ?? c.slug}
-                </p>
-              </div>
-              <Badge variant={c.isActive ? "terracotta" : "outline"}>
-                {c._count.items} dishes
-              </Badge>
-            </button>
+              <span className="flex-1 sm:hidden" />
+              <label className="flex items-center gap-2 text-[13px] text-dark-grey">
+                <Switch
+                  checked={c.isActive}
+                  disabled={busy !== null}
+                  onCheckedChange={(v) => run(c.id, () => request(`/api/categories/${c.id}`, "PATCH", { isActive: v }), v ? "Category shown" : "Category hidden")}
+                />
+                <span className="hidden sm:inline">Shown</span>
+              </label>
+              <span className="flex items-center">
+                <IconButton label="Move up" disabled={i === 0 || busy !== null} onClick={() => move(i, -1)}>
+                  <ArrowUp className="h-4 w-4" />
+                </IconButton>
+                <IconButton label="Move down" disabled={i === initial.length - 1 || busy !== null} onClick={() => move(i, 1)}>
+                  <ArrowDown className="h-4 w-4" />
+                </IconButton>
+                <IconButton label={`Delete ${c.name}`} disabled={busy !== null} onClick={() => remove(c)} danger>
+                  {busy === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </IconButton>
+              </span>
+            </li>
           ))}
-          {initial.length === 0 && (
-            <div className="py-16 text-center">
-              <p className="font-bold text-2xl tracking-[-0.03em] text-warm-white/70">
-                No categories yet.
-              </p>
-              <p className="mt-2 text-warm-white/50 text-[13px] font-light">
-                Create your first category to start adding dishes.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {editing && (
-        <CategoryDrawer
-          draft={editing}
-          onChange={setEditing}
-          onClose={() => setEditing(null)}
-          onSave={save}
-          onDelete={
-            editing.id
-              ? () => {
-                  const cat = initial.find((c) => c.id === editing.id);
-                  if (cat) remove(cat);
-                }
-              : undefined
-          }
-          pending={pending}
-        />
+        </ul>
       )}
-    </div>
-  );
-}
-
-function CategoryDrawer({
-  draft,
-  onChange,
-  onClose,
-  onSave,
-  onDelete,
-  pending,
-}: {
-  draft: DraftCat;
-  onChange: (c: DraftCat) => void;
-  onClose: () => void;
-  onSave: () => void;
-  onDelete?: () => void;
-  pending: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black-iron/70 backdrop-blur-md">
-      <div
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div className="relative w-full max-w-lg bg-black-iron border-l border-warm-white/[0.08] overflow-y-auto">
-        <div className="sticky top-0 bg-black-iron/95 backdrop-blur-xl border-b border-warm-white/[0.08] px-7 py-5 pt-[calc(1.25rem+var(--safe-top))] flex items-center justify-between">
-          <div>
-            <p className="text-[10px] tracking-[0.32em] uppercase text-terracotta">
-              {draft.id ? "Edit" : "New"}
-            </p>
-            <h3 className="mt-3 font-bold text-2xl text-warm-white tracking-[-0.035em]">
-              Category
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="grid place-items-center h-9 w-9 rounded-full text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06]"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" strokeWidth={1.5} />
-          </button>
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave();
-          }}
-          className="p-7 space-y-5"
-        >
-          <ImageUploader
-            value={draft.imageUrl}
-            onChange={(url) => onChange({ ...draft, imageUrl: url })}
-            folder="categories"
-            label="Cover image"
-            aspect="video"
-          />
-
-          <Field label="Name" required>
-            <Input
-              value={draft.name}
-              onChange={(e) => {
-                const name = e.target.value;
-                onChange({
-                  ...draft,
-                  name,
-                  slug:
-                    !draft.id && (!draft.slug || draft.slug === slugify(draft.name))
-                      ? slugify(name)
-                      : draft.slug,
-                });
-              }}
-              required
-              placeholder="Main Dishes"
-            />
-          </Field>
-
-          <Field label="Slug" required>
-            <Input
-              value={draft.slug}
-              onChange={(e) =>
-                onChange({ ...draft, slug: slugify(e.target.value) })
-              }
-              required
-              className="font-mono text-xs"
-              placeholder="mains"
-            />
-          </Field>
-
-          <Field label="Tagline">
-            <Input
-              value={draft.tagline ?? ""}
-              onChange={(e) => onChange({ ...draft, tagline: e.target.value })}
-              placeholder="The heart of the table"
-            />
-          </Field>
-
-          <Field label="Description">
-            <Textarea
-              value={draft.description ?? ""}
-              onChange={(e) =>
-                onChange({ ...draft, description: e.target.value })
-              }
-              rows={3}
-              placeholder="A short editorial intro to the section."
-            />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Sort order">
-              <Input
-                type="number"
-                min={0}
-                value={draft.order}
-                onChange={(e) =>
-                  onChange({ ...draft, order: Number(e.target.value) })
-                }
-              />
-            </Field>
-            <label className="flex items-end gap-3 pb-2.5">
-              <Switch
-                checked={draft.isActive}
-                onCheckedChange={(v) => onChange({ ...draft, isActive: v })}
-              />
-              <span className="text-[13px] text-warm-white font-light">
-                Active
-              </span>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between pt-4">
-            {onDelete ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onDelete}
-                className="text-pomegranate-red hover:bg-pomegranate-red/[0.10]"
-              >
-                <Trash2 className="h-4 w-4" /> Delete
-              </Button>
-            ) : (
-              <span />
-            )}
-            <Button type="submit" disabled={pending}>
-              {pending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Save
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label>
-        {label}
-        {required && <span className="text-terracotta ml-1">*</span>}
-      </Label>
-      {children}
-    </div>
+      <form onSubmit={add} className="flex gap-2 border-t border-black-iron/[0.06] p-4 md:px-6">
+        <TextInput value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New category, e.g. Desserts" aria-label="New category name" className="max-w-xs" />
+        <Button type="submit" size="sm" disabled={!newName.trim() || busy !== null} className="h-11">
+          {busy === "new" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          Add
+        </Button>
+      </form>
+    </Card>
   );
 }

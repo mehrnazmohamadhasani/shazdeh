@@ -30,6 +30,13 @@ const STAFF_PATHS = ["/admin/orders"];
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // The account behind this cookie no longer exists — forget it.
+  if (pathname === "/login" && req.nextUrl.searchParams.has("signed-out")) {
+    const res = NextResponse.next();
+    res.cookies.delete(SESSION_COOKIE);
+    return res;
+  }
+
   const role =
     pathname.startsWith("/admin") || pathname === "/login"
       ? await sessionRole(req)

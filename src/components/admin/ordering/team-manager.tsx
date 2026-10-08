@@ -2,19 +2,18 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, Field, IconButton, Select, TextInput } from "@/components/admin/ui";
 
 type Role = "ADMIN" | "EDITOR" | "STAFF";
 export type TeamRow = { id: string; email: string; name: string | null; role: Role };
 
-const ROLE_HINT: Record<Role, string> = {
-  ADMIN: "Everything, including settings, payments and team",
-  EDITOR: "Menu, content, zones and promo codes",
-  STAFF: "Orders board only — for kitchen tablets",
-};
+const ROLES: { value: Role; label: string; hint: string }[] = [
+  { value: "STAFF", label: "Kitchen staff", hint: "Orders board only — for kitchen tablets." },
+  { value: "EDITOR", label: "Editor", hint: "Menu, zones, promo codes and website content." },
+  { value: "ADMIN", label: "Admin", hint: "Everything, including settings and the team." },
+];
 
 export function TeamManager({ users, selfId }: { users: TeamRow[]; selfId: string }) {
   const router = useRouter();
@@ -31,7 +30,7 @@ export function TeamManager({ users, selfId }: { users: TeamRow[]; selfId: strin
     });
     setBusy(false);
     if (!res.ok) return toast.error((await res.json().catch(() => null))?.error ?? "Couldn't add");
-    toast.success("Team member added — share the password with them privately");
+    toast.success("Added — share the password with them privately");
     setForm({ email: "", name: "", role: "STAFF", password: "" });
     router.refresh();
   }
@@ -51,64 +50,74 @@ export function TeamManager({ users, selfId }: { users: TeamRow[]; selfId: strin
   }
 
   return (
-    <div className="space-y-8">
-      <div className="divide-y divide-warm-white/[0.06] rounded-md border border-warm-white/[0.08]">
-        {users.map((u) => (
-          <div key={u.id} className="flex flex-wrap items-center gap-4 px-5 py-4">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-medium text-warm-white">{u.name ?? u.email}</p>
-              <p className="truncate text-[12px] text-warm-white/55">{u.email}</p>
-            </div>
-            <select
-              value={u.role}
-              onChange={(e) => patch(u.id, { role: e.target.value }, "Role updated")}
-              className="h-10 rounded-md border border-warm-white/10 bg-black-iron/60 px-3 text-[13px] text-warm-white"
-            >
-              {(["ADMIN", "EDITOR", "STAFF"] as const).map((r) => (
-                <option key={r} value={r}>
-                  {r.charAt(0) + r.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                const pw = prompt("New password (10+ characters):");
-                if (pw) patch(u.id, { password: pw }, "Password changed");
-              }}
-            >
-              Reset password
-            </Button>
-            {u.id !== selfId && (
-              <Button size="icon" variant="ghost" aria-label={`Remove ${u.email}`} onClick={() => remove(u)}>
-                <Trash2 className="h-4 w-4 text-pomegranate-red" />
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
+    <>
+      <Card bodyClassName="p-0 md:p-0">
+        <ul className="divide-y divide-black-iron/[0.06]">
+          {users.map((u) => (
+            <li key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-6">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-terracotta/[0.1] text-[13px] font-semibold text-terracotta-ink">
+                {(u.name ?? u.email).charAt(0).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-medium">
+                  {u.name ?? u.email}
+                  {u.id === selfId && <span className="ml-2 text-[12px] font-normal text-dark-grey">(you)</span>}
+                </span>
+                <span className="block truncate text-[12.5px] text-dark-grey">{u.email}</span>
+              </span>
+              <Select value={u.role} onChange={(e) => patch(u.id, { role: e.target.value }, "Role updated")} aria-label={`Role for ${u.email}`} className="h-10 w-40">
+                {ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+              <IconButton
+                label={`New password for ${u.email}`}
+                onClick={() => {
+                  const pw = prompt("New password (10 or more characters):");
+                  if (pw) patch(u.id, { password: pw }, "Password changed");
+                }}
+              >
+                <KeyRound className="h-4 w-4" />
+              </IconButton>
+              {u.id !== selfId && (
+                <IconButton label={`Remove ${u.email}`} onClick={() => remove(u)} danger>
+                  <Trash2 className="h-4 w-4" />
+                </IconButton>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Card>
 
-      <form onSubmit={add} className="space-y-4 rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-6">
-        <h2 className="text-xl font-bold tracking-[-0.03em] text-warm-white">Add a team member</h2>
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="space-y-2"><Label>Email</Label><Input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-2">
-            <Label>Role</Label>
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })} className="flex h-12 w-full rounded-md border border-warm-white/10 bg-black-iron/60 px-3 text-[13px] text-warm-white">
-              <option value="STAFF">Staff</option>
-              <option value="EDITOR">Editor</option>
-              <option value="ADMIN">Admin</option>
-            </select>
+      <Card title="Add someone">
+        <form onSubmit={add} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Email" required>
+              <TextInput type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </Field>
+            <Field label="Name">
+              <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </Field>
+            <Field label="Role" hint={ROLES.find((r) => r.value === form.role)?.hint}>
+              <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
+                {ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Temporary password" hint="At least 10 characters." required>
+              <TextInput type="text" required minLength={10} autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </Field>
           </div>
-          <div className="space-y-2"><Label>Temporary password</Label><Input type="text" required minLength={10} autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
-        </div>
-        <p className="text-[12px] text-warm-white/55">{ROLE_HINT[form.role]}</p>
-        <Button type="submit" disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add member
-        </Button>
-      </form>
-    </div>
+          <Button type="submit" size="sm" disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add
+          </Button>
+        </form>
+      </Card>
+    </>
   );
 }

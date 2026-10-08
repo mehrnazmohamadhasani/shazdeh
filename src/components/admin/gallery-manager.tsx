@@ -3,26 +3,19 @@ import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Loader2, Eye, EyeOff } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, EmptyState } from "@/components/admin/ui";
 import { messageFromApiJson, messageFromUnknown } from "@/lib/error-message";
 import { uploadAdminImage } from "@/lib/upload-admin-image";
 
-type Img = {
-  id: string;
-  title: string | null;
-  caption: string | null;
-  imageUrl: string;
-  order: number;
-  isActive: boolean;
-};
+/* Gallery: upload photos, delete photos. New uploads go to the end. */
+
+type Img = { id: string; imageUrl: string };
 
 async function apiError(res: Response, fallback: string): Promise<string> {
   try {
-    const body = await res.json();
-    const msg = messageFromApiJson(body, fallback);
+    const msg = messageFromApiJson(await res.json(), fallback);
     if (msg) return msg;
   } catch {
     /* non-JSON body */
@@ -33,6 +26,7 @@ async function apiError(res: Response, fallback: string): Promise<string> {
 export function GalleryManager({ initial }: { initial: Img[] }) {
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
+  const [deleting, setDeleting] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   async function handleUpload(files: FileList | null) {
@@ -40,172 +34,74 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
     setPending(true);
     let success = 0;
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const upData = await uploadAdminImage(file, "gallery");
-        const createRes = await fetch("/api/gallery", {
+      for (const file of Array.from(files)) {
+        const up = await uploadAdminImage(file, "gallery");
+        const res = await fetch("/api/gallery", {
           method: "POST",
-          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrl: upData.url,
-            ...(upData.width && upData.width > 0 ? { width: upData.width } : {}),
-            ...(upData.height && upData.height > 0
-              ? { height: upData.height }
-              : {}),
-            order: initial.length + i,
-            title: file.name.replace(/\.[a-z]+$/i, "").replace(/[-_]/g, " "),
+            imageUrl: up.url,
+            ...(up.width && up.width > 0 ? { width: up.width } : {}),
+            ...(up.height && up.height > 0 ? { height: up.height } : {}),
           }),
         });
-        if (!createRes.ok) {
-          throw new Error(await apiError(createRes, "Could not save to gallery"));
-        }
+        if (!res.ok) throw new Error(await apiError(res, "Couldn't save to the gallery"));
         success += 1;
       }
-      if (success > 0) {
-        toast.success(
-          `${success} of ${files.length} image${files.length === 1 ? "" : "s"} uploaded`,
-        );
-      } else {
-        toast.error("Upload failed — no images were saved.");
-      }
-      router.refresh();
+      toast.success(`${success} photo${success === 1 ? "" : "s"} added`);
     } catch (e) {
       toast.error(messageFromUnknown(e, "Upload failed"));
     } finally {
       setPending(false);
       if (inputRef.current) inputRef.current.value = "";
-    }
-  }
-
-  async function patch(img: Img, patch: Partial<Img>) {
-    try {
-      const res = await fetch(`/api/gallery/${img.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (!res.ok) throw new Error("Failed to update");
       router.refresh();
-    } catch (e) {
-      toast.error(messageFromUnknown(e, "Update failed"));
     }
   }
 
   async function remove(img: Img) {
-    if (!confirm("Delete this image?")) return;
-    try {
-      const res = await fetch(`/api/gallery/${img.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
-      toast.success("Image deleted");
-      router.refresh();
-    } catch (e) {
-      toast.error(messageFromUnknown(e, "Delete failed"));
-    }
+    if (!confirm("Delete this photo?")) return;
+    setDeleting(img.id);
+    const res = await fetch(`/api/gallery/${img.id}`, { method: "DELETE" }).catch(() => null);
+    if (res?.ok) toast.success("Photo deleted");
+    else toast.error("Couldn't delete the photo");
+    setDeleting(null);
+    router.refresh();
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-end gap-3">
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept="image/*"
-          className="sr-only"
-          onChange={(e) => handleUpload(e.target.files)}
-        />
-        <Button onClick={() => inputRef.current?.click()} disabled={pending}>
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4" />
-          )}
-          Upload images
-        </Button>
-      </div>
-
+    <Card
+      title={`${initial.length} photo${initial.length === 1 ? "" : "s"}`}
+      actions={
+        <>
+          <input ref={inputRef} type="file" multiple accept="image/*" className="sr-only" onChange={(e) => handleUpload(e.target.files)} />
+          <Button size="sm" onClick={() => inputRef.current?.click()} disabled={pending}>
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Add photos
+          </Button>
+        </>
+      }
+    >
       {initial.length === 0 ? (
-        <div className="py-20 text-center rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02]">
-          <p className="font-bold text-2xl tracking-[-0.03em] text-warm-white/70">
-            The gallery is empty.
-          </p>
-          <p className="mt-2 text-warm-white/50 text-[13px] font-light">
-            Drop your first images to start the lookbook.
-          </p>
-        </div>
+        <EmptyState title="No photos yet" description="Add a few to fill the website gallery." />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {initial.map((img) => (
-            <div
-              key={img.id}
-              className="group relative overflow-hidden rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02]"
-            >
-              <div className="relative aspect-[4/5] bg-black-iron">
-                <Image
-                  src={img.imageUrl}
-                  alt={img.title ?? ""}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                  className="object-cover"
-                />
-                {!img.isActive && (
-                  <div className="absolute inset-0 bg-black-iron/70 grid place-items-center">
-                    <span className="text-warm-white text-[10px] tracking-[0.32em] uppercase font-medium">
-                      Hidden
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="p-4 space-y-3">
-                <Input
-                  value={img.title ?? ""}
-                  onChange={(e) =>
-                    patch(img, { title: e.target.value || null })
-                  }
-                  placeholder="Title"
-                  className="text-sm h-9"
-                />
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={img.isActive}
-                      onCheckedChange={(v) => patch(img, { isActive: v })}
-                    />
-                    <span className="text-warm-white/55">
-                      {img.isActive ? (
-                        <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      ) : (
-                        <EyeOff className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      value={img.order}
-                      onChange={(e) =>
-                        patch(img, { order: Number(e.target.value) })
-                      }
-                      className="w-16 h-8 text-xs font-mono"
-                      title="Sort order"
-                    />
-                    <button
-                      onClick={() => remove(img)}
-                      className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-pomegranate-red hover:bg-pomegranate-red/[0.10]"
-                      aria-label="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <li key={img.id} className="group relative aspect-[4/5] overflow-hidden rounded-[12px] bg-cream">
+              <Image src={img.imageUrl} alt="" fill sizes="(min-width: 1024px) 22vw, (min-width: 640px) 30vw, 45vw" className="object-cover" />
+              <button
+                type="button"
+                onClick={() => remove(img)}
+                disabled={deleting === img.id}
+                aria-label="Delete photo"
+                title="Delete photo"
+                className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-black-iron shadow-sm transition-colors hover:bg-pomegranate-red hover:text-white"
+              >
+                {deleting === img.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </Card>
   );
 }
-
-void Plus;

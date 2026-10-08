@@ -88,10 +88,6 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
         .filter((c) => c.products.length > 0),
     [categories, q, query, vegOnly],
   );
-  const loved = React.useMemo(
-    () => categories.flatMap((c) => c.products).filter((p) => p.isBestseller || p.isSignature).slice(0, 8),
-    [categories],
-  );
 
   // Scroll-spy for the category rail.
   React.useEffect(() => {
@@ -234,36 +230,6 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
 
       <div className="container-shazdeh grid gap-10 pb-32 pt-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:pb-20">
         <div className="min-w-0">
-          {!q && !vegOnly && loved.length > 0 && (
-            <section aria-labelledby="loved-heading" className="mb-10">
-              <h2 id="loved-heading" className="text-[1.375rem] font-bold tracking-[-0.03em]">
-                Most loved
-              </h2>
-              <ul className="no-scrollbar -mx-6 mt-4 flex snap-x scroll-px-6 gap-3 overflow-x-auto px-6 sm:mx-0 sm:scroll-px-0 sm:px-0">
-                {loved.map((p, i) => (
-                  <li key={p.key} className="w-[44%] shrink-0 snap-start sm:w-[30%] xl:w-[23%]">
-                    <button type="button" onClick={() => setSheet({ product: p })} className="group block w-full text-left">
-                      <div className="arch relative aspect-[4/5] overflow-hidden bg-cream">
-                        {p.imageUrl && (
-                          <Image
-                            src={p.imageUrl}
-                            alt=""
-                            fill
-                            preload={i < 2}
-                            sizes="(min-width: 1280px) 180px, (min-width: 640px) 28vw, 44vw"
-                            className="img-zoom object-cover"
-                          />
-                        )}
-                      </div>
-                      <p className="mt-3 text-[14px] font-semibold leading-tight">{p.title}</p>
-                      <p className="mt-1 text-[13px] tabular-nums text-dark-grey">{formatFils(p.fromPriceFils)}</p>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
           {visible.length === 0 && (
             <div className="rounded-[14px] bg-cream px-6 py-12 text-center">
               <p className="text-[16px] font-semibold">Nothing matches “{query || "vegetarian"}”.</p>
@@ -397,10 +363,6 @@ function ProductRow({
             {p.variants.length > 1 && <span className="font-normal text-dark-grey">from </span>}
             {formatFils(p.fromPriceFils)}
           </span>
-          {p.isSignature && <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-terracotta-ink">Signature</span>}
-          {p.isBestseller && !p.isSignature && (
-            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-dark-grey">Most loved</span>
-          )}
           {p.isVegetarian && (
             <span className="inline-flex items-center gap-1 text-[12px] text-olive-leaf">
               <Leaf className="h-3 w-3" strokeWidth={1.8} aria-hidden /> Veg

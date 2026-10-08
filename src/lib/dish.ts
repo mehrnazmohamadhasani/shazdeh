@@ -14,17 +14,11 @@ export type DishCardData = {
   portion: string | null;
   nameFa?: string | null;
   description?: string | null;
-  story?: string | null;
   ingredients?: string | null;
   allergens?: string | null;
   price: number;
-  currency: string;
   imageUrl?: string | null;
-  spicyLevel: number;
   isVegetarian: boolean;
-  isBestseller: boolean;
-  isNew: boolean;
-  isSignature: boolean;
   isAvailable: boolean;
   category: { name: string; slug: string };
 };
@@ -47,30 +41,17 @@ export function splitPortion(name: string): {
   };
 }
 
-export function spiceLabel(level: number) {
-  if (level >= 3) return "Hot";
-  if (level >= 2) return "Medium heat";
-  if (level >= 1) return "Mild";
-  return null;
-}
-
 type DishRow = {
   id: string;
   slug: string;
   name: string;
   nameFa: string | null;
   description: string | null;
-  story: string | null;
   ingredients: string | null;
   allergens: string | null;
   price: number;
-  currency: string;
   imageUrl: string | null;
-  spicyLevel: number;
   isVegetarian: boolean;
-  isBestseller: boolean;
-  isNew: boolean;
-  isSignature: boolean;
   isAvailable: boolean;
 };
 
@@ -87,17 +68,11 @@ export function toDishCard(
     portion,
     nameFa: row.nameFa,
     description: row.description,
-    story: row.story,
     ingredients: row.ingredients,
     allergens: row.allergens,
     price: row.price,
-    currency: row.currency,
     imageUrl: row.imageUrl,
-    spicyLevel: row.spicyLevel,
     isVegetarian: row.isVegetarian,
-    isBestseller: row.isBestseller,
-    isNew: row.isNew,
-    isSignature: row.isSignature,
     isAvailable: row.isAvailable,
     category,
   };

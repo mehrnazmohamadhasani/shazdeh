@@ -7,7 +7,7 @@ import { RevealItem, RevealStagger } from "@/components/shared/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
 
 /*
- * Signature dishes — arch-framed plates on a cream ground. Phones get
+ * Featured dishes — arch-framed plates on a cream ground. Phones get
  * a snap carousel with a visible "peek" so the plates stay large; the
  * grid takes over from tablet up.
  */
@@ -30,7 +30,7 @@ export function FeaturedDishes({
     >
       <div className="container-shazdeh">
         <SectionHeading
-          eyebrow="Signature dishes"
+          eyebrow="From the menu"
           id="signature-heading"
           title="The plates our guests return for."
           link={{ href: "/menu", label: "Full menu" }}

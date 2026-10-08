@@ -4,17 +4,13 @@ import { prisma } from "@/lib/prisma";
 
 export type RestaurantSettingsView = {
   brandName: string;
-  tagline: string | null;
   description: string | null;
   email: string | null;
   phone: string | null;
   whatsapp: string | null;
   address: string | null;
-  mapUrl: string | null;
   openingHours: string | null;
-  heroVideoUrl: string | null;
   logoUrl: string | null;
-  faviconUrl: string | null;
   metaTitle: string | null;
   metaDesc: string | null;
   ogImageUrl: string | null;
@@ -22,18 +18,14 @@ export type RestaurantSettingsView = {
 
 const FALLBACK: RestaurantSettingsView = {
   brandName: "SHĀZDEH",
-  tagline: "Persian Cuisine",
   description:
     "A contemporary Persian food brand rooted in heritage and expressed through a modern visual language. From our heart to your home.",
   email: null,
   phone: null,
   whatsapp: null,
   address: "Dubai, United Arab Emirates",
-  mapUrl: null,
   openingHours: null,
-  heroVideoUrl: null,
   logoUrl: null,
-  faviconUrl: null,
   metaTitle: "SHĀZDEH — Persian Cuisine · Dubai",
   metaDesc:
     "SHĀZDEH — contemporary Persian cuisine, delivered across Dubai. Slow-cooked khoresh, saffron rice and golden tahdig, from our heart to your home.",
@@ -53,17 +45,13 @@ export const getSettings = cache(
       if (!row) return FALLBACK;
       return {
         brandName: row.brandName,
-        tagline: row.tagline,
         description: row.description,
         email: row.email,
         phone: row.phone,
         whatsapp: row.whatsapp,
         address: row.address,
-        mapUrl: row.mapUrl,
         openingHours: row.openingHours,
-        heroVideoUrl: row.heroVideoUrl,
         logoUrl: row.logoUrl,
-        faviconUrl: row.faviconUrl,
         metaTitle: row.metaTitle,
         metaDesc: row.metaDesc,
         ogImageUrl: row.ogImageUrl,

@@ -4,50 +4,25 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Search,
-  Eye,
-  EyeOff,
-  Pencil,
-  Trash2,
-  Star,
-  Leaf,
-  Flame,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { ArrowDown, ArrowUp, ChevronRight, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+import { Card, EmptyState, Select, StatusPill, TextInput, IconButton } from "@/components/admin/ui";
 import { formatPrice, cn } from "@/lib/utils";
 
 type Item = {
   id: string;
   name: string;
-  slug: string;
   imageUrl: string | null;
   price: number;
-  currency: string;
   isAvailable: boolean;
   isActive: boolean;
   order: number;
-  isBestseller: boolean;
-  isSignature: boolean;
-  isNew: boolean;
-  isVegetarian: boolean;
-  spicyLevel: number;
   category: { id: string; name: string };
 };
 
 type Cat = { id: string; name: string };
 
-export function MenuItemsTable({
-  items,
-  categories,
-}: {
-  items: Item[];
-  categories: Cat[];
-}) {
+export function MenuItemsTable({ items, categories }: { items: Item[]; categories: Cat[] }) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
   const [activeCat, setActiveCat] = React.useState<string>("all");
@@ -55,24 +30,22 @@ export function MenuItemsTable({
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((i) => {
-      if (activeCat !== "all" && i.category.id !== activeCat) return false;
-      if (q && !i.name.toLowerCase().includes(q) && !i.slug.includes(q))
-        return false;
-      return true;
-    });
+    return items.filter(
+      (i) => (activeCat === "all" || i.category.id === activeCat) && (!q || i.name.toLowerCase().includes(q)),
+    );
   }, [items, query, activeCat]);
+  const canReorder = activeCat !== "all" && !query;
 
-  async function toggleAvailable(item: Item, value: boolean) {
+  async function patch(item: Item, body: Partial<Item>, message: string) {
     setPendingId(item.id);
     try {
       const res = await fetch(`/api/menu-items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isAvailable: value }),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to update");
-      toast.success(value ? "Marked available" : "Marked sold out");
+      if (!res.ok) throw new Error("Couldn't update the dish");
+      toast.success(message);
       router.refresh();
     } catch (e) {
       toast.error((e as Error).message);
@@ -81,48 +54,27 @@ export function MenuItemsTable({
     }
   }
 
-  /**
-   * Moves a dish up/down within its category and renumbers the category
-   * 1…n, so equal or gapped sort values never make the order ambiguous.
-   */
+  /** Moves a dish within its category and renumbers the category 1…n. */
   async function move(item: Item, dir: -1 | 1) {
-    const siblings = items
-      .filter((i) => i.category.id === item.category.id)
-      .sort((a, b) => a.order - b.order);
+    const siblings = items.filter((i) => i.category.id === item.category.id).sort((a, b) => a.order - b.order);
     const from = siblings.findIndex((i) => i.id === item.id);
     const to = from + dir;
     if (to < 0 || to >= siblings.length) return;
     [siblings[from], siblings[to]] = [siblings[to], siblings[from]];
     setPendingId(item.id);
     try {
-      const changed = siblings
-        .map((s, idx) => ({ s, order: idx + 1 }))
-        .filter(({ s, order }) => s.order !== order);
-      for (const { s, order } of changed) {
-        const res = await fetch(`/api/menu-items/${s.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order }),
-        });
-        if (!res.ok) throw new Error("Failed to reorder");
-      }
-      router.refresh();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function remove(item: Item) {
-    if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
-    setPendingId(item.id);
-    try {
-      const res = await fetch(`/api/menu-items/${item.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete");
-      toast.success("Dish deleted");
+      const changed = siblings.map((s, idx) => ({ s, order: idx + 1 })).filter(({ s, order }) => s.order !== order);
+      await Promise.all(
+        changed.map(({ s, order }) =>
+          fetch(`/api/menu-items/${s.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order }),
+          }).then((r) => {
+            if (!r.ok) throw new Error("Couldn't reorder");
+          }),
+        ),
+      );
       router.refresh();
     } catch (e) {
       toast.error((e as Error).message);
@@ -132,218 +84,103 @@ export function MenuItemsTable({
   }
 
   return (
-    <div className="space-y-5">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-white/45"
-            strokeWidth={1.5}
-          />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search dishes…"
-            className="pl-10"
-          />
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
-          <CatChip
-            active={activeCat === "all"}
-            onClick={() => setActiveCat("all")}
-            label="All"
-            count={items.length}
-          />
-          {categories.map((c) => {
-            const count = items.filter((i) => i.category.id === c.id).length;
-            return (
-              <CatChip
-                key={c.id}
-                active={activeCat === c.id}
-                onClick={() => setActiveCat(c.id)}
-                label={c.name}
-                count={count}
-              />
-            );
-          })}
-        </div>
+    <Card bodyClassName="p-0 md:p-0">
+      <div className="flex flex-col gap-2 border-b border-black-iron/[0.06] p-4 sm:flex-row md:px-6">
+        <label className="relative flex-1">
+          <span className="sr-only">Search dishes</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" strokeWidth={1.6} />
+          <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search dishes" className="pl-10" />
+        </label>
+        <Select value={activeCat} onChange={(e) => setActiveCat(e.target.value)} aria-label="Category" className="sm:w-56">
+          <option value="all">All categories ({items.length})</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({items.filter((i) => i.category.id === c.id).length})
+            </option>
+          ))}
+        </Select>
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] overflow-hidden">
-        <div className="hidden md:grid grid-cols-[64px_minmax(0,1fr)_120px_120px_140px_100px_auto] items-center px-4 py-3 border-b border-warm-white/[0.08] text-[10px] tracking-[0.22em] uppercase font-medium text-warm-white/55">
-          <span></span>
-          <span>Dish</span>
-          <span>Category</span>
-          <span>Price</span>
-          <span>Tags</span>
-          <span>In stock</span>
-          <span></span>
-        </div>
-        {filtered.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="font-bold text-2xl tracking-[-0.03em] text-warm-white/70">
-              No dishes found.
-            </p>
-            <p className="mt-2 text-warm-white/50 text-[13px] font-light">
-              Try a different search or category.
-            </p>
+      {filtered.length === 0 ? (
+        <EmptyState title="No dishes found" description="Try another search or category." />
+      ) : (
+        <>
+          <div className="hidden grid-cols-[minmax(0,1fr)_96px_88px_88px_76px] items-center gap-3 border-b border-black-iron/[0.06] px-6 py-2.5 text-[12px] font-medium text-dark-grey md:grid">
+            <span>Dish</span>
+            <span className="text-right">Price</span>
+            <span className="text-center">On menu</span>
+            <span className="text-center">In stock</span>
+            <span />
           </div>
-        ) : (
-          <div className="divide-y divide-warm-white/[0.06]">
-            {filtered.map((item) => (
-              <div
+          <ul className="divide-y divide-black-iron/[0.06]">
+            {filtered.map((item, idx) => (
+              <li
                 key={item.id}
                 className={cn(
-                  "grid grid-cols-[64px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_120px_120px_140px_100px_auto] gap-3 md:gap-2 items-center px-4 py-3.5 transition-colors hover:bg-warm-white/[0.03]",
+                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_96px_88px_88px_76px] md:px-6",
                   pendingId === item.id && "opacity-50",
                 )}
               >
-                <div className="relative h-12 w-12 rounded-sm overflow-hidden bg-black-iron border border-warm-white/[0.06]">
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.name}
-                      fill
-                      sizes="48px"
-                      className="object-cover"
-                    />
-                  ) : null}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-warm-white text-[13px] truncate font-medium">
-                    {item.name}
-                    {!item.isActive && (
-                      <span className="ml-2 align-middle text-[9.5px] uppercase tracking-[0.18em] text-saffron-orange">
-                        Hidden
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-warm-white/45 text-[11px] truncate font-mono">
-                    {item.slug}
-                  </p>
-                  <p className="md:hidden text-warm-white/55 text-[11px] mt-1 font-light">
-                    {item.category.name} ·{" "}
-                    {formatPrice(item.price, item.currency)}
-                  </p>
-                </div>
-                <span className="hidden md:block text-warm-white/70 text-[13px] truncate font-light">
-                  {item.category.name}
+                <Link href={`/admin/menu-items/${item.id}`} className="flex min-w-0 items-center gap-3">
+                  <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[10px] bg-cream">
+                    {item.imageUrl && <Image src={item.imageUrl} alt="" fill sizes="48px" className="object-cover" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[14px] font-medium text-black-iron">{item.name}</span>
+                    <span className="flex items-center gap-2 text-[12.5px] text-dark-grey">
+                      <span className="truncate">{item.category.name}</span>
+                      <span className="tabular-nums md:hidden">· {formatPrice(item.price)}</span>
+                    </span>
+                    <span className="mt-1 flex gap-1.5 md:hidden">
+                      {!item.isActive && <StatusPill>Hidden</StatusPill>}
+                      {item.isActive && !item.isAvailable && <StatusPill tone="warn">Sold out</StatusPill>}
+                    </span>
+                  </span>
+                </Link>
+
+                <span className="hidden text-right text-[14px] tabular-nums md:block">{formatPrice(item.price)}</span>
+                <span className="hidden justify-center md:flex">
+                  <Switch
+                    checked={item.isActive}
+                    disabled={pendingId === item.id}
+                    aria-label={`Show ${item.name} on the menu`}
+                    onCheckedChange={(v) => patch(item, { isActive: v }, v ? "Shown on the menu" : "Hidden from the menu")}
+                  />
                 </span>
-                <span className="hidden md:block text-terracotta text-[13px] font-medium tabular-nums">
-                  {formatPrice(item.price, item.currency)}
-                </span>
-                <div className="hidden md:flex flex-wrap gap-1">
-                  {item.isSignature && (
-                    <Badge variant="signature">Sig</Badge>
-                  )}
-                  {item.isBestseller && !item.isSignature && (
-                    <Badge variant="default">
-                      <Star className="h-2.5 w-2.5" strokeWidth={1.6} /> Best
-                    </Badge>
-                  )}
-                  {item.isNew && <Badge variant="new">New</Badge>}
-                  {item.isVegetarian && (
-                    <Badge variant="veg">
-                      <Leaf className="h-2.5 w-2.5" strokeWidth={1.6} />
-                    </Badge>
-                  )}
-                  {item.spicyLevel > 0 && (
-                    <Badge variant="spicy">
-                      <Flame className="h-2.5 w-2.5" strokeWidth={1.6} />
-                    </Badge>
-                  )}
-                </div>
-                <div className="hidden md:flex items-center gap-2">
+                <span className="flex justify-center">
                   <Switch
                     checked={item.isAvailable}
-                    onCheckedChange={(v) => toggleAvailable(item, v)}
                     disabled={pendingId === item.id}
+                    aria-label={`${item.name} in stock`}
+                    onCheckedChange={(v) => patch(item, { isAvailable: v }, v ? "Back in stock" : "Marked sold out")}
                   />
-                  <span className="text-warm-white/55">
-                    {item.isAvailable ? (
-                      <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 justify-end">
-                  {activeCat !== "all" && !query && (
+                </span>
+                <span className="hidden items-center justify-end gap-0.5 md:flex">
+                  {canReorder ? (
                     <>
-                      <button
-                        onClick={() => move(item, -1)}
-                        className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06]"
-                        aria-label="Move up"
-                        disabled={pendingId !== null}
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      </button>
-                      <button
-                        onClick={() => move(item, 1)}
-                        className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06]"
-                        aria-label="Move down"
-                        disabled={pendingId !== null}
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      </button>
+                      <IconButton label="Move up" disabled={idx === 0 || pendingId !== null} onClick={() => move(item, -1)}>
+                        <ArrowUp className="h-4 w-4" />
+                      </IconButton>
+                      <IconButton label="Move down" disabled={idx === filtered.length - 1 || pendingId !== null} onClick={() => move(item, 1)}>
+                        <ArrowDown className="h-4 w-4" />
+                      </IconButton>
                     </>
+                  ) : (
+                    <Link href={`/admin/menu-items/${item.id}`} aria-label={`Edit ${item.name}`} className="grid h-9 w-9 place-items-center rounded-full text-dark-grey hover:bg-black-iron/[0.05]">
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
                   )}
-                  <Link
-                    href={`/admin/menu-items/${item.id}`}
-                    className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06] transition-colors"
-                    aria-label="Edit"
-                  >
-                    <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  </Link>
-                  <button
-                    onClick={() => remove(item)}
-                    className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-pomegranate-red hover:bg-pomegranate-red/[0.10] transition-colors"
-                    aria-label="Delete"
-                    disabled={pendingId === item.id}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  </button>
-                </div>
-              </div>
+                </span>
+              </li>
             ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function CatChip({
-  active,
-  onClick,
-  label,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  count: number;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "shrink-0 inline-flex items-center gap-1.5 px-3 h-8 rounded-pill text-[10px] tracking-[0.22em] uppercase font-medium transition-colors border",
-        active
-          ? "bg-terracotta text-warm-white border-terracotta"
-          : "bg-transparent text-warm-white/65 hover:text-warm-white border-warm-white/15",
+          </ul>
+          {!canReorder && (
+            <p className="border-t border-black-iron/[0.06] px-6 py-3 text-[12px] text-dark-grey">
+              Choose a category to reorder its dishes.
+            </p>
+          )}
+        </>
       )}
-    >
-      {label}
-      <span
-        className={cn(
-          "text-[10px] tabular-nums",
-          active ? "text-warm-white/80" : "text-warm-white/45",
-        )}
-      >
-        {count}
-      </span>
-    </button>
+    </Card>
   );
 }

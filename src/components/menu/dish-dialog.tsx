@@ -75,12 +75,6 @@ export function DishDialog({
               </DialogDescription>
             )}
 
-            {d.story && (
-              <p className="mt-4 border-l-2 border-terracotta/40 pl-4 text-[14px] italic leading-[1.65] text-dark-grey">
-                {d.story}
-              </p>
-            )}
-
             <DishBadges dish={d} className="mt-6" />
 
             {(d.ingredients || d.allergens) && (
@@ -109,7 +103,7 @@ export function DishDialog({
                 <div>
                   <p className="caption">Price</p>
                   <p className="mt-2 text-3xl font-bold tabular-nums tracking-[-0.03em] text-terracotta-ink">
-                    {formatPrice(d.price, d.currency)}
+                    {formatPrice(d.price)}
                   </p>
                 </div>
                 <Link

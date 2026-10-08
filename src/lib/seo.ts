@@ -81,7 +81,7 @@ function offer(dish: DishCardData) {
   return {
     "@type": "Offer",
     price: dish.price.toFixed(2),
-    priceCurrency: dish.currency,
+    priceCurrency: "AED",
     availability: dish.isAvailable
       ? "https://schema.org/InStock"
       : "https://schema.org/OutOfStock",
@@ -102,7 +102,6 @@ export function menuJsonLd(categories: MenuCategoryWithItems[]) {
     hasMenuSection: categories.map((c) => ({
       "@type": "MenuSection",
       name: c.name,
-      description: c.description ?? undefined,
       hasMenuItem: c.items.map((i) => ({
         "@type": "MenuItem",
         name: i.name,

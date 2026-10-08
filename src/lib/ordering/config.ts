@@ -7,6 +7,9 @@ import { toFils } from "@/lib/ordering/money";
 import { getOnlineProvider } from "@/lib/payments";
 import type { OrderingConfig } from "@/lib/ordering/types";
 
+/** SHĀZDEH cooks in Dubai; every hours calculation uses this clock. */
+export const KITCHEN_TIMEZONE = "Asia/Dubai";
+
 export type OrderingSettingsRow = Awaited<ReturnType<typeof loadRow>>;
 
 const DEFAULTS = {
@@ -14,7 +17,6 @@ const DEFAULTS = {
   acceptingOrders: false,
   pausedMessage: null as string | null,
   deliveryHours: null as string | null,
-  timezone: "Asia/Dubai",
   kitchenLat: null as number | null,
   kitchenLng: null as number | null,
   vatRate: 5,
@@ -26,9 +28,7 @@ const DEFAULTS = {
     | "ONLINE"
   )[],
   deliveryModel: "OWN_FLEET" as "OWN_FLEET" | "THIRD_PARTY" | "HYBRID",
-  prepMinutes: 25,
   autoAccept: false,
-  cutleryDefault: false,
   notifyEmail: null as string | null,
   legalName: null as string | null,
   tradeLicenseNo: null as string | null,
@@ -52,7 +52,7 @@ export const getOrderingSettings = cache(loadRow);
 /** Hours that gate ordering: delivery hours, else the site's opening hours. */
 export async function getEffectiveHours() {
   const [row, site] = await Promise.all([getOrderingSettings(), getSettings()]);
-  return { hours: row.deliveryHours ?? site.openingHours, timezone: row.timezone };
+  return { hours: row.deliveryHours ?? site.openingHours, timezone: KITCHEN_TIMEZONE };
 }
 
 export async function getOrderingConfig(now = new Date()): Promise<OrderingConfig> {
@@ -72,7 +72,5 @@ export async function getOrderingConfig(now = new Date()): Promise<OrderingConfi
     serviceFeeFils: toFils(row.serviceFee),
     paymentMethods: methods,
     onlineProviderLabel: provider?.label ?? null,
-    cutleryDefault: row.cutleryDefault,
-    prepMinutes: row.prepMinutes,
   };
 }

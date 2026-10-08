@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AdminPageHeader } from "@/components/admin/page-header";
+import { AdminPage } from "@/components/admin/ui";
 import { TeamManager } from "@/components/admin/ordering/team-manager";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -12,13 +12,8 @@ export default async function TeamPage() {
   if (user.role !== "ADMIN") redirect("/admin");
   const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, email: true, name: true, role: true } });
   return (
-    <div className="container-shazdeh space-y-10 py-10 md:py-14">
-      <AdminPageHeader
-        eyebrow="Atelier"
-        title="Team"
-        description="Give kitchen tablets a Staff login: they see the orders board and nothing else."
-      />
+    <AdminPage title="Team" description="Who can sign in. Staff accounts only see the orders board.">
       <TeamManager users={users} selfId={user.id} />
-    </div>
+    </AdminPage>
   );
 }

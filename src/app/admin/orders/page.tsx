@@ -1,4 +1,4 @@
-import { AdminPageHeader } from "@/components/admin/page-header";
+import { AdminPage } from "@/components/admin/ui";
 import { OrdersBoard } from "@/components/admin/orders/orders-board";
 import { listOrders } from "@/lib/ordering/admin";
 import { getOrderingSettings } from "@/lib/ordering/config";
@@ -11,16 +11,11 @@ export default async function OrdersPage() {
   const [data, settings] = await Promise.all([listOrders("active"), getOrderingSettings()]);
   const providers = providersForModel(settings.deliveryModel).map(({ id, label, description }) => ({ id, label, description }));
   return (
-    <div className="container-shazdeh space-y-8 py-10 md:py-14">
-      <AdminPageHeader
-        eyebrow="Kitchen"
-        title="Orders"
-        description="New orders appear here automatically. Accept, cook, dispatch — one tap per step."
-      />
+    <AdminPage title="Orders" className="max-w-[1600px]">
       <OrdersBoard
         initial={{ ...data, acceptingOrders: settings.acceptingOrders, serverTime: new Date().toISOString() }}
         providers={providers}
       />
-    </div>
+    </AdminPage>
   );
 }

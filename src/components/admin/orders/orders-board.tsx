@@ -122,7 +122,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
 
   // Tab title shows waiting orders, so a backgrounded tab still nags.
   React.useEffect(() => {
-    document.title = data.counts.new > 0 ? `(${data.counts.new}) New orders · Atelier` : "Orders · Atelier";
+    document.title = data.counts.new > 0 ? `(${data.counts.new}) New orders · SHĀZDEH` : "Orders · SHĀZDEH Admin";
   }, [data.counts.new]);
 
   // Ring until nothing is waiting in "New" — accepting (or rejecting) the
@@ -221,14 +221,14 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
   return (
     <div className="space-y-6">
       {/* Control bar */}
-      <div className="flex flex-col gap-3 rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex cursor-pointer items-center gap-3">
           <Switch checked={data.acceptingOrders} onCheckedChange={toggleAccepting} />
           <span>
-            <span className={cn("block text-[15px] font-semibold", data.acceptingOrders ? "text-olive-leaf brightness-150" : "text-pomegranate-red brightness-150")}>
+            <span className={cn("block text-[15px] font-semibold", data.acceptingOrders ? "text-olive-leaf" : "text-pomegranate-red")}>
               {data.acceptingOrders ? "Accepting online orders" : "Online ordering paused"}
             </span>
-            <span className="block text-[12px] text-warm-white/55">Pause when the kitchen is overloaded.</span>
+            <span className="block text-[12px] text-dark-grey">Pause when the kitchen is overloaded.</span>
           </span>
         </label>
         <button
@@ -237,7 +237,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
           aria-pressed={sound}
           className={cn(
             "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-[12px] font-medium",
-            sound ? "border-terracotta/50 text-terracotta" : "border-warm-white/20 text-warm-white/80",
+            sound ? "border-terracotta/50 text-terracotta-ink" : "border-black-iron/20 text-black-iron/80",
           )}
         >
           {ringing ? (
@@ -277,13 +277,13 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
             }}
             className={cn(
               "h-10 shrink-0 rounded-pill px-4 text-[11px] font-medium uppercase tracking-[0.2em]",
-              view === key ? "bg-terracotta text-white" : "border border-warm-white/15 text-warm-white/70",
+              view === key ? "bg-terracotta text-white" : "border border-black-iron/15 text-black-iron/80",
             )}
           >
             {label}
           </button>
         ))}
-        {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin self-center text-warm-white/50" />}
+        {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin self-center text-dark-grey" />}
       </div>
 
       {view === "active" ? (
@@ -297,7 +297,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
                   onClick={() => setMobileCol(i)}
                   className={cn(
                     "h-10 shrink-0 rounded-md px-3 text-[13px]",
-                    mobileCol === i ? "bg-warm-white text-black-iron" : "bg-warm-white/[0.05] text-warm-white/70",
+                    mobileCol === i ? "bg-black-iron text-black-iron" : "bg-black-iron/[0.05] text-black-iron/80",
                   )}
                 >
                   {c.title} <span className="tabular-nums">{n}</span>
@@ -310,12 +310,12 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
               const orders = data.orders.filter((o) => c.statuses.includes(o.status));
               return (
                 <section key={c.title} className={cn("space-y-3", mobileCol !== i && "max-lg:hidden")} aria-label={c.title}>
-                  <h2 className="hidden items-center justify-between text-[11px] font-medium uppercase tracking-[0.22em] text-warm-white/55 lg:flex">
+                  <h2 className="hidden items-center justify-between text-[11px] font-medium uppercase tracking-[0.22em] text-dark-grey lg:flex">
                     {c.title}
                     <span className="tabular-nums">{orders.length}</span>
                   </h2>
                   {orders.length === 0 && (
-                    <p className="rounded-md border border-dashed border-warm-white/10 px-4 py-8 text-center text-[13px] text-warm-white/40">
+                    <p className="rounded-[16px] border border-dashed border-black-iron/15 px-4 py-8 text-center text-[13px] text-dark-grey">
                       Nothing here
                     </p>
                   )}
@@ -345,13 +345,13 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
               }}
               className="relative max-w-md"
             >
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-warm-white/45" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order number, phone or name" className="pl-10" />
             </form>
           )}
           <HistoryTable orders={data.orders} />
           {view === "history" && data.pages > 1 && (
-            <div className="flex items-center gap-3 text-[13px] text-warm-white/70">
+            <div className="flex items-center gap-3 text-[13px] text-black-iron/80">
               <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="min-h-10 px-3 disabled:opacity-30">
                 ← Newer
               </button>
@@ -396,7 +396,7 @@ function PaymentBadge({ order }: { order: BoardOrder }) {
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
-        paid ? "bg-olive-leaf/30 text-warm-white" : "bg-saffron-orange/20 text-saffron-orange",
+        paid ? "bg-olive-leaf/[0.12] text-olive-leaf" : "bg-saffron-orange/[0.16] text-cinnamon-bark",
       )}
     >
       <Icon className="h-3.5 w-3.5" strokeWidth={1.6} />
@@ -425,46 +425,46 @@ function OrderCard({
   return (
     <article
       className={cn(
-        "rounded-md border bg-warm-white/[0.03] p-4",
-        o.status === "RECEIVED" ? "border-terracotta/60 shadow-[0_0_0_1px_rgba(206,73,39,0.35)]" : "border-warm-white/[0.08]",
+        "rounded-[16px] border bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
+        o.status === "RECEIVED" ? "border-terracotta/60 shadow-[0_0_0_1px_rgba(206,73,39,0.35)]" : "border-black-iron/[0.08]",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link href={`/admin/orders/${o.id}`} className="text-[20px] font-bold tabular-nums tracking-[-0.02em] text-warm-white hover:text-terracotta">
+          <Link href={`/admin/orders/${o.id}`} className="whitespace-nowrap text-[20px] font-bold tabular-nums tracking-[-0.02em] text-black-iron hover:text-terracotta-ink">
             {o.number}
           </Link>
-          <p className="mt-0.5 text-[12.5px] text-warm-white/60">
+          <p className="mt-0.5 text-[12.5px] text-dark-grey">
             {o.customerName.split(" ")[0]} · {o.areaName}
           </p>
         </div>
         <div className="text-right">
-          <p className={cn("text-[13px] font-semibold tabular-nums", urgent || late ? "text-terracotta" : "text-warm-white/80")}>
+          <p className={cn("text-[13px] font-semibold tabular-nums", urgent || late ? "text-terracotta-ink" : "text-black-iron/80")}>
             {waited} min
           </p>
-          <p className="text-[11px] text-warm-white/45">{STAFF_LABEL[o.status]}</p>
+          <p className="text-[11px] text-dark-grey">{STAFF_LABEL[o.status]}</p>
         </div>
       </div>
 
-      <ul className="mt-3 space-y-1.5 border-t border-warm-white/[0.06] pt-3 text-[14px] text-warm-white">
+      <ul className="mt-3 space-y-1.5 border-t border-black-iron/[0.06] pt-3 text-[14px] text-black-iron">
         {o.items.map((i, idx) => (
           <li key={idx}>
-            <span className="font-bold tabular-nums text-terracotta">{i.quantity}×</span> {i.name}
-            {i.portion && <span className="text-warm-white/60"> ({i.portion})</span>}
-            {i.modifiers.length > 0 && <span className="block pl-6 text-[12.5px] text-warm-white/60">{i.modifiers.join(" · ")}</span>}
-            {i.notes && <span className="block pl-6 text-[12.5px] italic text-saffron-orange">“{i.notes}”</span>}
+            <span className="font-bold tabular-nums text-terracotta-ink">{i.quantity}×</span> {i.name}
+            {i.portion && <span className="text-dark-grey"> ({i.portion})</span>}
+            {i.modifiers.length > 0 && <span className="block pl-6 text-[12.5px] text-dark-grey">{i.modifiers.join(" · ")}</span>}
+            {i.notes && <span className="block pl-6 text-[12.5px] italic text-cinnamon-bark">“{i.notes}”</span>}
           </li>
         ))}
       </ul>
       {o.notes && (
-        <p className="mt-2 rounded-sm bg-saffron-orange/10 px-2.5 py-1.5 text-[12.5px] text-saffron-orange">Note: {o.notes}</p>
+        <p className="mt-2 rounded-sm bg-saffron-orange/[0.12] px-2.5 py-1.5 text-[12.5px] text-cinnamon-bark">Note: {o.notes}</p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <PaymentBadge order={o} />
-        <span className="text-[13px] font-semibold tabular-nums text-warm-white">{formatFils(o.totalFils)}</span>
+        <span className="text-[13px] font-semibold tabular-nums text-black-iron">{formatFils(o.totalFils)}</span>
         {o.cutlery && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-warm-white/55">
+          <span className="inline-flex items-center gap-1 text-[11px] text-dark-grey">
             <Utensils className="h-3 w-3" /> Cutlery
           </span>
         )}
@@ -486,7 +486,7 @@ function OrderCard({
           <button
             type="button"
             onClick={onReject}
-            className="min-h-12 rounded-md border border-warm-white/15 px-4 text-[13px] text-warm-white/75 hover:border-pomegranate-red hover:text-white"
+            className="min-h-12 rounded-md border border-black-iron/15 px-4 text-[13px] text-black-iron/80 hover:border-pomegranate-red hover:text-pomegranate-red"
           >
             Reject
           </button>
@@ -498,12 +498,12 @@ function OrderCard({
 
 function HistoryTable({ orders }: { orders: BoardOrder[] }) {
   if (orders.length === 0) {
-    return <p className="rounded-md border border-warm-white/[0.08] py-16 text-center text-[14px] text-warm-white/50">No orders.</p>;
+    return <p className="rounded-[16px] border border-black-iron/[0.07] bg-white py-16 text-center text-[14px] text-dark-grey">No orders.</p>;
   }
   return (
-    <div className="overflow-hidden rounded-md border border-warm-white/[0.08]">
+    <div className="overflow-hidden rounded-[16px] border border-black-iron/[0.07] bg-white">
       <table className="w-full text-left text-[13px]">
-        <thead className="border-b border-warm-white/[0.08] text-[10px] uppercase tracking-[0.2em] text-warm-white/50">
+        <thead className="border-b border-black-iron/[0.08] text-[10px] uppercase tracking-[0.2em] text-dark-grey">
           <tr>
             <th className="px-4 py-3 font-medium">Order</th>
             <th className="px-4 py-3 font-medium max-md:hidden">Placed</th>
@@ -512,22 +512,22 @@ function HistoryTable({ orders }: { orders: BoardOrder[] }) {
             <th className="px-4 py-3 text-right font-medium">Total</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-warm-white/[0.06]">
+        <tbody className="divide-y divide-black-iron/[0.06]">
           {orders.map((o) => (
-            <tr key={o.id} className="hover:bg-warm-white/[0.03]">
+            <tr key={o.id} className="hover:bg-black-iron/[0.03]">
               <td className="px-4 py-3">
-                <Link href={`/admin/orders/${o.id}`} className="font-semibold tabular-nums text-warm-white hover:text-terracotta">
+                <Link href={`/admin/orders/${o.id}`} className="font-semibold tabular-nums text-black-iron hover:text-terracotta-ink">
                   {o.number}
                 </Link>
               </td>
-              <td className="px-4 py-3 tabular-nums text-warm-white/60 max-md:hidden">
+              <td className="px-4 py-3 tabular-nums text-dark-grey max-md:hidden">
                 {new Date(o.placedAt).toLocaleString("en-AE", { timeZone: "Asia/Dubai", dateStyle: "medium", timeStyle: "short" })}
               </td>
-              <td className="px-4 py-3 text-warm-white/75 max-sm:hidden">
+              <td className="px-4 py-3 text-black-iron/80 max-sm:hidden">
                 {o.customerName} · {o.areaName}
               </td>
-              <td className="px-4 py-3 text-warm-white/75">{STAFF_LABEL[o.status]}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-warm-white">{formatFils(o.totalFils)}</td>
+              <td className="px-4 py-3 text-black-iron/80">{STAFF_LABEL[o.status]}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-black-iron">{formatFils(o.totalFils)}</td>
             </tr>
           ))}
         </tbody>

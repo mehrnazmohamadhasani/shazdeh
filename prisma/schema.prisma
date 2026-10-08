@@ -30,25 +30,12 @@ model User {
   updatedAt     DateTime @updatedAt
 }
 
-model Session {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
 // ─── Menu ────────────────────────────────────────────────────────────────────
 
 model Category {
   id          String     @id @default(cuid())
   slug        String     @unique
   name        String
-  tagline     String?
-  description String?
-  imageUrl    String?
   order       Int        @default(0)
   isActive    Boolean    @default(true)
   items       MenuItem[]
@@ -62,21 +49,14 @@ model MenuItem {
   name          String
   nameFa        String?
   description   String?
-  story         String?
   price         Float
-  currency      String        @default("AED")
   imageUrl      String?
   categoryId    String
   category      Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  variants      ItemVariant[]
   ingredients   String?
   allergens     String?
-  spicyLevel    Int           @default(0) // 0 = none, 1 = mild, 2 = medium, 3 = hot
   isVegetarian  Boolean       @default(false)
   isAvailable   Boolean       @default(true)
-  isBestseller  Boolean       @default(false)
-  isNew         Boolean       @default(false)
-  isSignature   Boolean       @default(false)
   // false = hidden from the menu and ordering entirely ("disabled").
   // isAvailable=false keeps it visible but marked sold out.
   isActive      Boolean       @default(true)
@@ -118,43 +98,14 @@ model ModifierOption {
   @@index([groupId])
 }
 
-model ItemVariant {
-  id          String   @id @default(cuid())
-  itemId      String
-  item        MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  label       String
-  price       Float
-  isAvailable Boolean  @default(true)
-  order       Int      @default(0)
-
-  @@index([itemId])
-}
-
 // ─── Content ────────────────────────────────────────────────────────────────
-
-model Banner {
-  id          String   @id @default(cuid())
-  title       String
-  subtitle    String?
-  ctaLabel    String?
-  ctaHref     String?
-  imageUrl    String
-  position    String   @default("home_hero") // home_hero | home_secondary | menu_hero
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
 
 model GalleryImage {
   id        String   @id @default(cuid())
-  title     String?
-  caption   String?
   imageUrl  String
   width     Int?
   height    Int?
   order     Int      @default(0)
-  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -164,7 +115,6 @@ model SocialLink {
   platform  String   // instagram | tiktok | whatsapp | talabat | deliveroo | careem | noon
   label     String
   url       String
-  icon      String?
   order     Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -174,17 +124,13 @@ model SocialLink {
 model RestaurantSettings {
   id            String   @id @default("default")
   brandName     String   @default("Shazdeh")
-  tagline       String?
   description   String?
   email         String?
   phone         String?
   whatsapp      String?
   address       String?
-  mapUrl        String?
   openingHours  String?  // JSON string of weekly hours
-  heroVideoUrl  String?
   logoUrl       String?
-  faviconUrl    String?
   metaTitle     String?
   metaDesc      String?
   ogImageUrl    String?
@@ -243,7 +189,6 @@ model OrderingSettings {
   pausedMessage      String?
   // JSON object day → "12:00 — 23:00"; null falls back to opening hours.
   deliveryHours      String?
-  timezone           String          @default("Asia/Dubai")
   kitchenLat         Float?
   kitchenLng         Float?
   vatRate            Float           @default(5)
@@ -253,9 +198,7 @@ model OrderingSettings {
   serviceFee         Float           @default(0)
   paymentMethods     PaymentMethod[] @default([CASH_ON_DELIVERY, CARD_ON_DELIVERY])
   deliveryModel      DeliveryModel   @default(OWN_FLEET)
-  prepMinutes        Int             @default(25)
   autoAccept         Boolean         @default(false)
-  cutleryDefault     Boolean         @default(false)
   notifyEmail        String?
   // Legal identity — printed on receipts (simplified tax invoice) and in
   // the site's legal disclosure (Consumer Protection Law Art. 25).
@@ -269,7 +212,6 @@ model OrderingSettings {
 model DeliveryZone {
   id               String         @id @default(cuid())
   name             String
-  description      String?
   fee              Float          @default(0)
   minOrder         Float          @default(0)
   freeDeliveryOver Float?
@@ -294,8 +236,6 @@ model DeliveryArea {
   name     String       @unique
   lat      Float?
   lng      Float?
-  isActive Boolean      @default(true)
-  order    Int          @default(0)
 
   @@index([zoneId])
 }

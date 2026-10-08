@@ -4,9 +4,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Card, EmptyState, Field, Select, StatusPill, TextInput } from "@/components/admin/ui";
 
 export type CouponRow = {
   id: string;
@@ -43,25 +42,38 @@ const BLANK: CouponRow = {
 const toLocal = (iso: string | null) => (iso ? new Date(iso).toISOString().slice(0, 16) : "");
 const fromLocal = (v: string) => (v ? new Date(v).toISOString() : null);
 
+function summary(c: CouponRow) {
+  if (c.type === "FREE_DELIVERY") return "Free delivery";
+  return c.type === "PERCENT" ? `${c.value}% off` : `${c.value} AED off`;
+}
+
 export function CouponsManager({ coupons }: { coupons: CouponRow[] }) {
   const [adding, setAdding] = React.useState(false);
   return (
-    <div className="space-y-4">
-      <p className="max-w-2xl text-[13px] text-warm-white/60">
-        Codes are checked and applied on the server. Phone numbers aren&apos;t verified yet, so “per phone” limits deter casual reuse
-        but can be bypassed with another number — keep big welcome offers small or capped until SMS verification is added.
-      </p>
+    <>
+      {coupons.length === 0 && !adding && (
+        <Card>
+          <EmptyState
+            title="No promo codes"
+            description="Codes are checked and applied by the server at checkout."
+            action={
+              <Button size="sm" onClick={() => setAdding(true)}>
+                <Plus className="h-4 w-4" /> New promo code
+              </Button>
+            }
+          />
+        </Card>
+      )}
+      {adding && <CouponEditor coupon={BLANK} onDone={() => setAdding(false)} />}
       {coupons.map((c) => (
         <CouponEditor key={c.id} coupon={c} />
       ))}
-      {adding ? (
-        <CouponEditor coupon={BLANK} onDone={() => setAdding(false)} />
-      ) : (
-        <Button onClick={() => setAdding(true)}>
+      {coupons.length > 0 && !adding && (
+        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
           <Plus className="h-4 w-4" /> New promo code
         </Button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -103,58 +115,70 @@ function CouponEditor({ coupon, onDone }: { coupon: CouponRow; onDone?: () => vo
   }
 
   return (
-    <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5">
-      <div className="grid gap-4 md:grid-cols-6">
-        <F label="Code"><Input value={d.code} onChange={(e) => set("code", e.target.value.toUpperCase())} className="font-mono uppercase" placeholder="WELCOME10" /></F>
-        <F label="Type">
-          <select
-            value={d.type}
-            onChange={(e) => set("type", e.target.value as CouponRow["type"])}
-            className="flex h-12 w-full rounded-md border border-warm-white/10 bg-black-iron/60 px-3 text-[13px] text-warm-white"
-          >
+    <Card
+      title={isNew ? "New promo code" : <span className="font-mono">{coupon.code}</span>}
+      description={isNew ? undefined : `${summary(coupon)} · used ${coupon.usedCount}×`}
+      actions={
+        <span className="flex items-center gap-3">
+          {!isNew && !coupon.isActive && <StatusPill>Off</StatusPill>}
+          <Switch checked={d.isActive} aria-label="Active" onCheckedChange={(v) => set("isActive", v)} />
+        </span>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Field label="Code">
+          <TextInput value={d.code} onChange={(e) => set("code", e.target.value.toUpperCase())} className="font-mono uppercase" placeholder="WELCOME10" />
+        </Field>
+        <Field label="Discount">
+          <Select value={d.type} onChange={(e) => set("type", e.target.value as CouponRow["type"])}>
             <option value="PERCENT">% off</option>
             <option value="FIXED">AED off</option>
             <option value="FREE_DELIVERY">Free delivery</option>
-          </select>
-        </F>
+          </Select>
+        </Field>
         {d.type !== "FREE_DELIVERY" && (
-          <F label={d.type === "PERCENT" ? "Percent" : "Amount (AED)"}><Input type="number" min={0} value={d.value} onChange={(e) => set("value", Number(e.target.value))} /></F>
+          <Field label={d.type === "PERCENT" ? "Percent" : "Amount (AED)"}>
+            <TextInput type="number" min={0} value={d.value} onChange={(e) => set("value", Number(e.target.value))} />
+          </Field>
         )}
-        <F label="Min. subtotal"><Input type="number" min={0} value={d.minSubtotal} onChange={(e) => set("minSubtotal", Number(e.target.value))} /></F>
-        <F label="Max discount"><Input type="number" min={0} placeholder="—" value={d.maxDiscount ?? ""} onChange={(e) => set("maxDiscount", nOrNull(e.target.value))} /></F>
-        <F label="Description"><Input value={d.description ?? ""} onChange={(e) => set("description", e.target.value || null)} placeholder="Shown to customer" /></F>
-        <F label="Starts"><Input type="datetime-local" value={toLocal(d.startsAt)} onChange={(e) => set("startsAt", fromLocal(e.target.value))} /></F>
-        <F label="Ends"><Input type="datetime-local" value={toLocal(d.endsAt)} onChange={(e) => set("endsAt", fromLocal(e.target.value))} /></F>
-        <F label="Total uses"><Input type="number" min={1} placeholder="∞" value={d.usageLimit ?? ""} onChange={(e) => set("usageLimit", nOrNull(e.target.value))} /></F>
-        <F label="Uses per phone"><Input type="number" min={1} placeholder="∞" value={d.perPhoneLimit ?? ""} onChange={(e) => set("perPhoneLimit", nOrNull(e.target.value))} /></F>
-        <div className="flex items-end gap-3 md:col-span-2">
-          <label className="flex min-h-12 items-center gap-2 text-[12px] text-warm-white/70">
-            <Switch checked={d.isActive} onCheckedChange={(v) => set("isActive", v)} /> Active
-          </label>
-          {!isNew && <span className="pb-3.5 text-[12px] tabular-nums text-warm-white/50">Used {coupon.usedCount}×</span>}
-        </div>
+        <Field label="Minimum order (AED)">
+          <TextInput type="number" min={0} value={d.minSubtotal} onChange={(e) => set("minSubtotal", Number(e.target.value))} />
+        </Field>
+        {d.type === "PERCENT" && (
+          <Field label="Max discount (AED)">
+            <TextInput type="number" min={0} placeholder="No cap" value={d.maxDiscount ?? ""} onChange={(e) => set("maxDiscount", nOrNull(e.target.value))} />
+          </Field>
+        )}
+        <Field label="Total uses">
+          <TextInput type="number" min={1} placeholder="Unlimited" value={d.usageLimit ?? ""} onChange={(e) => set("usageLimit", nOrNull(e.target.value))} />
+        </Field>
+        <Field label="Uses per customer">
+          <TextInput type="number" min={1} placeholder="Unlimited" value={d.perPhoneLimit ?? ""} onChange={(e) => set("perPhoneLimit", nOrNull(e.target.value))} />
+        </Field>
+        <Field label="Starts">
+          <TextInput type="datetime-local" value={toLocal(d.startsAt)} onChange={(e) => set("startsAt", fromLocal(e.target.value))} />
+        </Field>
+        <Field label="Ends">
+          <TextInput type="datetime-local" value={toLocal(d.endsAt)} onChange={(e) => set("endsAt", fromLocal(e.target.value))} />
+        </Field>
+        <Field label="Note for customers" className="col-span-2">
+          <TextInput value={d.description ?? ""} onChange={(e) => set("description", e.target.value || null)} placeholder="e.g. 10% off your first order" />
+        </Field>
       </div>
-      <div className="mt-4 flex justify-between">
+      <div className="mt-5 flex items-center justify-between">
         {isNew ? (
-          <Button variant="ghost" onClick={onDone}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={onDone}>
+            Cancel
+          </Button>
         ) : (
-          <Button variant="ghost" className="text-pomegranate-red" onClick={remove}>
+          <Button variant="ghost" size="sm" className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]" onClick={remove}>
             <Trash2 className="h-4 w-4" /> Delete
           </Button>
         )}
-        <Button onClick={save} disabled={busy || d.code.length < 3}>
+        <Button size="sm" onClick={save} disabled={busy || d.code.length < 3}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save
         </Button>
       </div>
-    </section>
-  );
-}
-
-function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
-    </div>
+    </Card>
   );
 }

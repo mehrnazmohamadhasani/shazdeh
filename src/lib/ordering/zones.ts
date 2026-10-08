@@ -40,7 +40,16 @@ export const getDeliveryNetwork = cache(async (): Promise<{ zones: ZoneTerms[]; 
     const zones = await prisma.deliveryZone.findMany({
       where: { isActive: true },
       orderBy: { order: "asc" },
-      include: { areas: { where: { isActive: true }, orderBy: [{ order: "asc" }, { name: "asc" }] } },
+      select: {
+        id: true,
+        name: true,
+        fee: true,
+        minOrder: true,
+        freeDeliveryOver: true,
+        etaMin: true,
+        etaMax: true,
+        areas: { select: { id: true, name: true, lat: true, lng: true } },
+      },
     });
     return {
       zones: zones.map(toZoneTerms),
@@ -70,7 +79,7 @@ export async function resolveDelivery(
     where: { id: areaId },
     include: { zone: true },
   });
-  if (!area || !area.isActive || !area.zone.isActive) {
+  if (!area || !area.zone.isActive) {
     return { ok: false, reason: "Sorry — we don't deliver to this area yet." };
   }
   if (lat != null && lng != null && area.zone.radiusKm) {

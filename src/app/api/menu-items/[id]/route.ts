@@ -17,7 +17,7 @@ export async function GET(
     const { id } = await ctx.params;
     const item = await prisma.menuItem.findUnique({
       where: { id },
-      include: { category: true, variants: true },
+      include: { category: true },
     });
     if (!item) return notFound();
     return ok(item);

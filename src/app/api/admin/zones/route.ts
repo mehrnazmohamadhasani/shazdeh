@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const { areas, ...zone } = parsed.data;
   try {
     const row = await prisma.deliveryZone.create({
-      data: { ...zone, areas: { create: areas.map((a, i) => ({ ...a, order: i })) } },
+      data: { ...zone, areas: { create: areas } },
       include: { areas: true },
     });
     revalidateSite();

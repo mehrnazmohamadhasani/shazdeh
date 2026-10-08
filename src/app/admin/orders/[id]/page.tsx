@@ -14,7 +14,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const { order, previousOrders } = detail;
   const providers = providersForModel(settings.deliveryModel).map(({ id, label, description }) => ({ id, label, description }));
   return (
-    <div className="container-shazdeh py-10 md:py-14">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 md:px-8 md:py-10">
       <OrderDetail
         providers={providers}
         order={{

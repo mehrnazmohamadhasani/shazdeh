@@ -53,10 +53,10 @@ export function ReasonDialog({
   const [busy, setBusy] = React.useState(false);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-theme="dark" className="bg-black-iron text-warm-white sm:max-w-md">
+      <DialogContent className="bg-white text-black-iron sm:max-w-md">
         <div className="p-6">
-          <DialogTitle className="text-2xl text-warm-white">{title}</DialogTitle>
-          <DialogDescription className="mt-2 text-warm-white/60">The customer sees this reason.</DialogDescription>
+          <DialogTitle className="text-2xl text-black-iron">{title}</DialogTitle>
+          <DialogDescription className="mt-2 text-dark-grey">The customer sees this reason.</DialogDescription>
           <div className="mt-5 flex flex-wrap gap-2">
             {REJECT_REASONS.map((r) => (
               <button
@@ -65,7 +65,7 @@ export function ReasonDialog({
                 onClick={() => setReason(r)}
                 className={cn(
                   "min-h-10 rounded-full border px-3.5 text-[12.5px]",
-                  reason === r ? "border-terracotta bg-terracotta/20 text-warm-white" : "border-warm-white/15 text-warm-white/75",
+                  reason === r ? "border-terracotta bg-terracotta/20 text-black-iron" : "border-black-iron/15 text-black-iron/80",
                 )}
               >
                 {r}
@@ -125,10 +125,10 @@ export function DispatchDialog({
   const [busy, setBusy] = React.useState(false);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-theme="dark" className="bg-black-iron text-warm-white sm:max-w-md">
+      <DialogContent className="bg-white text-black-iron sm:max-w-md">
         <div className="space-y-4 p-6">
-          <DialogTitle className="text-2xl text-warm-white">Dispatch order</DialogTitle>
-          <DialogDescription className="text-warm-white/60">
+          <DialogTitle className="text-2xl text-black-iron">Dispatch order</DialogTitle>
+          <DialogDescription className="text-dark-grey">
             Optional details. The customer sees the rider&apos;s first name and any courier tracking link.
           </DialogDescription>
           {providers.length > 1 && (
@@ -140,7 +140,7 @@ export function DispatchDialog({
                   onClick={() => setProvider(p.id)}
                   className={cn(
                     "min-h-12 rounded-md border px-3 text-left text-[13px]",
-                    provider === p.id ? "border-terracotta bg-terracotta/15" : "border-warm-white/15",
+                    provider === p.id ? "border-terracotta bg-terracotta/15" : "border-black-iron/15",
                   )}
                 >
                   {p.label}

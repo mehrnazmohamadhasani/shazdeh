@@ -2,23 +2,28 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Save, Loader2 } from "lucide-react";
-import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/admin/image-uploader";
+import { Card, Field, TextArea, TextInput } from "@/components/admin/ui";
 
-const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const DAYS = [
+  ["mon", "Monday"],
+  ["tue", "Tuesday"],
+  ["wed", "Wednesday"],
+  ["thu", "Thursday"],
+  ["fri", "Friday"],
+  ["sat", "Saturday"],
+  ["sun", "Sunday"],
+] as const;
 
 type Settings = {
   brandName: string;
-  tagline: string;
   description: string;
   email: string;
   phone: string;
   whatsapp: string;
   address: string;
-  mapUrl: string;
   openingHours: string;
   logoUrl: string | null;
   ogImageUrl: string | null;
@@ -52,243 +57,95 @@ export function SettingsForm({ initial }: { initial: Settings }) {
     e.preventDefault();
     setPending(true);
     try {
-      const payload = {
-        ...draft,
-        // empty → null
-        tagline: draft.tagline || null,
-        description: draft.description || null,
-        email: draft.email || null,
-        phone: draft.phone || null,
-        whatsapp: draft.whatsapp || null,
-        address: draft.address || null,
-        mapUrl: draft.mapUrl || null,
-        openingHours: draft.openingHours || null,
-        metaTitle: draft.metaTitle || null,
-        metaDesc: draft.metaDesc || null,
-      };
+      const empty = (v: string) => v.trim() || null;
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...draft,
+          description: empty(draft.description),
+          email: empty(draft.email),
+          phone: empty(draft.phone),
+          whatsapp: empty(draft.whatsapp),
+          address: empty(draft.address),
+          openingHours: draft.openingHours || null,
+          metaTitle: empty(draft.metaTitle),
+          metaDesc: empty(draft.metaDesc),
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "Failed to save");
+        throw new Error(err?.error ?? "Couldn't save");
       }
-      toast.success("Settings saved");
+      toast.success("Saved");
       router.refresh();
-    } catch (e) {
-      toast.error((e as Error).message);
+    } catch (err) {
+      toast.error((err as Error).message);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <form onSubmit={save} className="space-y-10">
-      <Section
-        eyebrow="Identity"
-        title="Brand identity"
-        description="Used everywhere — page titles, footer, OG cards."
-      >
-        <div className="grid sm:grid-cols-2 gap-5">
-          <Field label="Brand name" required>
-            <Input
-              value={draft.brandName}
-              onChange={(e) => update("brandName", e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Tagline">
-            <Input
-              value={draft.tagline}
-              onChange={(e) => update("tagline", e.target.value)}
-              placeholder="Persian Cuisine"
-            />
-          </Field>
-        </div>
-        <Field label="Description">
-          <Textarea
-            value={draft.description}
-            onChange={(e) => update("description", e.target.value)}
-            rows={4}
-          />
-        </Field>
-      </Section>
-
-      <Section
-        eyebrow="Contact"
-        title="How customers reach you"
-      >
-        <div className="grid sm:grid-cols-2 gap-5">
-          <Field label="Email">
-            <Input
-              type="email"
-              value={draft.email}
-              onChange={(e) => update("email", e.target.value)}
-              placeholder="hello@shazdeh.ae"
-            />
+    <form onSubmit={save} className="space-y-6">
+      <Card title="Contact" description="Shown in the website footer and used for order help.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Business name" required>
+            <TextInput value={draft.brandName} onChange={(e) => update("brandName", e.target.value)} required />
           </Field>
           <Field label="Phone">
-            <Input
-              value={draft.phone}
-              onChange={(e) => update("phone", e.target.value)}
-              placeholder="+971 4 000 0000"
-            />
+            <TextInput value={draft.phone} onChange={(e) => update("phone", e.target.value)} placeholder="+971 4 000 0000" inputMode="tel" />
           </Field>
-          <Field label="WhatsApp number">
-            <Input
-              value={draft.whatsapp}
-              onChange={(e) => update("whatsapp", e.target.value)}
-              placeholder="971500000000"
-              className="font-mono"
-            />
+          <Field label="WhatsApp number" hint="Digits only, with country code.">
+            <TextInput value={draft.whatsapp} onChange={(e) => update("whatsapp", e.target.value)} placeholder="971500000000" inputMode="tel" />
           </Field>
-          <Field label="Address">
-            <Input
-              value={draft.address}
-              onChange={(e) => update("address", e.target.value)}
-              placeholder="Dubai, United Arab Emirates"
-            />
+          <Field label="Email">
+            <TextInput type="email" value={draft.email} onChange={(e) => update("email", e.target.value)} placeholder="hello@shazdeh.ae" />
+          </Field>
+          <Field label="Address" className="sm:col-span-2">
+            <TextInput value={draft.address} onChange={(e) => update("address", e.target.value)} placeholder="Dubai, United Arab Emirates" />
           </Field>
         </div>
-        <Field label="Google Maps URL">
-          <Input
-            value={draft.mapUrl}
-            onChange={(e) => update("mapUrl", e.target.value)}
-            placeholder="https://maps.google.com/?q=..."
-            className="font-mono text-xs"
-          />
-        </Field>
-      </Section>
+      </Card>
 
-      <Section
-        eyebrow="Hours"
-        title="Opening hours"
-        description="Used on the contact page."
-      >
-        <div className="grid sm:grid-cols-2 gap-3">
-          {DAYS.map((day) => (
-            <div key={day} className="flex items-center gap-3">
-              <span className="w-12 text-warm-white/55 text-[10px] tracking-[0.22em] uppercase font-medium">
-                {day}
-              </span>
-              <Input
-                value={hours[day] ?? ""}
-                onChange={(e) => setHour(day, e.target.value)}
-                placeholder="12:00 — 23:00"
-              />
+      <Card title="Opening hours" description="Leave a day empty if you're closed.">
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {DAYS.map(([key, label]) => (
+            <div key={key} className="flex items-center gap-3">
+              <span className="w-24 shrink-0 text-[13px] text-dark-grey">{label}</span>
+              <TextInput value={hours[key] ?? ""} onChange={(e) => setHour(key, e.target.value)} placeholder="12:00 — 23:00" aria-label={`${label} hours`} />
             </div>
           ))}
         </div>
-      </Section>
+      </Card>
 
-      <Section
-        eyebrow="Brand assets"
-        title="Logo & OG image"
-        description="The logo shown in the admin sidebar and the social card image."
-      >
-        <div className="grid sm:grid-cols-2 gap-6">
-          <ImageUploader
-            value={draft.logoUrl}
-            onChange={(url) => update("logoUrl", url)}
-            folder="brand"
-            label="Logo"
-            aspect="square"
-          />
-          <ImageUploader
-            value={draft.ogImageUrl}
-            onChange={(url) => update("ogImageUrl", url)}
-            folder="brand"
-            label="OG / share image"
-            aspect="video"
-          />
+      <Card title="Logo & sharing image">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <ImageUploader value={draft.logoUrl} onChange={(url) => update("logoUrl", url)} folder="brand" label="Logo (optional)" aspect="video" />
+          <ImageUploader value={draft.ogImageUrl} onChange={(url) => update("ogImageUrl", url)} folder="brand" label="Image when the site is shared" aspect="video" />
         </div>
-      </Section>
+      </Card>
 
-      <Section
-        eyebrow="SEO"
-        title="Search engine basics"
-      >
-        <Field label="Meta title">
-          <Input
-            value={draft.metaTitle}
-            onChange={(e) => update("metaTitle", e.target.value)}
-            placeholder="SHĀZDEH — Persian Cuisine · Dubai"
-            maxLength={70}
-          />
-        </Field>
-        <Field label="Meta description">
-          <Textarea
-            value={draft.metaDesc}
-            onChange={(e) => update("metaDesc", e.target.value)}
-            rows={3}
-            maxLength={180}
-          />
-        </Field>
-      </Section>
+      <Card title="Search engines" description="How SHĀZDEH appears on Google.">
+        <div className="space-y-4">
+          <Field label="Page title">
+            <TextInput value={draft.metaTitle} onChange={(e) => update("metaTitle", e.target.value)} placeholder="SHĀZDEH — Persian Cuisine · Dubai" maxLength={70} />
+          </Field>
+          <Field label="Description" hint={`${draft.metaDesc.length}/160`}>
+            <TextArea value={draft.metaDesc} onChange={(e) => update("metaDesc", e.target.value)} rows={2} maxLength={180} />
+          </Field>
+          <Field label="About the business" hint="Used in Google's business summary.">
+            <TextArea value={draft.description} onChange={(e) => update("description", e.target.value)} rows={3} />
+          </Field>
+        </div>
+      </Card>
 
-      <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={pending} size="lg">
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          Save settings
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending}>
+          {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Save
         </Button>
       </div>
     </form>
-  );
-}
-
-function Section({
-  eyebrow,
-  title,
-  description,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-7 md:p-8 space-y-5">
-      <header>
-        <p className="text-[10px] tracking-[0.32em] uppercase text-terracotta">
-          {eyebrow}
-        </p>
-        <h2 className="mt-3 font-bold text-2xl text-warm-white tracking-[-0.035em]">
-          {title}
-        </h2>
-        {description && (
-          <p className="mt-2 text-warm-white/55 text-[13px] font-light">
-            {description}
-          </p>
-        )}
-      </header>
-      <div className="space-y-5">{children}</div>
-    </section>
-  );
-}
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label>
-        {label}
-        {required && <span className="text-terracotta ml-1">*</span>}
-      </Label>
-      {children}
-    </div>
   );
 }

@@ -5,14 +5,14 @@ import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
 
 export const metadata: Metadata = {
-  title: { default: "Atelier · SHĀZDEH", template: "%s · Atelier" },
+  title: { default: "Admin · SHĀZDEH", template: "%s · SHĀZDEH Admin" },
   robots: { index: false, follow: false },
 };
 
-// The Atelier is dark: match the browser / installed-app chrome to it.
+// Match the browser / installed-app chrome to the light admin.
 export const viewport: Viewport = {
-  themeColor: "#000000",
-  colorScheme: "dark",
+  themeColor: "#fdf6ec",
+  colorScheme: "light",
 };
 
 export default async function AdminLayout({
@@ -29,10 +29,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <div
-      data-theme="dark"
-      className="min-h-screen flex bg-black-iron text-warm-white"
-    >
+    <div className="flex min-h-screen bg-warm-white text-black-iron">
       <AdminSidebar user={user} />
       <div className="flex-1 flex flex-col min-w-0">
         <AdminMobileBar user={user} />

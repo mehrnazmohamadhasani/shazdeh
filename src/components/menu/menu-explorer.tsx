@@ -17,12 +17,10 @@ import { cn } from "@/lib/utils";
  * Desktop: one sticky bar carrying categories, search and filters.
  */
 
-type Filter = "all" | "signature" | "veg" | "loved";
+type Filter = "all" | "veg";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "signature", label: "Signature" },
-  { id: "loved", label: "Most loved" },
   { id: "veg", label: "Vegetarian" },
 ];
 
@@ -51,9 +49,6 @@ export function MenuExplorer({
         ...c,
         items: c.items.filter((i) => {
           if (filter === "veg" && !i.isVegetarian) return false;
-          if (filter === "signature" && !i.isSignature) return false;
-          if (filter === "loved" && !i.isBestseller && !i.isSignature)
-            return false;
           if (q) {
             const hay = [i.name, i.nameFa, i.description, i.ingredients]
               .filter(Boolean)

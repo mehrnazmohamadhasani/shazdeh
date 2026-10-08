@@ -50,16 +50,11 @@ export function ImageUploader({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <p className="text-[10px] font-medium tracking-[0.22em] uppercase text-warm-white/55">
-        {label}
-      </p>
+      <p className="text-[13px] font-medium text-black-iron">{label}</p>
       <label
         className={cn(
-          "group relative block w-full overflow-hidden rounded-md border border-dashed cursor-pointer transition-colors bg-black-iron/40",
+          "group relative block w-full cursor-pointer overflow-hidden rounded-[12px] border border-dashed border-black-iron/20 bg-cream/60 transition-colors hover:border-terracotta/50",
           aspectClass,
-          value
-            ? "border-warm-white/15 hover:border-terracotta/40"
-            : "border-warm-white/15 hover:border-terracotta/40 hover:bg-black-iron/60",
         )}
       >
         <input
@@ -78,30 +73,28 @@ export function ImageUploader({
               sizes="(min-width: 768px) 50vw, 100vw"
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-black-iron/0 group-hover:bg-black-iron/40 transition-colors flex items-center justify-center">
-              <span className="opacity-0 group-hover:opacity-100 text-warm-white text-[10px] tracking-[0.22em] uppercase font-medium transition-opacity">
-                Replace
+            <div className="absolute inset-0 flex items-center justify-center bg-black-iron/0 transition-colors group-hover:bg-black-iron/25">
+              <span className="rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black-iron opacity-0 transition-opacity group-hover:opacity-100">
+                Replace photo
               </span>
             </div>
           </>
         ) : (
-          <div className="absolute inset-0 grid place-items-center text-warm-white/55">
+          <div className="absolute inset-0 grid place-items-center text-dark-grey">
             {pending ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <Upload className="h-5 w-5" strokeWidth={1.5} />
-                <span className="text-[12px] font-light">Click to upload</span>
-                <span className="text-[10px] text-warm-white/45 font-light">
-                  JPG, PNG, WebP · up to 12MB locally, 3MB on Vercel (20MB with Cloudinary)
-                </span>
+                <span className="text-[13px] font-medium">Upload photo</span>
+                <span className="text-[11.5px]">JPG, PNG or WebP</span>
               </div>
             )}
           </div>
         )}
         {pending && value && (
-          <div className="absolute inset-0 bg-black-iron/70 grid place-items-center">
-            <Loader2 className="h-5 w-5 text-warm-white animate-spin" />
+          <div className="absolute inset-0 grid place-items-center bg-white/70">
+            <Loader2 className="h-5 w-5 animate-spin text-black-iron" />
           </div>
         )}
       </label>
@@ -109,9 +102,9 @@ export function ImageUploader({
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="inline-flex items-center gap-1.5 text-[11px] font-light text-warm-white/55 hover:text-pomegranate-red transition-colors"
+          className="inline-flex min-h-9 items-center gap-1.5 text-[12.5px] text-dark-grey transition-colors hover:text-pomegranate-red"
         >
-          <X className="h-3 w-3" strokeWidth={1.5} /> Remove image
+          <X className="h-3.5 w-3.5" strokeWidth={1.6} /> Remove photo
         </button>
       )}
     </div>

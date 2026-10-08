@@ -85,7 +85,10 @@ export async function requireAdmin(): Promise<SessionUser> {
         select: { id: true, email: true, name: true, role: true },
       })
     : null;
-  if (!user) redirect("/login");
+  // A valid token for a removed account: send them to sign in and have
+  // the proxy drop the stale cookie (otherwise /login would bounce
+  // straight back here).
+  if (!user) redirect(session ? "/login?signed-out=1" : "/login");
   return user;
 }
 

@@ -64,9 +64,6 @@ const optionalText = (max: number) =>
 export const categorySchema = z.object({
   slug: slugSchema,
   name: z.string().trim().min(1).max(100),
-  tagline: optionalText(200),
-  description: optionalText(2000),
-  imageUrl: optional(imageSrc),
   order: z.number().int().nonnegative().optional().default(0),
   isActive: z.boolean().optional().default(true),
 });
@@ -78,55 +75,30 @@ export const menuItemSchema = z.object({
   name: z.string().trim().min(1).max(120),
   nameFa: optionalText(120),
   description: optionalText(1500),
-  story: optionalText(2500),
   price: z.number().nonnegative().max(100000),
-  currency: z.string().trim().min(1).max(8).default("AED"),
   imageUrl: optional(imageSrc),
   categoryId: z.string().min(1),
   ingredients: optionalText(1500),
   allergens: optionalText(500),
-  spicyLevel: z.number().int().min(0).max(3).optional().default(0),
   isVegetarian: z.boolean().optional().default(false),
   isAvailable: z.boolean().optional().default(true),
-  isBestseller: z.boolean().optional().default(false),
-  isNew: z.boolean().optional().default(false),
-  isSignature: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
-  order: z.number().int().nonnegative().optional().default(0),
+  // Omitted on create → placed at the end of its category.
+  order: z.number().int().nonnegative().optional(),
 });
 
 export const menuItemUpdateSchema = updateSchema(menuItemSchema);
 
-export const bannerSchema = z.object({
-  title: z.string().trim().min(1).max(160),
-  subtitle: optionalText(280),
-  ctaLabel: optionalText(60),
-  ctaHref: optional(safeHref),
-  imageUrl: imageSrc,
-  position: z.string().trim().min(1).max(40).default("home_hero"),
-  order: z.number().int().nonnegative().optional().default(0),
-  isActive: z.boolean().optional().default(true),
-});
-
-export const bannerUpdateSchema = updateSchema(bannerSchema);
-
 export const galleryImageSchema = z.object({
-  title: optionalText(160),
-  caption: optionalText(500),
   imageUrl: imageSrc,
   width: z.number().int().positive().nullable().optional(),
   height: z.number().int().positive().nullable().optional(),
-  order: z.number().int().nonnegative().optional().default(0),
-  isActive: z.boolean().optional().default(true),
 });
-
-export const galleryImageUpdateSchema = updateSchema(galleryImageSchema);
 
 export const socialLinkSchema = z.object({
   platform: z.string().trim().toLowerCase().min(1).max(40),
   label: z.string().trim().min(1).max(60),
   url: safeHref,
-  icon: optionalText(60),
   order: z.number().int().nonnegative().optional().default(0),
   isActive: z.boolean().optional().default(true),
 });
@@ -154,23 +126,13 @@ const openingHours = z
 
 export const settingsUpdateSchema = z.object({
   brandName: z.string().trim().min(1).max(60).optional(),
-  tagline: optionalText(200),
   description: optionalText(2000),
   email: optional(z.email()),
   phone: optionalText(40),
   whatsapp: optionalText(40),
   address: optionalText(500),
-  mapUrl: optional(safeHref),
   openingHours: openingHours.nullable().optional(),
-  heroVideoUrl: z
-    .string()
-    .trim()
-    .max(1000)
-    .refine((v) => v === "" || /^https:\/\//i.test(v) || v.startsWith("/"), "Use an https:// video URL")
-    .nullable()
-    .optional(),
   logoUrl: optional(imageSrc),
-  faviconUrl: optional(imageSrc),
   metaTitle: optionalText(160),
   metaDesc: optionalText(280),
   ogImageUrl: optional(imageSrc),

@@ -9,8 +9,6 @@ import { EASE } from "@/lib/motion";
 export type GalleryImage = {
   id: string;
   imageUrl: string;
-  title?: string | null;
-  caption?: string | null;
 };
 
 /*
@@ -20,21 +18,9 @@ export type GalleryImage = {
  * modal: focus is trapped, Escape closes, arrow keys navigate.
  */
 
-/** Uploaded files sometimes keep their filename as a title. */
-function cleanTitle(t: string | null | undefined) {
-  if (!t) return null;
-  const s = t.replace(/\.[a-z]{2,5}$/i, "").replace(/[-_]+/g, " ").trim();
-  return s ? s[0].toUpperCase() + s.slice(1) : null;
+function altFor(i: number) {
+  return `A SHĀZDEH plate, photograph ${i + 1}`;
 }
-
-function altFor(img: GalleryImage, i: number) {
-  return (
-    cleanTitle(img.title) ??
-    img.caption ??
-    `A SHĀZDEH plate, photograph ${i + 1}`
-  );
-}
-
 
 export function GalleryGrid({ images }: { images: GalleryImage[] }) {
   const [active, setActive] = React.useState<number | null>(null);
@@ -74,7 +60,7 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
               type="button"
               onClick={() => setActive(i)}
               className="group block w-full text-left"
-              aria-label={`Open photograph: ${altFor(img, i)}`}
+              aria-label={`Open photograph: ${altFor(i)}`}
             >
               <span className="relative block aspect-[4/5] w-full overflow-hidden rounded-sm bg-cream">
                 <Image
@@ -84,14 +70,6 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
                   sizes="(min-width: 1024px) 30vw, 48vw"
                   className="img-zoom object-cover"
                 />
-              </span>
-              <span className="caption mt-3 block">
-                <span className="tabular-nums">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                {cleanTitle(img.title) && (
-                  <span className="text-black-iron/80"> · {cleanTitle(img.title)}</span>
-                )}
               </span>
             </button>
           </motion.li>
@@ -119,9 +97,6 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
                     <span className="tabular-nums">
                       {String(active + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}
                     </span>
-                    {current && cleanTitle(current.title) && (
-                      <> · {cleanTitle(current.title)}</>
-                    )}
                   </>
                 )}
               </DialogPrimitive.Title>
@@ -146,7 +121,7 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
                   >
                     <Image
                       src={current.imageUrl}
-                      alt={altFor(current, active)}
+                      alt={altFor(active)}
                       fill
                       sizes="100vw"
                       className="object-contain"
@@ -177,13 +152,7 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
               )}
             </div>
 
-            <div className="min-h-16 px-6 pb-6 pt-3 text-center">
-              {current?.caption && (
-                <p className="mx-auto max-w-xl text-[14px] text-warm-white/75">
-                  {current.caption}
-                </p>
-              )}
-            </div>
+            <div className="h-16" aria-hidden />
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>

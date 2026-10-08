@@ -1,55 +1,29 @@
 import Link from "next/link";
-import {
-  UtensilsCrossed,
-  FolderTree,
-  Image as ImageIcon,
-  Sparkles,
-  Star,
-  Eye,
-  EyeOff,
-  Plus,
-} from "lucide-react";
-import { AdminPageHeader } from "@/components/admin/page-header";
+import Image from "next/image";
+import { ArrowRight, Plus } from "lucide-react";
+import { AdminPage, Card, EmptyState, StatusPill } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 import { formatFils } from "@/lib/ordering/money";
 import { localClock } from "@/lib/ordering/hours";
+import { KITCHEN_TIMEZONE } from "@/lib/ordering/config";
+import { STAFF_LABEL } from "@/lib/ordering/status";
+import { ACTIVE_STATUSES } from "@/lib/ordering/admin";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Dashboard" };
 
 /** Start of "today" in Dubai, as a UTC Date. */
 function startOfDubaiDay(now = new Date()) {
-  const { minutes } = localClock(now, "Asia/Dubai");
+  const { minutes } = localClock(now, KITCHEN_TIMEZONE);
   const d = new Date(now.getTime() - minutes * 60_000);
   d.setUTCSeconds(0, 0);
   return d;
 }
 
-export const dynamic = "force-dynamic";
-
-export default async function AdminOverview() {
-  const [
-    itemCount,
-    categoryCount,
-    galleryCount,
-    bannerCount,
-    bestsellerCount,
-    unavailableCount,
-    recentItems,
-    todayOrders,
-    waiting,
-  ] = await Promise.all([
-    prisma.menuItem.count(),
-    prisma.category.count(),
-    prisma.galleryImage.count(),
-    prisma.banner.count(),
-    prisma.menuItem.count({ where: { isBestseller: true } }),
-    prisma.menuItem.count({ where: { isAvailable: false } }),
-    prisma.menuItem.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: 6,
-      include: { category: true },
-    }),
+export default async function Dashboard() {
+  const [today, waiting, inProgress, soldOut, latestOrders, recentDishes] = await Promise.all([
     prisma.order.aggregate({
       where: {
         placedAt: { gte: startOfDubaiDay() },
@@ -59,190 +33,129 @@ export default async function AdminOverview() {
       _sum: { totalFils: true },
     }),
     prisma.order.count({ where: { status: "RECEIVED" } }),
+    prisma.order.count({ where: { status: { in: [...ACTIVE_STATUSES] } } }),
+    prisma.menuItem.count({ where: { isAvailable: false, isActive: true } }),
+    prisma.order.findMany({
+      where: { status: { not: "PENDING_PAYMENT" } },
+      orderBy: { placedAt: "desc" },
+      take: 5,
+      select: { id: true, number: true, status: true, customerName: true, areaName: true, totalFils: true },
+    }),
+    prisma.menuItem.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        imageUrl: true,
+        isAvailable: true,
+        isActive: true,
+        category: { select: { name: true } },
+      },
+    }),
   ]);
-  const todayCount = todayOrders._count;
-  const todaySales = todayOrders._sum.totalFils ?? 0;
 
   const stats = [
-    {
-      label: "Menu items",
-      value: itemCount,
-      icon: UtensilsCrossed,
-      href: "/admin/menu-items",
-      tone: "accent" as const,
-    },
-    {
-      label: "Categories",
-      value: categoryCount,
-      icon: FolderTree,
-      href: "/admin/categories",
-      tone: "default" as const,
-    },
-    {
-      label: "Bestsellers",
-      value: bestsellerCount,
-      icon: Star,
-      href: "/admin/menu-items?filter=bestseller",
-      tone: "default" as const,
-    },
-    {
-      label: "Sold out",
-      value: unavailableCount,
-      icon: EyeOff,
-      href: "/admin/menu-items?filter=unavailable",
-      tone: unavailableCount > 0 ? "warn" : "default",
-    },
-    {
-      label: "Gallery",
-      value: galleryCount,
-      icon: ImageIcon,
-      href: "/admin/gallery",
-      tone: "default" as const,
-    },
-    {
-      label: "Banners",
-      value: bannerCount,
-      icon: Sparkles,
-      href: "/admin/banners",
-      tone: "default" as const,
-    },
+    { label: "Orders today", value: String(today._count), href: "/admin/orders" },
+    { label: "Sales today", value: formatFils(today._sum.totalFils ?? 0), href: "/admin/orders" },
+    { label: "Waiting to accept", value: String(waiting), href: "/admin/orders", alert: waiting > 0 },
+    { label: "Sold out dishes", value: String(soldOut), href: "/admin/menu-items", alert: soldOut > 0 },
   ];
 
   return (
-    <div className="container-shazdeh py-10 md:py-14 space-y-12">
-      <AdminPageHeader
-        eyebrow="Atelier"
-        title="Welcome back."
-        description="Manage every plate, image and word that lives on the SHĀZDEH table."
-        actions={
-          <Button asChild>
-            <Link href="/admin/menu-items/new">
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.6} /> New dish
-            </Link>
-          </Button>
-        }
-      />
-
-      {/* Today */}
-      <section className="grid gap-3 sm:grid-cols-3">
-        {[
-          { label: "Orders today", value: String(todayCount) },
-          { label: "Sales today", value: formatFils(todaySales) },
-          { label: "Waiting to be accepted", value: String(waiting), warn: waiting > 0 },
-        ].map((t) => (
+    <AdminPage
+      title="Dashboard"
+      actions={
+        <Button asChild size="sm">
+          <Link href="/admin/menu-items/new">
+            <Plus className="h-4 w-4" /> New dish
+          </Link>
+        </Button>
+      }
+    >
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((s) => (
           <Link
-            key={t.label}
-            href="/admin/orders"
-            className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5 transition-colors hover:border-terracotta/30"
+            key={s.label}
+            href={s.href}
+            className="rounded-[16px] border border-black-iron/[0.07] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-black-iron/20"
           >
-            <p className={`text-3xl font-bold tabular-nums tracking-[-0.03em] ${t.warn ? "text-terracotta" : "text-warm-white"}`}>
-              {t.value}
+            <p className="text-[13px] text-dark-grey">{s.label}</p>
+            <p className={`mt-2 text-[26px] font-bold tabular-nums tracking-[-0.02em] ${s.alert ? "text-terracotta-ink" : "text-black-iron"}`}>
+              {s.value}
             </p>
-            <p className="mt-3 text-[10px] uppercase tracking-[0.22em] text-warm-white/55">{t.label}</p>
           </Link>
         ))}
-      </section>
+      </div>
 
-      {/* Stats */}
-      <section>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Link
-                key={stat.label}
-                href={stat.href}
-                className="group relative overflow-hidden rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5 transition-colors hover:border-terracotta/30 hover:bg-warm-white/[0.04]"
-              >
-                <div className="flex items-start justify-between">
-                  <Icon
-                    className={`h-4 w-4 ${
-                      stat.tone === "accent"
-                        ? "text-terracotta"
-                        : stat.tone === "warn"
-                          ? "text-pomegranate-red"
-                          : "text-warm-white/55"
-                    }`}
-                    strokeWidth={1.5}
-                  />
-                </div>
-                <p className="mt-5 font-bold text-3xl text-warm-white leading-none tabular-nums tracking-[-0.03em]">
-                  {stat.value}
-                </p>
-                <p className="mt-3 text-[10px] tracking-[0.22em] uppercase text-warm-white/55">
-                  {stat.label}
-                </p>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card
+          title="Latest orders"
+          description={inProgress > 0 ? `${inProgress} in progress` : undefined}
+          actions={
+            <Link href="/admin/orders" className="inline-flex items-center gap-1 text-[13px] font-medium text-terracotta-ink hover:underline">
+              Open board <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          }
+          bodyClassName="p-0 md:p-0"
+        >
+          {latestOrders.length === 0 ? (
+            <EmptyState title="No orders yet" description="Orders placed on the website appear here." />
+          ) : (
+            <ul className="divide-y divide-black-iron/[0.06]">
+              {latestOrders.map((o) => (
+                <li key={o.id}>
+                  <Link href={`/admin/orders/${o.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-black-iron/[0.02] md:px-6">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-semibold tabular-nums">{o.number}</span>
+                      <span className="block truncate text-[12.5px] text-dark-grey">
+                        {o.customerName} · {o.areaName}
+                      </span>
+                    </span>
+                    <StatusPill tone={o.status === "RECEIVED" ? "accent" : o.status === "DELIVERED" ? "good" : "neutral"}>
+                      {STAFF_LABEL[o.status]}
+                    </StatusPill>
+                    <span className="w-20 text-right text-[13.5px] tabular-nums">{formatFils(o.totalFils)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
-      {/* Recent items */}
-      <section>
-        <div className="flex items-end justify-between mb-5">
-          <div>
-            <p className="text-[10px] tracking-[0.32em] uppercase text-terracotta">
-              Recently updated
-            </p>
-            <h2 className="mt-3 font-bold text-2xl md:text-3xl text-warm-white tracking-[-0.035em]">
-              The latest in the kitchen
-            </h2>
-          </div>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/admin/menu-items">View all →</Link>
-          </Button>
-        </div>
-
-        <div className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] overflow-hidden">
-          <div className="divide-y divide-warm-white/[0.06]">
-            {recentItems.map((item) => (
-              <Link
-                key={item.id}
-                href={`/admin/menu-items/${item.id}`}
-                className="flex items-center gap-4 px-5 py-4 hover:bg-warm-white/[0.04] transition-colors"
-              >
-                <div
-                  className="h-12 w-12 rounded-sm bg-black-iron bg-cover bg-center shrink-0 border border-warm-white/[0.06]"
-                  style={
-                    item.imageUrl
-                      ? { backgroundImage: `url(${item.imageUrl})` }
-                      : undefined
-                  }
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-warm-white text-[14px] truncate font-medium">
-                    {item.name}
-                  </p>
-                  <p className="text-warm-white/55 text-[12px] truncate font-light">
-                    {item.category.name} ·{" "}
-                    {formatPrice(item.price, item.currency)}
-                  </p>
-                </div>
-                <div className="hidden md:flex items-center gap-1.5">
-                  {item.isSignature && (
-                    <Badge variant="signature">Signature</Badge>
-                  )}
-                  {item.isBestseller && !item.isSignature && (
-                    <Badge variant="default">Best</Badge>
-                  )}
-                  {item.isNew && <Badge variant="new">New</Badge>}
-                  {!item.isAvailable && (
-                    <Badge variant="outline">
-                      <EyeOff className="h-3 w-3" strokeWidth={1.6} />
-                      Off
-                    </Badge>
-                  )}
-                </div>
-                <Eye
-                  className="h-3.5 w-3.5 text-warm-white/45 shrink-0"
-                  strokeWidth={1.5}
-                />
-              </Link>
+        <Card
+          title="Recently edited dishes"
+          actions={
+            <Link href="/admin/menu-items" className="inline-flex items-center gap-1 text-[13px] font-medium text-terracotta-ink hover:underline">
+              All dishes <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          }
+          bodyClassName="p-0 md:p-0"
+        >
+          <ul className="divide-y divide-black-iron/[0.06]">
+            {recentDishes.map((d) => (
+              <li key={d.id}>
+                <Link href={`/admin/menu-items/${d.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-black-iron/[0.02] md:px-6">
+                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[10px] bg-cream">
+                    {d.imageUrl && <Image src={d.imageUrl} alt="" fill sizes="44px" className="object-cover" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-medium">{d.name}</span>
+                    <span className="block truncate text-[12.5px] text-dark-grey">{d.category.name}</span>
+                  </span>
+                  {!d.isActive ? (
+                    <StatusPill>Hidden</StatusPill>
+                  ) : !d.isAvailable ? (
+                    <StatusPill tone="warn">Sold out</StatusPill>
+                  ) : null}
+                  <span className="text-[13.5px] tabular-nums">{formatPrice(d.price)}</span>
+                </Link>
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
-    </div>
+          </ul>
+        </Card>
+      </div>
+    </AdminPage>
   );
 }

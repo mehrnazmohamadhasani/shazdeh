@@ -21,21 +21,14 @@ type SeedItem = {
   name: string;
   nameFa?: string;
   description?: string;
-  story?: string;
   price: number;
   imageUrl?: string;
-  spicyLevel?: number;
   isVegetarian?: boolean;
-  isBestseller?: boolean;
-  isNew?: boolean;
-  isSignature?: boolean;
 };
 
 type SeedCategory = {
   slug: string;
   name: string;
-  tagline: string;
-  description: string;
   order: number;
   items: SeedItem[];
 };
@@ -46,9 +39,6 @@ const CATEGORIES: SeedCategory[] = [
   {
     slug: "mains",
     name: "Main Dishes",
-    tagline: "The heart of the table",
-    description:
-      "Our signature Persian khoresh and polo — slow-cooked, aromatic, and built around generations of Iranian craft.",
     order: 1,
     items: [
       {
@@ -57,12 +47,8 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "قیمه بادمجان",
         description:
           "Tender lamb stew braised with split yellow peas, tomato, dried lime, and roasted aubergine — finished with crisped potato straws.",
-        story:
-          "A Persian classic with deep rust-red color and the gentle perfume of dried lime (limoo amani).",
         price: 128,
         imageUrl: IMG("gheimeh-bademjan.jpg"),
-        isBestseller: true,
-        isSignature: true,
       },
       {
         slug: "ghormeh-sabzi",
@@ -72,8 +58,6 @@ const CATEGORIES: SeedCategory[] = [
           "Iran's national stew — slow-cooked herbs, kidney beans, dried lime and lamb, served with steamed saffron basmati.",
         price: 128,
         imageUrl: IMG("ghormeh-sabzi.jpg"),
-        isBestseller: true,
-        isSignature: true,
       },
       {
         slug: "karafs",
@@ -101,7 +85,6 @@ const CATEGORIES: SeedCategory[] = [
           "Fava beans and dill scented basmati rice, paired with melt-off-the-bone braised lamb shank.",
         price: 128,
         imageUrl: IMG("baghali-polo-mahiche.jpg"),
-        isSignature: true,
       },
       {
         slug: "zereshk-polo-morgh",
@@ -111,7 +94,6 @@ const CATEGORIES: SeedCategory[] = [
           "Saffron rice jeweled with tart barberries, served with slow-braised chicken in a warm tomato-saffron glaze.",
         price: 98,
         imageUrl: IMG("zereshk-polo-morgh.jpg"),
-        isBestseller: true,
       },
       {
         slug: "fesenjan",
@@ -121,7 +103,6 @@ const CATEGORIES: SeedCategory[] = [
           "Roasted walnuts and pomegranate molasses simmered slowly with chicken — sweet, sour, deeply nutty.",
         price: 118,
         imageUrl: IMG("fesenjoon.jpg"),
-        isSignature: true,
       },
       {
         slug: "kabab-digi",
@@ -158,7 +139,6 @@ const CATEGORIES: SeedCategory[] = [
           "Tehran-style pasta with spiced tomato beef ragu — slow-built tahdig crust, golden and crisp on top.",
         price: 88,
         imageUrl: IMG("makaroni.jpg"),
-        isNew: true,
       },
       {
         slug: "shazdeh-mix",
@@ -168,17 +148,12 @@ const CATEGORIES: SeedCategory[] = [
           "Our signature tasting plate — chef's selection of three rotating khoresh, served with saffron rice and tahdig.",
         price: 98,
         imageUrl: IMG("shazdeh-mix.jpg"),
-        isSignature: true,
-        isNew: true,
       },
     ],
   },
   {
     slug: "vegetarian",
     name: "Vegetarian",
-    tagline: "Plant-forward Persian",
-    description:
-      "Soulful Persian classics, reinterpreted entirely from the garden — no meat, no compromise.",
     order: 2,
     items: [
       {
@@ -230,16 +205,12 @@ const CATEGORIES: SeedCategory[] = [
         price: 44,
         imageUrl: IMG("kashke-bademjoon.jpg"),
         isVegetarian: true,
-        isBestseller: true,
       },
     ],
   },
   {
     slug: "sides",
     name: "Sides",
-    tagline: "The Persian table",
-    description:
-      "Cooling yoghurts, fresh herbs and house-made pickles — the rituals that complete a Persian table.",
     order: 3,
     items: [
       {
@@ -315,9 +286,6 @@ const CATEGORIES: SeedCategory[] = [
   {
     slug: "drinks",
     name: "Drinks",
-    tagline: "Liquid heritage",
-    description:
-      "Persian-inspired refreshers and classics — saffron, sour cherry, sekanjabin and more.",
     order: 4,
     items: [
       {
@@ -329,7 +297,6 @@ const CATEGORIES: SeedCategory[] = [
         price: 38,
         imageUrl: IMG("zafaran.jpg"),
         isVegetarian: true,
-        isSignature: true,
       },
       {
         slug: "bahar-narenj",
@@ -412,14 +379,12 @@ async function main() {
     create: {
       id: "default",
       brandName: "SHĀZDEH",
-      tagline: "Persian Cuisine",
       description:
         "A contemporary Persian food brand rooted in heritage and expressed through a modern visual language. Inspired by Persian culture, craftsmanship and hospitality, set in Dubai for a global table.",
       email: "hello@shazdeh.ae",
       phone: "+971 4 000 0000",
       whatsapp: "971500000000",
       address: "Dubai, United Arab Emirates",
-      mapUrl: "https://maps.google.com/?q=Dubai",
       openingHours: JSON.stringify({
         mon: "12:00 — 23:00",
         tue: "12:00 — 23:00",
@@ -442,16 +407,12 @@ async function main() {
       where: { slug: cat.slug },
       update: {
         name: cat.name,
-        tagline: cat.tagline,
-        description: cat.description,
         order: cat.order,
         isActive: true,
       },
       create: {
         slug: cat.slug,
         name: cat.name,
-        tagline: cat.tagline,
-        description: cat.description,
         order: cat.order,
         isActive: true,
       },
@@ -466,14 +427,9 @@ async function main() {
           name: item.name,
           nameFa: item.nameFa ?? null,
           description: item.description ?? null,
-          story: item.story ?? null,
           price: item.price,
           imageUrl: item.imageUrl ?? null,
-          spicyLevel: item.spicyLevel ?? 0,
           isVegetarian: item.isVegetarian ?? false,
-          isBestseller: item.isBestseller ?? false,
-          isNew: item.isNew ?? false,
-          isSignature: item.isSignature ?? false,
           order,
           categoryId: category.id,
         },
@@ -482,15 +438,9 @@ async function main() {
           name: item.name,
           nameFa: item.nameFa ?? null,
           description: item.description ?? null,
-          story: item.story ?? null,
           price: item.price,
-          currency: "AED",
           imageUrl: item.imageUrl ?? null,
-          spicyLevel: item.spicyLevel ?? 0,
           isVegetarian: item.isVegetarian ?? false,
-          isBestseller: item.isBestseller ?? false,
-          isNew: item.isNew ?? false,
-          isSignature: item.isSignature ?? false,
           order,
           categoryId: category.id,
         },
@@ -498,32 +448,6 @@ async function main() {
     }
     console.log(`  ✓ ${cat.name} (${cat.items.length} items)`);
   }
-
-  // Banners
-  await prisma.banner.deleteMany();
-  await prisma.banner.createMany({
-    data: [
-      {
-        title: "From our heart to your home.",
-        ctaLabel: "View the menu",
-        ctaHref: "/menu",
-        imageUrl: IMG("ghormeh-sabzi.jpg"),
-        position: "home_hero",
-        order: 1,
-      },
-      {
-        title: "Signature Tasting — SHĀZDEH Mix",
-        subtitle:
-          "Three rotating khoresh, saffron rice, golden tahdig.",
-        ctaLabel: "Discover",
-        ctaHref: "/menu/shazdeh-mix",
-        imageUrl: IMG("shazdeh-mix.jpg"),
-        position: "home_secondary",
-        order: 1,
-      },
-    ],
-  });
-  console.log("  ✓ Banners");
 
   // Gallery
   await prisma.galleryImage.deleteMany();
@@ -543,9 +467,8 @@ async function main() {
   ];
   await prisma.galleryImage.createMany({
     data: galleryFiles.map((f, i) => ({
-      title: f.replace(/[-_.]/g, " ").replace(/\.jpg$/, ""),
       imageUrl: IMG(f),
-      order: i,
+      order: i + 1,
     })),
   });
   console.log(`  ✓ Gallery (${galleryFiles.length} images)`);

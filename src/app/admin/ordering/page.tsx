@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AdminPageHeader } from "@/components/admin/page-header";
+import { AdminPage } from "@/components/admin/ui";
 import { OrderingSettingsForm } from "@/components/admin/ordering/ordering-settings-form";
 import { requireAdmin } from "@/lib/auth";
 import { getOrderingSettings } from "@/lib/ordering/config";
@@ -7,7 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { getOnlineProvider } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Ordering settings" };
+export const metadata = { title: "Online ordering" };
 
 export default async function OrderingSettingsPage() {
   const user = await requireAdmin();
@@ -15,12 +15,7 @@ export default async function OrderingSettingsPage() {
   const [s, site] = await Promise.all([getOrderingSettings(), getSettings()]);
   const provider = getOnlineProvider();
   return (
-    <div className="container-shazdeh space-y-10 py-10 md:py-14">
-      <AdminPageHeader
-        eyebrow="Ordering"
-        title="Ordering settings"
-        description="Hours, payments, VAT, delivery model and the legal details printed on receipts."
-      />
+    <AdminPage title="Online ordering">
       <OrderingSettingsForm
         onlineProvider={provider ? provider.id : null}
         siteHours={site.openingHours}
@@ -35,9 +30,7 @@ export default async function OrderingSettingsPage() {
           serviceFee: s.serviceFee,
           paymentMethods: s.paymentMethods,
           deliveryModel: s.deliveryModel,
-          prepMinutes: s.prepMinutes,
           autoAccept: s.autoAccept,
-          cutleryDefault: s.cutleryDefault,
           notifyEmail: s.notifyEmail,
           legalName: s.legalName,
           tradeLicenseNo: s.tradeLicenseNo,
@@ -45,6 +38,6 @@ export default async function OrderingSettingsPage() {
           trn: s.trn,
         }}
       />
-    </div>
+    </AdminPage>
   );
 }

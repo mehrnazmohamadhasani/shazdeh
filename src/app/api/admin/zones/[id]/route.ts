@@ -15,12 +15,12 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       await tx.deliveryZone.update({ where: { id }, data: zone });
       const names = areas.map((a) => a.name);
       await tx.deliveryArea.deleteMany({ where: { zoneId: id, name: { notIn: names } } });
-      for (const [i, a] of areas.entries()) {
+      for (const a of areas) {
         // An area moves here from another zone if it already exists elsewhere.
         await tx.deliveryArea.upsert({
           where: { name: a.name },
-          update: { zoneId: id, lat: a.lat ?? null, lng: a.lng ?? null, order: i, isActive: true },
-          create: { zoneId: id, name: a.name, lat: a.lat ?? null, lng: a.lng ?? null, order: i },
+          update: { zoneId: id, lat: a.lat ?? null, lng: a.lng ?? null },
+          create: { zoneId: id, name: a.name, lat: a.lat ?? null, lng: a.lng ?? null },
         });
       }
       return tx.deliveryZone.findUnique({ where: { id }, include: { areas: { orderBy: { name: "asc" } } } });

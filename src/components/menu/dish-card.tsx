@@ -2,9 +2,9 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Flame, Leaf } from "lucide-react";
+import { Leaf } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { spiceLabel, type DishCardData } from "@/lib/dish";
+import type { DishCardData } from "@/lib/dish";
 import { formatPrice, cn } from "@/lib/utils";
 
 export type { DishCardData } from "@/lib/dish";
@@ -109,11 +109,6 @@ export function DishCard({
               className="img-zoom object-cover"
             />
           )}
-          {dish.isSignature && (
-            <span className="absolute inset-x-0 bottom-4 z-[2] flex justify-center">
-              <Badge variant="solid">Signature</Badge>
-            </span>
-          )}
         </div>
         <div className="mt-6 text-center">
           <p className="caption">{dish.category.name}</p>
@@ -148,7 +143,6 @@ export function DishCard({
         )}
         <div className="absolute left-3 top-3 z-[2] flex flex-wrap gap-1.5">
           {soldOut && <Badge variant="solid">Sold out</Badge>}
-          {dish.isSignature && <Badge variant="terracotta">Signature</Badge>}
         </div>
       </div>
       <div className="mt-4 flex flex-col gap-1.5 sm:mt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -165,7 +159,7 @@ export function DishCard({
           {dish.description}
         </p>
       )}
-      <DishBadges dish={dish} className="mt-3 sm:mt-3.5" hideSignature />
+      <DishBadges dish={dish} className="mt-3 sm:mt-3.5" />
     </article>
   );
 }
@@ -204,54 +198,19 @@ function Price({ dish, className }: { dish: DishCardData; className?: string }) 
         className,
       )}
     >
-      {formatPrice(dish.price, dish.currency)}
+      {formatPrice(dish.price)}
     </span>
   );
 }
 
-export function DishBadges({
-  dish,
-  className,
-  hideSignature,
-}: {
-  dish: DishCardData;
-  className?: string;
-  hideSignature?: boolean;
-}) {
-  const spice = spiceLabel(dish.spicyLevel);
-  const items: React.ReactNode[] = [];
-  if (dish.isSignature && !hideSignature)
-    items.push(
-      <Badge key="sig" variant="signature">
-        Signature
-      </Badge>,
-    );
-  if (dish.isBestseller && !dish.isSignature)
-    items.push(
-      <Badge key="best" variant="outline">
-        Most loved
-      </Badge>,
-    );
-  if (dish.isNew)
-    items.push(
-      <Badge key="new" variant="new">
-        New
-      </Badge>,
-    );
-  if (dish.isVegetarian)
-    items.push(
-      <Badge key="veg" variant="veg">
+export function DishBadges({ dish, className }: { dish: DishCardData; className?: string }) {
+  if (!dish.isVegetarian) return null;
+  return (
+    <div className={cn("flex flex-wrap gap-1.5", className)}>
+      <Badge variant="veg">
         <Leaf className="h-2.5 w-2.5" strokeWidth={1.8} aria-hidden />
         Vegetarian
-      </Badge>,
-    );
-  if (spice)
-    items.push(
-      <Badge key="spi" variant="spicy">
-        <Flame className="h-2.5 w-2.5" strokeWidth={1.8} aria-hidden />
-        {spice}
-      </Badge>,
-    );
-  if (items.length === 0) return null;
-  return <div className={cn("flex flex-wrap gap-1.5", className)}>{items}</div>;
+      </Badge>
+    </div>
+  );
 }

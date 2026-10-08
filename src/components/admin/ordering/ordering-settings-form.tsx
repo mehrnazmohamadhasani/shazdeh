@@ -2,11 +2,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Card, Field, SwitchRow, TextInput } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
 
 export type OrderingSettingsDraft = {
@@ -20,9 +18,7 @@ export type OrderingSettingsDraft = {
   serviceFee: number;
   paymentMethods: ("CASH_ON_DELIVERY" | "CARD_ON_DELIVERY" | "ONLINE")[];
   deliveryModel: "OWN_FLEET" | "THIRD_PARTY" | "HYBRID";
-  prepMinutes: number;
   autoAccept: boolean;
-  cutleryDefault: boolean;
   notifyEmail: string | null;
   legalName: string | null;
   tradeLicenseNo: string | null;
@@ -63,6 +59,7 @@ export function OrderingSettingsForm({
   const [hours, setHours] = React.useState<Record<string, string>>(parseHours(initial.deliveryHours ?? siteHours));
   const [busy, setBusy] = React.useState(false);
   const set = <K extends keyof OrderingSettingsDraft>(k: K, v: OrderingSettingsDraft[K]) => setD((x) => ({ ...x, [k]: v }));
+  const text = (v: string) => v || null;
 
   function toggleMethod(m: OrderingSettingsDraft["paymentMethods"][number], on: boolean) {
     set("paymentMethods", on ? [...new Set([...d.paymentMethods, m])] : d.paymentMethods.filter((x) => x !== m));
@@ -79,7 +76,7 @@ export function OrderingSettingsForm({
         body: JSON.stringify({ ...d, deliveryHours: useSiteHours ? null : JSON.stringify(cleanHours) }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't save");
-      toast.success("Ordering settings saved");
+      toast.success("Saved");
       router.refresh();
     } catch (err) {
       toast.error((err as Error).message);
@@ -89,86 +86,78 @@ export function OrderingSettingsForm({
   }
 
   return (
-    <form onSubmit={save} className="space-y-8">
+    <form onSubmit={save} className="space-y-6">
       <Card title="Taking orders">
-        <Row label="Accept online orders" hint="Master switch. Kitchen staff can also pause from the Orders board.">
-          <Switch checked={d.acceptingOrders} onCheckedChange={(v) => set("acceptingOrders", v)} />
-        </Row>
-        <F label="Message when paused">
-          <Input value={d.pausedMessage ?? ""} onChange={(e) => set("pausedMessage", e.target.value || null)} placeholder="We're very busy right now — please check back shortly." />
-        </F>
-        <Row label="Auto-accept orders" hint="Skip the manual accept step. Leave off until the kitchen routine is settled.">
-          <Switch checked={d.autoAccept} onCheckedChange={(v) => set("autoAccept", v)} />
-        </Row>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <F label="New-order email (kitchen inbox)">
-            <Input type="email" value={d.notifyEmail ?? ""} onChange={(e) => set("notifyEmail", e.target.value || null)} placeholder="orders@…" />
-          </F>
-          <F label="Typical prep time (min)">
-            <Input type="number" min={0} value={d.prepMinutes} onChange={(e) => set("prepMinutes", Number(e.target.value))} />
-          </F>
+        <div className="space-y-3">
+          <SwitchRow
+            label="Accept online orders"
+            description="Kitchen staff can also pause this from the Orders board."
+            checked={d.acceptingOrders}
+            onCheckedChange={(v) => set("acceptingOrders", v)}
+          />
+          <SwitchRow
+            label="Accept orders automatically"
+            description="Skips the manual accept step."
+            checked={d.autoAccept}
+            onCheckedChange={(v) => set("autoAccept", v)}
+          />
+          <div className="grid gap-4 pt-1 sm:grid-cols-2">
+            <Field label="Message when paused">
+              <TextInput value={d.pausedMessage ?? ""} onChange={(e) => set("pausedMessage", text(e.target.value))} placeholder="We're very busy — please check back shortly." />
+            </Field>
+            <Field label="Email for new orders">
+              <TextInput type="email" value={d.notifyEmail ?? ""} onChange={(e) => set("notifyEmail", text(e.target.value))} placeholder="orders@…" />
+            </Field>
+          </div>
         </div>
       </Card>
 
       <Card title="Delivery hours">
-        <Row label="Same as opening hours" hint="Use the hours set in Brand Settings.">
-          <Switch checked={useSiteHours} onCheckedChange={setUseSiteHours} />
-        </Row>
+        <SwitchRow label="Same as opening hours" description="Set in Business details." checked={useSiteHours} onCheckedChange={setUseSiteHours} />
         {!useSiteHours && (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
             {DAYS.map(([key, label]) => (
-              <F key={key} label={label}>
-                <Input value={hours[key] ?? ""} onChange={(e) => setHours((h) => ({ ...h, [key]: e.target.value }))} placeholder="12:00 — 23:00 (empty = closed)" />
-              </F>
+              <div key={key} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-[13px] text-dark-grey">{label}</span>
+                <TextInput value={hours[key] ?? ""} onChange={(e) => setHours((h) => ({ ...h, [key]: e.target.value }))} placeholder="12:00 — 23:00" aria-label={`${label} delivery hours`} />
+              </div>
             ))}
           </div>
         )}
-        <p className="text-[12px] text-warm-white/50">Times are Dubai time. Late nights work: “18:00 — 02:00”.</p>
       </Card>
 
       <Card title="Payments">
         <div className="grid gap-3 sm:grid-cols-3">
-          {(
-            [
-              ["CASH_ON_DELIVERY", "Cash on delivery", null],
-              ["CARD_ON_DELIVERY", "Card on delivery", "Riders need a card machine"],
-              ["ONLINE", "Pay online", onlineProvider ? `via ${onlineProvider}` : "Needs a payment provider configured on the server"],
-            ] as const
-          ).map(([m, label, hint]) => {
-            const disabled = m === "ONLINE" && !onlineProvider;
-            return (
-              <label key={m} className={cn("flex items-start gap-3 rounded-md border border-warm-white/[0.08] p-3.5", disabled && "opacity-50")}>
-                <Switch checked={d.paymentMethods.includes(m)} disabled={disabled} onCheckedChange={(v) => toggleMethod(m, v)} />
-                <span>
-                  <span className="block text-[13px] font-medium text-warm-white">{label}</span>
-                  {hint && <span className="block text-[11px] text-warm-white/55">{hint}</span>}
-                </span>
-              </label>
-            );
-          })}
+          <SwitchRow label="Cash on delivery" checked={d.paymentMethods.includes("CASH_ON_DELIVERY")} onCheckedChange={(v) => toggleMethod("CASH_ON_DELIVERY", v)} />
+          <SwitchRow label="Card on delivery" description="Riders need a card machine." checked={d.paymentMethods.includes("CARD_ON_DELIVERY")} onCheckedChange={(v) => toggleMethod("CARD_ON_DELIVERY", v)} />
+          <SwitchRow
+            label="Pay online"
+            description={onlineProvider ? `via ${onlineProvider}` : "Needs a payment provider set up first."}
+            disabled={!onlineProvider}
+            checked={d.paymentMethods.includes("ONLINE")}
+            onCheckedChange={(v) => toggleMethod("ONLINE", v)}
+          />
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <F label="VAT rate (%)">
-            <Input type="number" min={0} max={30} step="0.5" value={d.vatRate} onChange={(e) => set("vatRate", Number(e.target.value))} />
-          </F>
-          <F label="Service fee (AED)">
-            <Input type="number" min={0} step="0.5" value={d.serviceFee} onChange={(e) => set("serviceFee", Number(e.target.value))} />
-          </F>
-          <Row label="Menu prices include VAT" hint="Required for UAE consumer prices.">
-            <Switch checked={d.pricesIncludeVat} onCheckedChange={(v) => set("pricesIncludeVat", v)} />
-          </Row>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <Field label="VAT (%)">
+            <TextInput type="number" min={0} max={30} step="0.5" value={d.vatRate} onChange={(e) => set("vatRate", Number(e.target.value))} />
+          </Field>
+          <Field label="Service fee (AED)">
+            <TextInput type="number" min={0} step="0.5" value={d.serviceFee} onChange={(e) => set("serviceFee", Number(e.target.value))} />
+          </Field>
+          <SwitchRow label="Prices include VAT" description="Required for UAE customers." checked={d.pricesIncludeVat} onCheckedChange={(v) => set("pricesIncludeVat", v)} className="self-end" />
         </div>
       </Card>
 
-      <Card title="Delivery operation">
-        <div role="radiogroup" className="grid gap-3 sm:grid-cols-3">
+      <Card title="Who delivers">
+        <div role="radiogroup" aria-label="Who delivers" className="grid gap-3 sm:grid-cols-3">
           {(
             [
-              ["OWN_FLEET", "Own riders", "SHĀZDEH riders deliver every order"],
-              ["THIRD_PARTY", "Logistics partner", "A courier company delivers"],
-              ["HYBRID", "Both", "Choose per order at dispatch"],
+              ["OWN_FLEET", "Our riders"],
+              ["THIRD_PARTY", "A courier company"],
+              ["HYBRID", "Both"],
             ] as const
-          ).map(([v, label, hint]) => (
+          ).map(([v, label]) => (
             <button
               key={v}
               type="button"
@@ -176,75 +165,46 @@ export function OrderingSettingsForm({
               aria-checked={d.deliveryModel === v}
               onClick={() => set("deliveryModel", v)}
               className={cn(
-                "rounded-md border p-3.5 text-left",
-                d.deliveryModel === v ? "border-terracotta bg-terracotta/10" : "border-warm-white/[0.08]",
+                "min-h-12 rounded-[12px] border px-4 text-left text-[14px] font-medium transition-colors",
+                d.deliveryModel === v ? "border-terracotta bg-terracotta/[0.06] text-terracotta-ink" : "border-black-iron/[0.1] hover:border-black-iron/25",
               )}
             >
-              <span className="block text-[13px] font-medium text-warm-white">{label}</span>
-              <span className="block text-[11px] text-warm-white/55">{hint}</span>
+              {label}
             </button>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <F label="Kitchen latitude">
-            <Input type="number" step="any" value={d.kitchenLat ?? ""} onChange={(e) => set("kitchenLat", e.target.value === "" ? null : Number(e.target.value))} placeholder="25.2048" />
-          </F>
-          <F label="Kitchen longitude">
-            <Input type="number" step="any" value={d.kitchenLng ?? ""} onChange={(e) => set("kitchenLng", e.target.value === "" ? null : Number(e.target.value))} placeholder="55.2708" />
-          </F>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="Kitchen latitude" hint="Only needed for distance limits on zones.">
+            <TextInput type="number" step="any" value={d.kitchenLat ?? ""} onChange={(e) => set("kitchenLat", e.target.value === "" ? null : Number(e.target.value))} placeholder="25.2048" />
+          </Field>
+          <Field label="Kitchen longitude">
+            <TextInput type="number" step="any" value={d.kitchenLng ?? ""} onChange={(e) => set("kitchenLng", e.target.value === "" ? null : Number(e.target.value))} placeholder="55.2708" />
+          </Field>
         </div>
-        <Row label="Cutlery ticked by default" hint="Off is kinder to the planet; customers can still opt in.">
-          <Switch checked={d.cutleryDefault} onCheckedChange={(v) => set("cutleryDefault", v)} />
-        </Row>
       </Card>
 
-      <Card title="Legal identity (receipts & footer)">
+      <Card title="Legal details" description="Printed on receipts and in the website footer.">
         <div className="grid gap-4 sm:grid-cols-2">
-          <F label="Legal business name"><Input value={d.legalName ?? ""} onChange={(e) => set("legalName", e.target.value || null)} /></F>
-          <F label="Trade licence number"><Input value={d.tradeLicenseNo ?? ""} onChange={(e) => set("tradeLicenseNo", e.target.value || null)} /></F>
-          <F label="Licensing authority"><Input value={d.licensingAuthority ?? ""} onChange={(e) => set("licensingAuthority", e.target.value || null)} placeholder="Dubai Department of Economy and Tourism" /></F>
-          <F label="VAT TRN"><Input value={d.trn ?? ""} onChange={(e) => set("trn", e.target.value || null)} placeholder="15-digit TRN" /></F>
+          <Field label="Legal business name">
+            <TextInput value={d.legalName ?? ""} onChange={(e) => set("legalName", text(e.target.value))} />
+          </Field>
+          <Field label="Trade licence number">
+            <TextInput value={d.tradeLicenseNo ?? ""} onChange={(e) => set("tradeLicenseNo", text(e.target.value))} />
+          </Field>
+          <Field label="Licensing authority">
+            <TextInput value={d.licensingAuthority ?? ""} onChange={(e) => set("licensingAuthority", text(e.target.value))} placeholder="Dubai Department of Economy and Tourism" />
+          </Field>
+          <Field label="VAT number (TRN)">
+            <TextInput value={d.trn ?? ""} onChange={(e) => set("trn", text(e.target.value))} />
+          </Field>
         </div>
-        <p className="text-[12px] text-warm-white/50">
-          UAE consumer-protection rules expect the seller&apos;s name, licence and licensing authority to be shown; the TRN is required on tax invoices if registered.
-        </p>
       </Card>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={busy} size="lg">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save settings
+        <Button type="submit" disabled={busy}>
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save
         </Button>
       </div>
     </form>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-5 rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-6">
-      <h2 className="text-xl font-bold tracking-[-0.03em] text-warm-white">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="flex items-start justify-between gap-6">
-      <span>
-        <span className="block text-[13.5px] font-medium text-warm-white">{label}</span>
-        {hint && <span className="block text-[11.5px] text-warm-white/55">{hint}</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
-    </div>
   );
 }

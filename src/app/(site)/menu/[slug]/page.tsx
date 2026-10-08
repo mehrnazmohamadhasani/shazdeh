@@ -65,7 +65,7 @@ export default async function DishPage({ params }: Props) {
   const { slug } = await params;
   const found = await getMenuItemBySlug(slug);
   if (!found) notFound();
-  const { dish, variants } = found;
+  const { dish } = found;
 
   const [settings, socials, related] = await Promise.all([
     getSettings(),
@@ -144,11 +144,6 @@ export default async function DishPage({ params }: Props) {
                 {dish.description}
               </p>
             )}
-            {dish.story && (
-              <p className="mt-6 max-w-xl border-l-2 border-terracotta/40 pl-5 text-[15px] italic leading-[1.7] text-dark-grey">
-                {dish.story}
-              </p>
-            )}
 
             <DishBadges dish={dish} className="mt-8" />
 
@@ -174,25 +169,10 @@ export default async function DishPage({ params }: Props) {
             )}
 
             <div className="mt-10 border-t border-black-iron/10 pt-8">
-              {variants.length > 0 ? (
-                <ul className="space-y-3">
-                  {variants.map((v) => (
-                    <li key={v.id} className="flex items-baseline justify-between gap-6">
-                      <span className="text-[15px]">{v.label}</span>
-                      <span className="text-xl font-bold tabular-nums text-terracotta-ink">
-                        {formatPrice(v.price, dish.currency)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <>
-                  <p className="caption">Price</p>
-                  <p className="mt-2 text-4xl font-bold tabular-nums tracking-[-0.03em] text-terracotta-ink">
-                    {formatPrice(dish.price, dish.currency)}
-                  </p>
-                </>
-              )}
+              <p className="caption">Price</p>
+              <p className="mt-2 text-4xl font-bold tabular-nums tracking-[-0.03em] text-terracotta-ink">
+                {formatPrice(dish.price)}
+              </p>
 
               {dish.isAvailable ? (
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">

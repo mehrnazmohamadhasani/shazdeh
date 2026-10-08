@@ -1,12 +1,11 @@
 "use client";
 import * as React from "react";
 import Image from "next/image";
-import { Check, ChevronDown, Flame, Leaf } from "lucide-react";
+import { Check, ChevronDown, Leaf } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { QuantityStepper } from "@/components/order/quantity-stepper";
 import { cart, type CartLine } from "@/components/order/cart-store";
-import { spiceLabel } from "@/lib/dish";
 import { formatFils } from "@/lib/ordering/money";
 import { unitPriceFils, validateSelection, type PricingGroup } from "@/lib/ordering/pricing";
 import { variantToPricingItem, type OrderProduct } from "@/lib/ordering/types";
@@ -114,7 +113,6 @@ function SheetBody({
     onDone();
   }
 
-  const spice = spiceLabel(product.spicyLevel);
 
   return (
     <div className="flex flex-col">
@@ -145,11 +143,6 @@ function SheetBody({
           {product.isVegetarian && (
             <span className="inline-flex items-center gap-1.5 text-olive-leaf">
               <Leaf className="h-3.5 w-3.5" strokeWidth={1.6} aria-hidden /> Vegetarian
-            </span>
-          )}
-          {spice && (
-            <span className="inline-flex items-center gap-1.5 text-rose-sumac">
-              <Flame className="h-3.5 w-3.5" strokeWidth={1.6} aria-hidden /> {spice}
             </span>
           )}
         </div>

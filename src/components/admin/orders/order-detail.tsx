@@ -113,18 +113,18 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
   return (
     <div className="space-y-8">
       <div className="print:hidden">
-        <Link href="/admin/orders" className="inline-flex min-h-10 items-center gap-2 text-[12px] uppercase tracking-[0.2em] text-warm-white/60 hover:text-warm-white">
+        <Link href="/admin/orders" className="inline-flex min-h-10 items-center gap-2 text-[12px] uppercase tracking-[0.2em] text-dark-grey hover:text-black-iron">
           <ArrowLeft className="h-4 w-4" /> All orders
         </Link>
       </div>
 
-      <header className="flex flex-col gap-4 border-b border-warm-white/[0.08] pb-6 md:flex-row md:items-end md:justify-between">
+      <header className="flex flex-col gap-4 border-b border-black-iron/[0.08] pb-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.32em] text-terracotta">
+          <p className="text-[12px] font-medium text-terracotta-ink">
             {STAFF_LABEL[o.status]} · placed {dubaiTime(o.placedAt, true)}
           </p>
-          <h1 className="mt-3 text-4xl font-bold tabular-nums tracking-[-0.04em] text-warm-white md:text-5xl">{o.number}</h1>
-          {o.rejectionReason && <p className="mt-2 text-[14px] text-pomegranate-red brightness-150">Reason: {o.rejectionReason}</p>}
+          <h1 className="mt-3 text-4xl font-bold tabular-nums tracking-[-0.04em] text-black-iron md:text-5xl">{o.number}</h1>
+          {o.rejectionReason && <p className="mt-2 text-[14px] text-pomegranate-red">Reason: {o.rejectionReason}</p>}
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           {next && (
@@ -154,31 +154,31 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Items — the kitchen ticket */}
-        <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5 lg:col-span-2">
-          <h2 className="text-[10px] uppercase tracking-[0.32em] text-terracotta">Items</h2>
-          <ul className="mt-4 divide-y divide-warm-white/[0.06]">
+        <section className="rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-5 lg:col-span-2">
+          <h2 className="text-[16px] font-semibold text-black-iron">Items</h2>
+          <ul className="mt-4 divide-y divide-black-iron/[0.06]">
             {o.items.map((i) => (
               <li key={i.id} className="flex justify-between gap-4 py-3">
-                <div className="text-[16px] text-warm-white">
-                  <span className="font-bold tabular-nums text-terracotta">{i.quantity}×</span> {i.name}
-                  {i.portion && <span className="text-warm-white/60"> ({i.portion})</span>}
-                  {i.modifiers.length > 0 && <p className="pl-7 text-[13px] text-warm-white/65">{i.modifiers.join(" · ")}</p>}
-                  {i.notes && <p className="pl-7 text-[13px] italic text-saffron-orange">“{i.notes}”</p>}
+                <div className="text-[16px] text-black-iron">
+                  <span className="font-bold tabular-nums text-terracotta-ink">{i.quantity}×</span> {i.name}
+                  {i.portion && <span className="text-dark-grey"> ({i.portion})</span>}
+                  {i.modifiers.length > 0 && <p className="pl-7 text-[13px] text-dark-grey">{i.modifiers.join(" · ")}</p>}
+                  {i.notes && <p className="pl-7 text-[13px] italic text-cinnamon-bark">“{i.notes}”</p>}
                 </div>
-                <span className="shrink-0 tabular-nums text-warm-white/80">{formatFils(i.lineTotalFils)}</span>
+                <span className="shrink-0 tabular-nums text-black-iron/80">{formatFils(i.lineTotalFils)}</span>
               </li>
             ))}
           </ul>
-          {o.notes && <p className="mt-3 rounded-sm bg-saffron-orange/10 px-3 py-2 text-[14px] text-saffron-orange">Kitchen note: {o.notes}</p>}
-          <p className="mt-3 text-[13px] text-warm-white/60">{o.cutlery ? "Include cutlery and napkins" : "No cutlery"}</p>
+          {o.notes && <p className="mt-3 rounded-sm bg-saffron-orange/[0.12] px-3 py-2 text-[14px] text-cinnamon-bark">Kitchen note: {o.notes}</p>}
+          <p className="mt-3 text-[13px] text-dark-grey">{o.cutlery ? "Include cutlery and napkins" : "No cutlery"}</p>
 
-          <dl className="mt-5 space-y-1.5 border-t border-warm-white/[0.08] pt-4 text-[14px]">
+          <dl className="mt-5 space-y-1.5 border-t border-black-iron/[0.08] pt-4 text-[14px]">
             <Line label="Subtotal" value={formatFils(o.subtotalFils)} />
             <Line label={`Delivery (${o.zoneName})`} value={formatFils(o.deliveryFeeFils)} />
             {o.serviceFeeFils > 0 && <Line label="Service fee" value={formatFils(o.serviceFeeFils)} />}
             {o.discountFils > 0 && <Line label={`Promo ${o.couponCode ?? ""}`} value={`−${formatFils(o.discountFils)}`} />}
             <Line label="VAT included" value={formatFils(o.vatFils)} muted />
-            <div className="flex justify-between pt-2 text-[18px] font-bold text-warm-white">
+            <div className="flex justify-between pt-2 text-[18px] font-bold text-black-iron">
               <dt>Total</dt>
               <dd className="tabular-nums">{formatFils(o.totalFils)}</dd>
             </div>
@@ -187,10 +187,10 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
 
         <div className="space-y-6">
           {/* Payment */}
-          <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5">
-            <h2 className="text-[10px] uppercase tracking-[0.32em] text-terracotta">Payment</h2>
-            <p className="mt-3 text-[16px] font-semibold text-warm-white">{PAYMENT_METHOD_LABEL[o.paymentMethod]}</p>
-            <p className={cn("text-[14px]", o.paymentStatus === "PAID" ? "text-olive-leaf brightness-150" : "text-saffron-orange")}>
+          <section className="rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-5">
+            <h2 className="text-[16px] font-semibold text-black-iron">Payment</h2>
+            <p className="mt-3 text-[16px] font-semibold text-black-iron">{PAYMENT_METHOD_LABEL[o.paymentMethod]}</p>
+            <p className={cn("text-[14px]", o.paymentStatus === "PAID" ? "text-olive-leaf" : "text-cinnamon-bark")}>
               {PAYMENT_LABEL[o.paymentStatus]}
               {o.paymentStatus === "PAY_ON_DELIVERY" && ` — collect ${formatFils(o.totalFils)}`}
             </p>
@@ -202,36 +202,36 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
           </section>
 
           {/* Customer & address */}
-          <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5">
-            <h2 className="text-[10px] uppercase tracking-[0.32em] text-terracotta">Customer</h2>
-            <p className="mt-3 text-[16px] font-semibold text-warm-white">{o.customerName}</p>
-            <p className="text-[12.5px] text-warm-white/55">
+          <section className="rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-5">
+            <h2 className="text-[16px] font-semibold text-black-iron">Customer</h2>
+            <p className="mt-3 text-[16px] font-semibold text-black-iron">{o.customerName}</p>
+            <p className="text-[12.5px] text-dark-grey">
               {o.previousOrders > 0 ? `${o.previousOrders} previous delivered order${o.previousOrders > 1 ? "s" : ""}` : "First order"}
             </p>
             <div className="mt-3 flex flex-wrap gap-2 print:hidden">
-              <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-white/15 px-3.5 text-[13px] text-warm-white">
+              <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron">
                 <Phone className="h-4 w-4" /> {formatUaeMobile(o.customerPhone)}
               </a>
               <a
                 href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Hello ${o.customerName.split(" ")[0]}, this is SHĀZDEH about your order ${o.number}.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-white/15 px-3.5 text-[13px] text-warm-white"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron"
               >
                 <MessageSquare className="h-4 w-4" /> WhatsApp
               </a>
             </div>
-            <p className="mt-1 hidden text-[14px] text-warm-white print:block">{formatUaeMobile(o.customerPhone)}</p>
-            {o.customerEmail && <p className="mt-2 text-[13px] text-warm-white/65">{o.customerEmail}</p>}
+            <p className="mt-1 hidden text-[14px] text-black-iron print:block">{formatUaeMobile(o.customerPhone)}</p>
+            {o.customerEmail && <p className="mt-2 text-[13px] text-dark-grey">{o.customerEmail}</p>}
 
-            <div className="mt-5 border-t border-warm-white/[0.08] pt-4 text-[14px] leading-relaxed text-warm-white">
-              <p className="capitalize text-warm-white/55">{o.addressType}</p>
+            <div className="mt-5 border-t border-black-iron/[0.08] pt-4 text-[14px] leading-relaxed text-black-iron">
+              <p className="capitalize text-dark-grey">{o.addressType}</p>
               <p>{[o.unit && `Unit ${o.unit}`, o.floor && `Floor ${o.floor}`].filter(Boolean).join(", ")}</p>
               <p className="font-semibold">{o.building}</p>
               {o.street && <p>{o.street}</p>}
               <p>{o.areaName}</p>
-              {o.instructions && <p className="mt-2 text-saffron-orange">“{o.instructions}”</p>}
-              <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-10 items-center gap-2 text-[13px] text-terracotta print:hidden">
+              {o.instructions && <p className="mt-2 text-cinnamon-bark">“{o.instructions}”</p>}
+              <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-10 items-center gap-2 text-[13px] text-terracotta-ink print:hidden">
                 <MapPin className="h-4 w-4" /> Open in Maps {o.lat != null && "(customer shared location)"}
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -239,14 +239,14 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
           </section>
 
           {/* Delivery */}
-          <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5 print:hidden">
-            <h2 className="text-[10px] uppercase tracking-[0.32em] text-terracotta">Delivery</h2>
-            <p className="mt-3 text-[14px] text-warm-white">
+          <section className="rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-5 print:hidden">
+            <h2 className="text-[16px] font-semibold text-black-iron">Delivery</h2>
+            <p className="mt-3 text-[14px] text-black-iron">
               Promised {o.etaMin}–{o.etaMax} min · by{" "}
               {dubaiTime(new Date(new Date(o.placedAt).getTime() + o.etaMax * 60000).toISOString())}
             </p>
             {(o.driverName || o.deliveryRef) && (
-              <p className="mt-1 text-[13px] text-warm-white/65">
+              <p className="mt-1 text-[13px] text-dark-grey">
                 {o.deliveryProvider === "courier" ? "Courier" : "Rider"}: {[o.driverName, o.driverPhone, o.deliveryRef].filter(Boolean).join(" · ")}
               </p>
             )}
@@ -255,7 +255,7 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
                 <Clock className="h-3.5 w-3.5" /> Running late +10 min
               </Button>
             )}
-            <a href={`/order/track/${o.trackingToken}`} target="_blank" rel="noopener noreferrer" className="mt-3 block text-[12.5px] text-warm-white/55 underline">
+            <a href={`/order/track/${o.trackingToken}`} target="_blank" rel="noopener noreferrer" className="mt-3 block text-[12.5px] text-dark-grey underline">
               Customer&apos;s tracking page
             </a>
           </section>
@@ -263,8 +263,8 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
       </div>
 
       {/* Timeline */}
-      <section className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5 print:hidden">
-        <h2 className="text-[10px] uppercase tracking-[0.32em] text-terracotta">Timeline</h2>
+      <section className="rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-5 print:hidden">
+        <h2 className="text-[16px] font-semibold text-black-iron">Timeline</h2>
         <form
           className="mt-4 flex gap-2"
           onSubmit={async (e) => {
@@ -280,11 +280,11 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
         <ol className="mt-4 space-y-3">
           {o.events.map((e) => (
             <li key={e.id} className="flex gap-4 text-[13.5px]">
-              <span className="w-28 shrink-0 tabular-nums text-warm-white/50">{dubaiTime(e.createdAt, true)}</span>
-              <span className="text-warm-white">
+              <span className="w-28 shrink-0 tabular-nums text-dark-grey">{dubaiTime(e.createdAt, true)}</span>
+              <span className="text-black-iron">
                 {e.status && e.type === "status" ? <strong>{STAFF_LABEL[e.status]}</strong> : <strong className="capitalize">{e.type}</strong>}
-                {e.message && <span className="text-warm-white/75"> — {e.message}</span>}
-                <span className="block text-[11.5px] text-warm-white/45">{e.actor}</span>
+                {e.message && <span className="text-black-iron/80"> — {e.message}</span>}
+                <span className="block text-[11.5px] text-dark-grey">{e.actor}</span>
               </span>
             </li>
           ))}
@@ -316,7 +316,7 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
 
 function Line({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
-    <div className={cn("flex justify-between", muted ? "text-warm-white/50" : "text-warm-white/80")}>
+    <div className={cn("flex justify-between", muted ? "text-dark-grey" : "text-black-iron/80")}>
       <dt>{label}</dt>
       <dd className="tabular-nums">{value}</dd>
     </div>

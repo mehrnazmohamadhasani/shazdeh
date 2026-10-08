@@ -1,4 +1,4 @@
-import { AdminPageHeader } from "@/components/admin/page-header";
+import { AdminPage } from "@/components/admin/ui";
 import { ZonesManager } from "@/components/admin/ordering/zones-manager";
 import { prisma } from "@/lib/prisma";
 
@@ -8,16 +8,23 @@ export const metadata = { title: "Delivery zones" };
 export default async function DeliveryPage() {
   const zones = await prisma.deliveryZone.findMany({
     orderBy: { order: "asc" },
-    include: { areas: { orderBy: { order: "asc" }, select: { name: true, lat: true, lng: true } } },
+    select: {
+      id: true,
+      name: true,
+      fee: true,
+      minOrder: true,
+      freeDeliveryOver: true,
+      etaMin: true,
+      etaMax: true,
+      radiusKm: true,
+      isActive: true,
+      order: true,
+      areas: { orderBy: { name: "asc" }, select: { name: true, lat: true, lng: true } },
+    },
   });
   return (
-    <div className="container-shazdeh space-y-10 py-10 md:py-14">
-      <AdminPageHeader
-        eyebrow="Ordering"
-        title="Delivery zones"
-        description="Where you deliver, what it costs, the minimum order and how long it takes. Customers pick their area; the zone sets the terms."
-      />
+    <AdminPage title="Delivery zones" description="Where you deliver, the fee, the minimum order and how long it takes.">
       <ZonesManager zones={zones} />
-    </div>
+    </AdminPage>
   );
 }

@@ -28,10 +28,6 @@ export type OrderProduct = {
   allergens: string | null;
   imageUrl: string | null;
   isVegetarian: boolean;
-  isSignature: boolean;
-  isBestseller: boolean;
-  isNew: boolean;
-  spicyLevel: number;
   categorySlug: string;
   categoryName: string;
   fromPriceFils: number;
@@ -41,7 +37,6 @@ export type OrderProduct = {
 export type OrderCategory = {
   slug: string;
   name: string;
-  tagline: string | null;
   products: OrderProduct[];
 };
 
@@ -66,8 +61,6 @@ export type OrderingConfig = {
   serviceFeeFils: number;
   paymentMethods: ("CASH_ON_DELIVERY" | "CARD_ON_DELIVERY" | "ONLINE")[];
   onlineProviderLabel: string | null;
-  cutleryDefault: boolean;
-  prepMinutes: number;
 };
 
 export function variantToPricingItem(product: OrderProduct, v: OrderVariant): PricingItem {

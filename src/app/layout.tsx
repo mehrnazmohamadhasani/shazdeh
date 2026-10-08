@@ -70,9 +70,6 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       ...(s.ogImageUrl ? { images: [s.ogImageUrl] } : {}),
     },
-    ...(s.faviconUrl
-      ? { icons: { icon: s.faviconUrl, apple: s.faviconUrl } }
-      : {}),
     formatDetection: { telephone: false, email: false, address: false },
     // Installed-app behaviour on iOS / iPadOS (the manifest covers the
     // rest). "default" keeps dark status-bar text over the warm-white

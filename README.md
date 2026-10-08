@@ -4,11 +4,11 @@ A premium digital platform for **SHĀZDEH**, a contemporary Persian food
 brand in Dubai. SHĀZDEH is **delivery-only** — every primary action on the
 public site leads to ordering, now **directly on the website** (`/order`),
 with delivery apps and WhatsApp as alternatives. Behind it sits a full
-admin atelier (CMS) and a kitchen order board.
+admin (CMS) and a kitchen order board.
 
 ```
 shazdeh ── public site (cinematic, mobile-first, SEO-ready)
-       ├── admin atelier (auth-gated CRUD for everything)
+       ├── admin (auth-gated, role-aware)
        ├── REST API (validated, type-safe)
        └── image upload pipeline (local / Supabase / Cloudinary)
 ```
@@ -58,9 +58,9 @@ npm install
 # 2. Set up environment
 cp .env.example .env
 
-# 3. Migrate + seed (creates the Shazdeh menu, admin user, banners…)
+# 3. Migrate + seed (creates the Shazdeh menu, admin user, gallery…)
 #    ⚠ Point DATABASE_URL at a local/dev database first — seeding deletes
-#    and recreates banners, gallery images and social links.
+#    and recreates gallery images and social links.
 npm run db:migrate
 npm run db:seed
 
@@ -69,7 +69,7 @@ npm run dev
 ```
 
 Open `http://localhost:3000` — the public site.
-Open `http://localhost:3000/login` — the admin atelier.
+Open `http://localhost:3000/login` — the admin.
 
 Default admin credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
 `.env` (seed only). **Change the password before deploying** — the example
@@ -82,9 +82,8 @@ value is public.
 ```
 shazdeh/
 ├── prisma/
-│   ├── schema.prisma            # Data model (Users, Categories, MenuItem,
-│   │                            # ItemVariant, Banner, GalleryImage,
-│   │                            # SocialLink, RestaurantSettings)
+│   ├── schema.prisma            # Data model (menu, content, settings,
+│   │                            # and online ordering)
 │   ├── seed.ts                  # Full Shazdeh menu seed
 │   └── migrations/
 ├── public/
@@ -113,20 +112,18 @@ shazdeh/
     │   │   └── not-found.tsx
     │   ├── not-found.tsx        # Branded 404 for unmatched URLs
     │   ├── login/page.tsx       # Admin sign-in
-    │   ├── admin/               # Auth-gated atelier
+    │   ├── admin/               # Auth-gated admin (light, role-aware)
     │   │   ├── layout.tsx
-    │   │   ├── page.tsx         # Overview + analytics tiles
+    │   │   ├── page.tsx         # Dashboard: today's orders, sales, sold out
     │   │   ├── menu-items/      # List + new + [id] editor
     │   │   ├── categories/
-    │   │   ├── banners/
     │   │   ├── gallery/
     │   │   ├── social/
-    │   │   └── settings/        # Brand, contact, hours, SEO, logo
+    │   │   └── settings/        # Business details: contact, hours, SEO, logo
     │   ├── api/                 # REST API
     │   │   ├── auth/{login,logout}/
     │   │   ├── menu-items/[id]/
     │   │   ├── categories/[id]/
-    │   │   ├── banners/[id]/
     │   │   ├── gallery/[id]/
     │   │   ├── social/[id]/
     │   │   ├── settings/
@@ -196,13 +193,11 @@ CSS reduced-motion guard; the hero video has a pause control.
 
 Prisma schema covers every entity the brand needs:
 
-- `User` + `Session` — admin auth
-- `Category` — menu sections (Mains, Vegetarian, Sides, Drinks…)
-- `MenuItem` — dishes (English + Persian name, price, image, story,
-   spicy level, vegetarian, signature, bestseller, new flags)
-- `ItemVariant` — per-item options (e.g. small / large)
-- `Banner` — homepage and section heroes (`home_hero`, `home_secondary`,
-   `menu_hero`)
+- `User` — admin, editor and kitchen-staff accounts (JWT sessions)
+- `Category` — menu sections (name, order, shown/hidden)
+- `MenuItem` — dishes (English + Persian name, price in AED, photo,
+   description, ingredients, allergens, spice level, labels, shown / in stock)
+- `ModifierGroup` / `ModifierOption` — options & add-ons for ordering
 - `GalleryImage` — editorial photo set
 - `SocialLink` — Instagram, WhatsApp, Talabat, Deliveroo, Careem, Noon…
 - `RestaurantSettings` — single-row store for brand, contact, hours,
@@ -231,7 +226,7 @@ All routes live under `/api/*` and respond JSON. Mutating routes
 | POST   | `/api/categories`            | admin                          |
 | PATCH  | `/api/categories/[id]`       | admin                          |
 | DELETE | `/api/categories/[id]`       | admin                          |
-| `…`    | banners, gallery, social     | identical CRUD pattern         |
+| `…`    | gallery, social              | identical CRUD pattern         |
 | GET    | `/api/settings`              | public                         |
 | PATCH  | `/api/settings`              | admin                          |
 | POST   | `/api/upload`                | admin · multipart `file`       |
@@ -359,7 +354,7 @@ sure the host has access to `node_modules/.prisma` and the
 | Command                  | What it does                              |
 | ------------------------ | ----------------------------------------- |
 | `npm run dev`            | Local dev server                          |
-| `npm run build`          | `prisma generate` + **`prisma db push`** + `next build` — note the push runs against whatever `DATABASE_URL` points at |
+| `npm run build`          | `prisma generate` + `next build`. Schema changes are applied separately with `npx prisma db push`, so a deploy can never drop data |
 | `npm run start`          | Run production build                      |
 | `npm run lint`           | ESLint                                    |
 | `npm run db:migrate`     | Create + apply a new dev migration        |
