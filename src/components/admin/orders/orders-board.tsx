@@ -29,6 +29,16 @@ import { cn } from "@/lib/utils";
 const POLL_MS = 8000;
 // Gap between chimes while an order waits to be accepted.
 const ALARM_MS = 3000;
+// Remembers "alerts on" across reloads, per device.
+const ALERTS_KEY = "shazdeh.kitchen.alerts";
+
+function saveAlerts(on: boolean) {
+  try {
+    window.localStorage.setItem(ALERTS_KEY, on ? "on" : "off");
+  } catch {
+    // Private mode: alerts just won't survive a reload.
+  }
+}
 
 type BoardData = {
   orders: BoardOrder[];
@@ -58,6 +68,8 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
   const [page, setPage] = React.useState(1);
   const [now, setNow] = React.useState(() => Date.now());
   const [sound, setSound] = React.useState(false);
+  // Browsers keep audio muted after a reload until the first tap/key.
+  const [audioLocked, setAudioLocked] = React.useState(false);
   const audio = React.useRef<AudioContext | null>(null);
   const seen = React.useRef(new Set(initial.orders.filter((o) => o.status === "RECEIVED").map((o) => o.id)));
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -120,8 +132,10 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
     if (!ringing) return;
     const ring = () => {
       const ctx = audio.current;
-      if (!ctx) return;
-      // iOS suspends audio after interruptions (calls, Siri).
+      // Still waiting for the first tap: skip, or the queued chimes would
+      // all fire at once on unlock.
+      if (!ctx || ctx.state === "suspended") return;
+      // iOS pauses audio after interruptions (calls, Siri).
       void ctx.resume().then(() => playChime(ctx));
     };
     ring();
@@ -131,13 +145,54 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
 
   const awake = useWakeLock(sound);
 
+  /** Creates the audio context and tracks whether the browser has muted it. */
+  const ensureAudio = React.useCallback(() => {
+    if (!audio.current) {
+      const ctx = new AudioContext();
+      ctx.onstatechange = () => setAudioLocked(ctx.state === "suspended");
+      audio.current = ctx;
+    }
+    return audio.current;
+  }, []);
+
+  // Alerts were on before the reload → turn them back on. Notifications
+  // (already permitted) and the wake lock need no tap; sound does, so the
+  // first tap or key press anywhere on the page unlocks it.
+  React.useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(ALERTS_KEY);
+    } catch {}
+    if (stored !== "on") return;
+
+    const ctx = ensureAudio();
+    const unlock = () => void ctx.resume();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    const t = setTimeout(() => {
+      setSound(true);
+      setAudioLocked(ctx.state === "suspended");
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [ensureAudio]);
+
   function enableSound() {
-    if (!audio.current) audio.current = new AudioContext();
-    void audio.current.resume();
-    playChime(audio.current);
+    const ctx = ensureAudio();
+    void ctx.resume();
+    playChime(ctx);
     setSound(true);
+    saveAlerts(true);
     // Same click, so the browser allows the permission prompt.
     void requestNotifications();
+  }
+
+  function disableSound() {
+    setSound(false);
+    saveAlerts(false);
   }
 
   async function act(order: BoardOrder, to: OrderStatusValue, extra: Record<string, unknown> = {}) {
@@ -178,7 +233,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
         </label>
         <button
           type="button"
-          onClick={() => (sound ? setSound(false) : enableSound())}
+          onClick={() => (sound && !audioLocked ? disableSound() : enableSound())}
           aria-pressed={sound}
           className={cn(
             "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-[12px] font-medium",
@@ -192,7 +247,9 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
           ) : (
             <BellOff className="h-4 w-4" />
           )}
-          {ringing
+          {sound && audioLocked
+            ? "Tap to unmute alerts"
+            : ringing
             ? "Ringing — accept the order to stop"
             : sound
               ? `Alerts on${awake ? " · screen stays awake" : ""}`
