@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { MenuItemForm } from "@/components/admin/menu-item-form";
+import { ModifiersEditor } from "@/components/admin/ordering/modifiers-editor";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,12 @@ export default async function EditMenuItemPage({
 }) {
   const { id } = await params;
   const [item, categories] = await Promise.all([
-    prisma.menuItem.findUnique({ where: { id } }),
+    prisma.menuItem.findUnique({
+      where: { id },
+      include: {
+        modifierGroups: { orderBy: { order: "asc" }, include: { options: { orderBy: { order: "asc" } } } },
+      },
+    }),
     prisma.category.findMany({ orderBy: { order: "asc" } }),
   ]);
   if (!item) notFound();
@@ -46,8 +52,18 @@ export default async function EditMenuItemPage({
           isBestseller: item.isBestseller,
           isNew: item.isNew,
           isSignature: item.isSignature,
+          isActive: item.isActive,
           order: item.order,
         }}
+      />
+      <ModifiersEditor
+        itemId={item.id}
+        initial={item.modifierGroups.map((g) => ({
+          name: g.name,
+          minSelect: g.minSelect,
+          maxSelect: g.maxSelect,
+          options: g.options.map((o) => ({ name: o.name, price: o.price, isAvailable: o.isAvailable })),
+        }))}
       />
     </div>
   );

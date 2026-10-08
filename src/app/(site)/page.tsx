@@ -36,7 +36,6 @@ export default async function HomePage() {
       <HomeHero
         title={banner?.title}
         subtitle={banner?.subtitle}
-        videoSrc={settings.heroVideoUrl}
       />
       <FeaturedDishes dishes={featured} whatsapp={whatsappNumber} />
       <HomeManifesto />

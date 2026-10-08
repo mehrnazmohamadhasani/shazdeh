@@ -126,17 +126,17 @@ export function DishDialog({
 
               {d.isAvailable ? (
                 <div className="mt-6 flex flex-col gap-2.5">
+                  <Button asChild size="lg">
+                    <Link href={`/order?dish=${d.slug}`}>Order this dish</Link>
+                  </Button>
                   {orderUrl && (
-                    <Button asChild size="lg">
+                    <Button asChild size="lg" variant="outline">
                       <a href={orderUrl} target="_blank" rel="noopener noreferrer">
                         <WhatsappIcon className="h-4 w-4" />
-                        Order on WhatsApp
+                        Ask on WhatsApp
                       </a>
                     </Button>
                   )}
-                  <Button asChild size="lg" variant="outline">
-                    <Link href="/order">Order via delivery apps</Link>
-                  </Button>
                 </div>
               ) : (
                 <p className="mt-6 rounded-sm bg-cream px-4 py-3 text-[14px] text-dark-grey">

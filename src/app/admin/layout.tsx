@@ -1,4 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
 
@@ -7,12 +9,24 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// The Atelier is dark: match the browser / installed-app chrome to it.
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  colorScheme: "dark",
+};
+
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const user = await requireAdmin();
+  // The proxy checks the token's role; this re-checks the current role
+  // from the database so a demotion applies on the next page load.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  if (user.role === "STAFF" && !pathname.startsWith("/admin/orders")) {
+    redirect("/admin/orders");
+  }
 
   return (
     <div

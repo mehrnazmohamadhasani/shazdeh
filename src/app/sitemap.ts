@@ -10,7 +10,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { path: "/", priority: 1, changeFrequency: "weekly" as const },
     { path: "/menu", priority: 0.9, changeFrequency: "weekly" as const },
-    { path: "/order", priority: 0.8, changeFrequency: "monthly" as const },
+    { path: "/order", priority: 0.9, changeFrequency: "daily" as const },
+    { path: "/order/apps", priority: 0.4, changeFrequency: "monthly" as const },
+    { path: "/legal/terms", priority: 0.2, changeFrequency: "yearly" as const },
+    { path: "/legal/privacy", priority: 0.2, changeFrequency: "yearly" as const },
+    { path: "/legal/refunds", priority: 0.2, changeFrequency: "yearly" as const },
+    { path: "/legal/delivery", priority: 0.2, changeFrequency: "yearly" as const },
     { path: "/about", priority: 0.6, changeFrequency: "yearly" as const },
     { path: "/gallery", priority: 0.5, changeFrequency: "monthly" as const },
   ].map((r) => ({
@@ -22,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const items = await prisma.menuItem.findMany({
-      where: { category: { isActive: true } },
+      where: { isActive: true, category: { isActive: true } },
       select: { slug: true, updatedAt: true, imageUrl: true },
       orderBy: { order: "asc" },
     });

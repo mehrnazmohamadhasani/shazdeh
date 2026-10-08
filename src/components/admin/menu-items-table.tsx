@@ -13,6 +13,8 @@ import {
   Star,
   Leaf,
   Flame,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -27,6 +29,8 @@ type Item = {
   price: number;
   currency: string;
   isAvailable: boolean;
+  isActive: boolean;
+  order: number;
   isBestseller: boolean;
   isSignature: boolean;
   isNew: boolean;
@@ -69,6 +73,39 @@ export function MenuItemsTable({
       });
       if (!res.ok) throw new Error("Failed to update");
       toast.success(value ? "Marked available" : "Marked sold out");
+      router.refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  /**
+   * Moves a dish up/down within its category and renumbers the category
+   * 1…n, so equal or gapped sort values never make the order ambiguous.
+   */
+  async function move(item: Item, dir: -1 | 1) {
+    const siblings = items
+      .filter((i) => i.category.id === item.category.id)
+      .sort((a, b) => a.order - b.order);
+    const from = siblings.findIndex((i) => i.id === item.id);
+    const to = from + dir;
+    if (to < 0 || to >= siblings.length) return;
+    [siblings[from], siblings[to]] = [siblings[to], siblings[from]];
+    setPendingId(item.id);
+    try {
+      const changed = siblings
+        .map((s, idx) => ({ s, order: idx + 1 }))
+        .filter(({ s, order }) => s.order !== order);
+      for (const { s, order } of changed) {
+        const res = await fetch(`/api/menu-items/${s.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order }),
+        });
+        if (!res.ok) throw new Error("Failed to reorder");
+      }
       router.refresh();
     } catch (e) {
       toast.error((e as Error).message);
@@ -134,13 +171,13 @@ export function MenuItemsTable({
 
       {/* Table */}
       <div className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] overflow-hidden">
-        <div className="hidden md:grid grid-cols-[64px_minmax(0,1fr)_120px_120px_140px_120px_60px] items-center px-4 py-3 border-b border-warm-white/[0.08] text-[10px] tracking-[0.22em] uppercase font-medium text-warm-white/55">
+        <div className="hidden md:grid grid-cols-[64px_minmax(0,1fr)_120px_120px_140px_100px_auto] items-center px-4 py-3 border-b border-warm-white/[0.08] text-[10px] tracking-[0.22em] uppercase font-medium text-warm-white/55">
           <span></span>
           <span>Dish</span>
           <span>Category</span>
           <span>Price</span>
           <span>Tags</span>
-          <span>Available</span>
+          <span>In stock</span>
           <span></span>
         </div>
         {filtered.length === 0 ? (
@@ -158,7 +195,7 @@ export function MenuItemsTable({
               <div
                 key={item.id}
                 className={cn(
-                  "grid grid-cols-[64px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_120px_120px_140px_120px_60px] gap-3 md:gap-2 items-center px-4 py-3.5 transition-colors hover:bg-warm-white/[0.03]",
+                  "grid grid-cols-[64px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_120px_120px_140px_100px_auto] gap-3 md:gap-2 items-center px-4 py-3.5 transition-colors hover:bg-warm-white/[0.03]",
                   pendingId === item.id && "opacity-50",
                 )}
               >
@@ -176,6 +213,11 @@ export function MenuItemsTable({
                 <div className="min-w-0">
                   <p className="text-warm-white text-[13px] truncate font-medium">
                     {item.name}
+                    {!item.isActive && (
+                      <span className="ml-2 align-middle text-[9.5px] uppercase tracking-[0.18em] text-saffron-orange">
+                        Hidden
+                      </span>
+                    )}
                   </p>
                   <p className="text-warm-white/45 text-[11px] truncate font-mono">
                     {item.slug}
@@ -227,6 +269,26 @@ export function MenuItemsTable({
                   </span>
                 </div>
                 <div className="flex items-center gap-1 justify-end">
+                  {activeCat !== "all" && !query && (
+                    <>
+                      <button
+                        onClick={() => move(item, -1)}
+                        className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06]"
+                        aria-label="Move up"
+                        disabled={pendingId !== null}
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      </button>
+                      <button
+                        onClick={() => move(item, 1)}
+                        className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06]"
+                        aria-label="Move down"
+                        disabled={pendingId !== null}
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      </button>
+                    </>
+                  )}
                   <Link
                     href={`/admin/menu-items/${item.id}`}
                     className="grid place-items-center h-8 w-8 rounded-md text-warm-white/55 hover:text-warm-white hover:bg-warm-white/[0.06] transition-colors"

@@ -42,7 +42,7 @@ export const getMenuTree = cache(
       where: { isActive: true },
       orderBy: { order: "asc" },
       include: {
-        items: { orderBy: { order: "asc" }, select: DISH_SELECT },
+        items: { where: { isActive: true }, orderBy: { order: "asc" }, select: DISH_SELECT },
       },
     });
 
@@ -73,6 +73,7 @@ export async function getFeaturedDishes(limit = 4): Promise<DishCardData[]> {
     const items = await prisma.menuItem.findMany({
       where: {
         isAvailable: true,
+        isActive: true,
         imageUrl: { not: null },
         category: { isActive: true },
         OR: [{ isSignature: true }, { isBestseller: true }],
@@ -114,6 +115,7 @@ export const getMenuItemBySlug = cache(async (slug: string) => {
     where: { slug },
     select: {
       ...DISH_SELECT,
+      isActive: true,
       updatedAt: true,
       category: { select: { name: true, slug: true, isActive: true } },
       variants: {
@@ -123,7 +125,7 @@ export const getMenuItemBySlug = cache(async (slug: string) => {
       },
     },
   });
-  if (!item || !item.category.isActive) return null;
+  if (!item || !item.isActive || !item.category.isActive) return null;
   return {
     dish: toDishCard(item, item.category),
     variants: item.variants,
@@ -141,6 +143,7 @@ export async function getRelatedDishes(
     const items = await prisma.menuItem.findMany({
       where: {
         isAvailable: true,
+        isActive: true,
         slug: { not: excludeSlug },
         category: { slug: categorySlug, isActive: true },
       },

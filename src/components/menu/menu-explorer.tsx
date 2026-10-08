@@ -138,7 +138,7 @@ export function MenuExplorer({
   return (
     <div className="relative">
       {/* Sticky category rail (+ desktop controls) */}
-      <div className="glass-soft sticky top-[68px] z-30 border-y border-black-iron/[0.07] md:top-[84px]">
+      <div className="glass-soft sticky top-[calc(68px+var(--safe-top))] z-30 border-y border-black-iron/[0.07] md:top-[calc(84px+var(--safe-top))]">
         <div className="container-shazdeh flex items-center gap-6">
           <nav
             aria-label="Menu categories"

@@ -215,7 +215,7 @@ function BannerDrawer({
     <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black-iron/70 backdrop-blur-md">
       <div className="absolute inset-0" onClick={onClose} aria-hidden />
       <div className="relative w-full max-w-lg bg-black-iron border-l border-warm-white/[0.08] overflow-y-auto">
-        <div className="sticky top-0 bg-black-iron/95 backdrop-blur-xl border-b border-warm-white/[0.08] px-7 py-5 flex items-center justify-between">
+        <div className="sticky top-0 bg-black-iron/95 backdrop-blur-xl border-b border-warm-white/[0.08] px-7 py-5 pt-[calc(1.25rem+var(--safe-top))] flex items-center justify-between">
           <div>
             <p className="text-[10px] tracking-[0.32em] uppercase text-terracotta">
               {draft.id ? "Edit" : "New"}

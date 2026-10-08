@@ -14,6 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
+import { formatFils } from "@/lib/ordering/money";
+import { localClock } from "@/lib/ordering/hours";
+
+/** Start of "today" in Dubai, as a UTC Date. */
+function startOfDubaiDay(now = new Date()) {
+  const { minutes } = localClock(now, "Asia/Dubai");
+  const d = new Date(now.getTime() - minutes * 60_000);
+  d.setUTCSeconds(0, 0);
+  return d;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +36,8 @@ export default async function AdminOverview() {
     bestsellerCount,
     unavailableCount,
     recentItems,
+    todayOrders,
+    waiting,
   ] = await Promise.all([
     prisma.menuItem.count(),
     prisma.category.count(),
@@ -38,7 +50,18 @@ export default async function AdminOverview() {
       take: 6,
       include: { category: true },
     }),
+    prisma.order.aggregate({
+      where: {
+        placedAt: { gte: startOfDubaiDay() },
+        status: { notIn: ["PENDING_PAYMENT", "REJECTED", "CANCELLED"] },
+      },
+      _count: true,
+      _sum: { totalFils: true },
+    }),
+    prisma.order.count({ where: { status: "RECEIVED" } }),
   ]);
+  const todayCount = todayOrders._count;
+  const todaySales = todayOrders._sum.totalFils ?? 0;
 
   const stats = [
     {
@@ -99,6 +122,26 @@ export default async function AdminOverview() {
           </Button>
         }
       />
+
+      {/* Today */}
+      <section className="grid gap-3 sm:grid-cols-3">
+        {[
+          { label: "Orders today", value: String(todayCount) },
+          { label: "Sales today", value: formatFils(todaySales) },
+          { label: "Waiting to be accepted", value: String(waiting), warn: waiting > 0 },
+        ].map((t) => (
+          <Link
+            key={t.label}
+            href="/admin/orders"
+            className="rounded-md border border-warm-white/[0.08] bg-warm-white/[0.02] p-5 transition-colors hover:border-terracotta/30"
+          >
+            <p className={`text-3xl font-bold tabular-nums tracking-[-0.03em] ${t.warn ? "text-terracotta" : "text-warm-white"}`}>
+              {t.value}
+            </p>
+            <p className="mt-3 text-[10px] uppercase tracking-[0.22em] text-warm-white/55">{t.label}</p>
+          </Link>
+        ))}
+      </section>
 
       {/* Stats */}
       <section>

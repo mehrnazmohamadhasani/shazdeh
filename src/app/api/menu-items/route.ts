@@ -15,7 +15,7 @@ export async function GET() {
     // Hidden / inactive records are only listed for signed-in admins.
     const isAdmin = Boolean(await getSessionUser());
     const items = await prisma.menuItem.findMany({
-      where: isAdmin ? undefined : { category: { isActive: true } },
+      where: isAdmin ? undefined : { isActive: true, category: { isActive: true } },
       orderBy: [{ category: { order: "asc" } }, { order: "asc" }],
       include: { category: true, variants: true },
     });

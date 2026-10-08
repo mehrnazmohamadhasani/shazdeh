@@ -31,6 +31,7 @@ export type MenuItemDraft = {
   isBestseller: boolean;
   isNew: boolean;
   isSignature: boolean;
+  isActive: boolean;
   order: number;
 };
 
@@ -52,6 +53,7 @@ const EMPTY: MenuItemDraft = {
   isBestseller: false,
   isNew: false,
   isSignature: false,
+  isActive: true,
   order: 0,
 };
 
@@ -281,8 +283,14 @@ export function MenuItemForm({
         </h3>
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Toggle
-            label="Available"
-            description="Customers can order this dish"
+            label="Shown on menu"
+            description="Off hides the dish everywhere (menu, ordering, search)"
+            checked={draft.isActive}
+            onChange={(v) => update("isActive", v)}
+          />
+          <Toggle
+            label="In stock"
+            description="Off keeps it visible but marked sold out — can't be ordered"
             checked={draft.isAvailable}
             onChange={(v) => update("isAvailable", v)}
           />

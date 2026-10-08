@@ -23,8 +23,10 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
-  role: "ADMIN" | "EDITOR";
+  role: UserRoleValue;
 };
+
+export type UserRoleValue = "ADMIN" | "EDITOR" | "STAFF";
 
 export async function signSession(user: SessionUser): Promise<string> {
   const secret = getAuthSecret();
@@ -57,7 +59,7 @@ export async function verifySession(token: string): Promise<SessionUser | null> 
       id: String(payload.sub),
       email: String(payload.email),
       name: (payload.name as string | null) ?? null,
-      role: payload.role as "ADMIN" | "EDITOR",
+      role: payload.role as UserRoleValue,
     };
   } catch {
     return null;
@@ -71,8 +73,18 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return verifySession(token);
 }
 
+/**
+ * Gate for admin pages. Re-reads the user so a removed account (or a
+ * changed role) takes effect immediately, not when the JWT expires.
+ */
 export async function requireAdmin(): Promise<SessionUser> {
-  const user = await getSessionUser();
+  const session = await getSessionUser();
+  const user = session
+    ? await prisma.user.findUnique({
+        where: { id: session.id },
+        select: { id: true, email: true, name: true, role: true },
+      })
+    : null;
   if (!user) redirect("/login");
   return user;
 }

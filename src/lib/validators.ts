@@ -91,6 +91,7 @@ export const menuItemSchema = z.object({
   isBestseller: z.boolean().optional().default(false),
   isNew: z.boolean().optional().default(false),
   isSignature: z.boolean().optional().default(false),
+  isActive: z.boolean().optional().default(true),
   order: z.number().int().nonnegative().optional().default(0),
 });
 

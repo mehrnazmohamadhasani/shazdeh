@@ -2,14 +2,32 @@
 
 A premium digital platform for **SHĀZDEH**, a contemporary Persian food
 brand in Dubai. SHĀZDEH is **delivery-only** — every primary action on the
-public site leads to ordering (delivery partners or WhatsApp). Behind it
-sits a full admin atelier (CMS).
+public site leads to ordering, now **directly on the website** (`/order`),
+with delivery apps and WhatsApp as alternatives. Behind it sits a full
+admin atelier (CMS) and a kitchen order board.
 
 ```
 shazdeh ── public site (cinematic, mobile-first, SEO-ready)
        ├── admin atelier (auth-gated CRUD for everything)
        ├── REST API (validated, type-safe)
        └── image upload pipeline (local / Supabase / Cloudinary)
+```
+
+---
+
+## Online ordering
+
+Direct ordering (menu → basket → checkout → tracking), the staff order
+board, delivery zones, promo codes, provider-agnostic online payments and
+notification hooks. Ordering ships **switched off**; see:
+
+- [`docs/ordering/README.md`](docs/ordering/README.md) — architecture, routes, security, go-live runbook, roadmap
+- [`docs/ordering/owner-checklist.md`](docs/ordering/owner-checklist.md) — what to collect from the restaurant
+- [`docs/ordering/legal-dubai.md`](docs/ordering/legal-dubai.md) — Dubai/UAE regulatory research
+
+```bash
+npm run db:seed:demo   # local only: demo zones, add-ons, promo NOOSH10, ordering on
+npm test               # pricing / hours / status / phone unit tests
 ```
 
 ---
@@ -85,7 +103,10 @@ shazdeh/
     │   │   │                    #   craft, gallery strip, order band
     │   │   ├── menu/page.tsx    # Menu explorer (filters, search, quick view)
     │   │   ├── menu/[slug]/     # Dish pages (SSG + ISR, MenuItem JSON-LD)
-    │   │   ├── order/page.tsx   # Delivery partners, WhatsApp, hours, FAQ
+    │   │   ├── order/apps/      # Delivery partners, WhatsApp, hours, FAQ
+    │   │   ├── legal/[slug]/    # Terms, privacy, refunds, delivery (drafts)
+    │   ├── (order)/             # Route group · direct ordering (slim shell)
+    │   │   └── order/           # Menu, checkout, track/[token]
     │   │   ├── about/page.tsx   # Brand story, values, hospitality
     │   │   ├── gallery/page.tsx # Editorial masonry + accessible lightbox
     │   │   ├── error.tsx        # Friendly error state
@@ -249,6 +270,48 @@ a full-screen accessible menu. 44px minimum touch targets throughout.
 
 ---
 
+## Installable app (PWA)
+
+The same Next.js app is also an installable Progressive Web App: no
+separate codebase, no store listing.
+
+| Piece | Where |
+| --- | --- |
+| Manifest (name, icons, `standalone`, shortcuts) | `src/app/manifest.ts` → `/manifest.webmanifest` |
+| Icons (any + maskable + apple-touch) | `public/icons/` — regenerate with `npm run icons:pwa` |
+| Service worker | `public/sw.js` (plain JS, no build step) |
+| Registration, update prompt, online/offline notice | `src/components/pwa/service-worker.tsx` |
+| Install card (Chrome/Edge prompt, iOS instructions) | `src/components/pwa/install-prompt.tsx` |
+| Offline fallback | `src/app/offline/page.tsx` |
+| Installed-app tab bar (phones) | `src/components/site/app-tab-bar.tsx` |
+
+**Caching rules** (`public/sw.js`):
+
+- `/_next/static/*` — cache-first (content-hashed, immutable).
+- Images (`/_next/image`, `*.jpg|png|webp…`) — stale-while-revalidate, capped at 120.
+- Public pages (`/`, `/menu`, `/menu/:slug`, `/about`, `/gallery`, `/legal/:slug`,
+  `/order/apps`) — network-first; the saved copy is used only when offline
+  (or after 5 s on a very slow connection).
+- **Never cached, never intercepted:** `/api/*`, any non-GET request, RSC
+  payloads, cross-origin requests (Stripe etc.). Admin, login, checkout,
+  payment and tracking pages go straight to the network and fall back to
+  `/offline` — they are never written to a cache. API responses also carry
+  `Cache-Control: no-store`.
+
+A page is only added to `PUBLIC_PAGES` if it renders identically for every
+visitor — keep it that way when adding routes.
+
+**Updates.** The worker is registered as `/sw.js?v=<commit sha>` (see
+`appVersion()` in `next.config.ts`), so each deploy installs a new worker
+with fresh caches. Open tabs get a "new version is ready → Refresh" toast;
+nothing reloads by itself mid-checkout.
+
+**Development.** The worker only registers in production builds; `next dev`
+unregisters any leftover worker. To test locally: `next build && next start`,
+then DevTools → Application.
+
+---
+
 ## Production deployment
 
 ### Recommended target — **Vercel + Supabase Postgres + Supabase Storage**
@@ -304,6 +367,7 @@ sure the host has access to `node_modules/.prisma` and the
 | `npm run db:seed`        | Re-seed the Shazdeh menu                  |
 | `npm run db:studio`      | Prisma Studio (visual DB editor)          |
 | `npm run images:optimize`| Re-optimize the brand asset pack          |
+| `npm run icons:pwa`      | Regenerate PWA / home-screen icons from `brand-assets/app-icon-source.png` |
 
 ---
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { ArchLines } from "@/components/brand/arch";
 import { WhatsappIcon } from "@/components/icons/social";
@@ -16,7 +17,6 @@ export function OrderBand({
   partners: SocialLinkView[];
   whatsapp?: string;
 }) {
-  if (partners.length === 0 && !whatsapp) return null;
 
   return (
     <section
@@ -41,6 +41,19 @@ export function OrderBand({
         </Reveal>
         <Reveal delay={0.14}>
           <ul className="mt-12 flex flex-wrap gap-3">
+            <li>
+              <Link
+                href="/order"
+                className="group inline-flex h-14 items-center gap-3 rounded-pill bg-black-iron px-8 text-[12px] font-medium uppercase tracking-[0.2em] text-warm-white transition-colors duration-500 hover:bg-ash"
+              >
+                Order direct
+                <ArrowUpRight
+                  aria-hidden
+                  className="h-4 w-4 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  strokeWidth={1.5}
+                />
+              </Link>
+            </li>
             {partners.map((p) => (
               <li key={p.id}>
                 <a
