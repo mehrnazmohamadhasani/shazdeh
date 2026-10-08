@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -7,6 +7,12 @@ import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
 export const metadata: Metadata = {
   title: { default: "Atelier · SHĀZDEH", template: "%s · Atelier" },
   robots: { index: false, follow: false },
+};
+
+// The Atelier is dark: match the browser / installed-app chrome to it.
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  colorScheme: "dark",
 };
 
 export default async function AdminLayout({

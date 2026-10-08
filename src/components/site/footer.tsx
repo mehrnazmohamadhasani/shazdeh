@@ -148,7 +148,7 @@ function FooterColumn({
       <h2 className="mb-5 text-[11px] font-medium uppercase tracking-[0.2em] text-warm-white/50">
         {label}
       </h2>
-      <ul className="space-y-3">
+      <ul className="space-y-1">
         {items.map((child, i) => (
           <li key={i}>{child}</li>
         ))}
@@ -167,7 +167,7 @@ function FooterLink({
   external?: boolean;
 }) {
   const className =
-    "inline-block text-[14px] text-warm-white/80 transition-colors duration-300 hover:text-white [overflow-wrap:anywhere]";
+    "inline-block py-[7px] text-[14px] text-warm-white/80 transition-colors duration-300 hover:text-white [overflow-wrap:anywhere]";
   if (external) {
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className={className}>

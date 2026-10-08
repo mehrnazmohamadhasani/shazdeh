@@ -14,7 +14,8 @@
     "test": "tsx --test src/lib/ordering/__tests__/*.test.ts",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
-    "images:optimize": "tsx scripts/optimize-images.ts"
+    "images:optimize": "tsx scripts/optimize-images.ts",
+    "icons:pwa": "tsx scripts/generate-pwa-icons.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

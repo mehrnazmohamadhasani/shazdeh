@@ -480,7 +480,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
         </div>
 
         {/* Summary */}
-        <aside aria-label="Order summary" className="lg:sticky lg:top-[92px] lg:self-start">
+        <aside aria-label="Order summary" className="lg:sticky lg:top-[calc(92px+var(--safe-top))] lg:self-start">
           <div className="rounded-[18px] border border-black-iron/10 bg-white/70 p-5 sm:p-6">
             <h2 className="text-[1.25rem] font-bold tracking-[-0.03em]">Order summary</h2>
             {quote?.zone && (

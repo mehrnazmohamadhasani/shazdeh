@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
 import { env } from "@/lib/env";
+import { ServiceWorker } from "@/components/pwa/service-worker";
 
 // Inter is the brand typeface — loaded as a single variable file so
 // Light (body) and Bold (headlines) cost one request, not six.
@@ -73,6 +74,18 @@ export async function generateMetadata(): Promise<Metadata> {
       ? { icons: { icon: s.faviconUrl, apple: s.faviconUrl } }
       : {}),
     formatDetection: { telephone: false, email: false, address: false },
+    // Installed-app behaviour on iOS / iPadOS (the manifest covers the
+    // rest). "default" keeps dark status-bar text over the warm-white
+    // header; "black-translucent" would put white text on it.
+    appleWebApp: {
+      capable: true,
+      title: s.brandName,
+      statusBarStyle: "default",
+    },
+    other: {
+      // Pre-iOS 16.4 Safari only honours the legacy apple-prefixed name.
+      "apple-mobile-web-app-capable": "yes",
+    },
   };
 }
 
@@ -81,6 +94,9 @@ export const viewport: Viewport = {
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
+  // Lets the layout reach under the notch / home indicator; every fixed or
+  // sticky bar pads itself with the safe-area insets (see globals.css).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -94,8 +110,14 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         {children}
+        <ServiceWorker />
         <Toaster
           position="bottom-center"
+          mobileOffset={{
+            bottom: "calc(16px + var(--safe-bottom) + var(--tabbar-h))",
+            left: "max(16px, var(--safe-left))",
+            right: "max(16px, var(--safe-right))",
+          }}
           toastOptions={{
             style: {
               background: "#fdf6ec",

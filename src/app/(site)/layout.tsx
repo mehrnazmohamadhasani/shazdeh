@@ -1,5 +1,7 @@
 import { SiteNav } from "@/components/site/nav";
 import { SiteFooter } from "@/components/site/footer";
+import { AppTabBar } from "@/components/site/app-tab-bar";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { MotionProvider } from "@/components/shared/motion-provider";
 import { getSettings } from "@/lib/settings";
 import { deliveryPartners, findPlatform, getSocialLinks } from "@/lib/social";
@@ -27,7 +29,8 @@ export default async function SiteLayout({
       >
         Skip to content
       </a>
-      <div className="relative flex min-h-screen flex-col">
+      {/* Bottom padding reserves room for the installed app's tab bar. */}
+      <div className="relative flex min-h-screen flex-col pb-[var(--tabbar-h)]">
         <SiteNav logoUrl={settings.logoUrl} />
         <main id="main" className="flex-1">
           {children}
@@ -39,6 +42,8 @@ export default async function SiteLayout({
           whatsapp={whatsapp}
         />
       </div>
+      <AppTabBar />
+      <InstallPrompt />
     </MotionProvider>
   );
 }

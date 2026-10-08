@@ -270,6 +270,48 @@ a full-screen accessible menu. 44px minimum touch targets throughout.
 
 ---
 
+## Installable app (PWA)
+
+The same Next.js app is also an installable Progressive Web App: no
+separate codebase, no store listing.
+
+| Piece | Where |
+| --- | --- |
+| Manifest (name, icons, `standalone`, shortcuts) | `src/app/manifest.ts` → `/manifest.webmanifest` |
+| Icons (any + maskable + apple-touch) | `public/icons/` — regenerate with `npm run icons:pwa` |
+| Service worker | `public/sw.js` (plain JS, no build step) |
+| Registration, update prompt, online/offline notice | `src/components/pwa/service-worker.tsx` |
+| Install card (Chrome/Edge prompt, iOS instructions) | `src/components/pwa/install-prompt.tsx` |
+| Offline fallback | `src/app/offline/page.tsx` |
+| Installed-app tab bar (phones) | `src/components/site/app-tab-bar.tsx` |
+
+**Caching rules** (`public/sw.js`):
+
+- `/_next/static/*` — cache-first (content-hashed, immutable).
+- Images (`/_next/image`, `*.jpg|png|webp…`) — stale-while-revalidate, capped at 120.
+- Public pages (`/`, `/menu`, `/menu/:slug`, `/about`, `/gallery`, `/legal/:slug`,
+  `/order/apps`) — network-first; the saved copy is used only when offline
+  (or after 5 s on a very slow connection).
+- **Never cached, never intercepted:** `/api/*`, any non-GET request, RSC
+  payloads, cross-origin requests (Stripe etc.). Admin, login, checkout,
+  payment and tracking pages go straight to the network and fall back to
+  `/offline` — they are never written to a cache. API responses also carry
+  `Cache-Control: no-store`.
+
+A page is only added to `PUBLIC_PAGES` if it renders identically for every
+visitor — keep it that way when adding routes.
+
+**Updates.** The worker is registered as `/sw.js?v=<commit sha>` (see
+`appVersion()` in `next.config.ts`), so each deploy installs a new worker
+with fresh caches. Open tabs get a "new version is ready → Refresh" toast;
+nothing reloads by itself mid-checkout.
+
+**Development.** The worker only registers in production builds; `next dev`
+unregisters any leftover worker. To test locally: `next build && next start`,
+then DevTools → Application.
+
+---
+
 ## Production deployment
 
 ### Recommended target — **Vercel + Supabase Postgres + Supabase Storage**
@@ -325,6 +367,7 @@ sure the host has access to `node_modules/.prisma` and the
 | `npm run db:seed`        | Re-seed the Shazdeh menu                  |
 | `npm run db:studio`      | Prisma Studio (visual DB editor)          |
 | `npm run images:optimize`| Re-optimize the brand asset pack          |
+| `npm run icons:pwa`      | Regenerate PWA / home-screen icons from `brand-assets/app-icon-source.png` |
 
 ---
 

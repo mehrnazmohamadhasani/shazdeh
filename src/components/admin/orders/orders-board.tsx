@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Bell, BellOff, Banknote, CreditCard, Loader2, Search, Utensils } from "lucide-react";
+import { Bell, BellOff, BellRing, Banknote, CreditCard, Loader2, Search, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   playChime,
   type DispatchProviderOption,
 } from "@/components/admin/orders/order-actions";
+import { notifyNewOrder, requestNotifications, useWakeLock } from "@/components/admin/orders/kitchen-alerts";
 import type { BoardOrder } from "@/lib/ordering/admin";
 import { formatFils } from "@/lib/ordering/money";
 import { STAFF_ACTION, STAFF_LABEL, nextStatus, type OrderStatusValue } from "@/lib/ordering/status";
@@ -20,10 +21,14 @@ import { cn } from "@/lib/utils";
 /*
  * The kitchen board. Designed to be read across a counter: the order
  * number, how long it's been waiting, what to cook, and one button for
- * the next step. Polls every 8 seconds and chimes on new orders.
+ * the next step. Polls every 8 seconds. With alerts on, a new order rings
+ * until it is accepted (from any device), pops a desktop notification,
+ * and the screen is kept awake.
  */
 
 const POLL_MS = 8000;
+// Gap between chimes while an order waits to be accepted.
+const ALARM_MS = 3000;
 
 type BoardData = {
   orders: BoardOrder[];
@@ -78,10 +83,10 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
         const fresh = next.orders.filter((o) => o.status === "RECEIVED" && !seen.current.has(o.id));
         if (fresh.length) {
           fresh.forEach((o) => seen.current.add(o.id));
-          playChime(audio.current);
-          toast(`New order ${fresh[0].number}${fresh.length > 1 ? ` (+${fresh.length - 1})` : ""}`, {
-            description: `${fresh[0].areaName} · ${formatFils(fresh[0].totalFils)}`,
-          });
+          const title = `New order ${fresh[0].number}${fresh.length > 1 ? ` (+${fresh.length - 1})` : ""}`;
+          const description = `${fresh[0].areaName} · ${formatFils(fresh[0].totalFils)}`;
+          toast(title, { description });
+          void notifyNewOrder(title, description, `order-${fresh[0].id}`);
         }
       }
       setData(next);
@@ -108,11 +113,31 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
     document.title = data.counts.new > 0 ? `(${data.counts.new}) New orders · Atelier` : "Orders · Atelier";
   }, [data.counts.new]);
 
+  // Ring until nothing is waiting in "New" — accepting (or rejecting) the
+  // last one, here or on another device, stops it on the next poll.
+  const ringing = sound && data.counts.new > 0;
+  React.useEffect(() => {
+    if (!ringing) return;
+    const ring = () => {
+      const ctx = audio.current;
+      if (!ctx) return;
+      // iOS suspends audio after interruptions (calls, Siri).
+      void ctx.resume().then(() => playChime(ctx));
+    };
+    ring();
+    const t = setInterval(ring, ALARM_MS);
+    return () => clearInterval(t);
+  }, [ringing]);
+
+  const awake = useWakeLock(sound);
+
   function enableSound() {
     if (!audio.current) audio.current = new AudioContext();
     void audio.current.resume();
     playChime(audio.current);
     setSound(true);
+    // Same click, so the browser allows the permission prompt.
+    void requestNotifications();
   }
 
   async function act(order: BoardOrder, to: OrderStatusValue, extra: Record<string, unknown> = {}) {
@@ -154,13 +179,24 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
         <button
           type="button"
           onClick={() => (sound ? setSound(false) : enableSound())}
+          aria-pressed={sound}
           className={cn(
             "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-[12px] font-medium",
             sound ? "border-terracotta/50 text-terracotta" : "border-warm-white/20 text-warm-white/80",
           )}
         >
-          {sound ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-          {sound ? "Sound on" : "Turn on new-order sound"}
+          {ringing ? (
+            <BellRing className="h-4 w-4 animate-pulse" />
+          ) : sound ? (
+            <Bell className="h-4 w-4" />
+          ) : (
+            <BellOff className="h-4 w-4" />
+          )}
+          {ringing
+            ? "Ringing — accept the order to stop"
+            : sound
+              ? `Alerts on${awake ? " · screen stays awake" : ""}`
+              : "Turn on new-order alerts"}
         </button>
       </div>
 

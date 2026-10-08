@@ -74,7 +74,7 @@ export function AdminSidebar({
   return (
     <aside
       data-theme="dark"
-      className="hidden lg:flex print:!hidden flex-col w-64 shrink-0 h-screen sticky top-0 border-r border-warm-white/[0.08] bg-black-iron text-warm-white"
+      className="hidden lg:flex print:!hidden flex-col w-64 shrink-0 h-screen sticky top-0 pt-[var(--safe-top)] pb-[var(--safe-bottom)] border-r border-warm-white/[0.08] bg-black-iron text-warm-white"
     >
       <div className="p-6 border-b border-warm-white/[0.08]">
         <Link href="/admin" className="block">
@@ -163,20 +163,20 @@ export function AdminMobileBar({
   return (
     <header
       data-theme="dark"
-      className="lg:hidden print:hidden sticky top-0 z-40 bg-black-iron/95 text-warm-white backdrop-blur-xl border-b border-warm-white/[0.08]"
+      className="lg:hidden print:hidden sticky top-0 z-40 pt-[var(--safe-top)] bg-black-iron/95 text-warm-white backdrop-blur-xl border-b border-warm-white/[0.08]"
     >
-      <div className="flex items-center justify-between px-4 h-14">
+      <div className="flex items-center justify-between px-[max(1rem,var(--safe-left))] h-14">
         <Link href="/admin">
           <Wordmark size="xs" className="text-warm-white" />
         </Link>
         <button
           onClick={handleLogout}
-          className="text-[10px] tracking-[0.22em] uppercase font-medium text-warm-white/65 hover:text-pomegranate-red"
+          className="-mr-2 min-h-11 px-2 text-[10px] tracking-[0.22em] uppercase font-medium text-warm-white/65 hover:text-pomegranate-red"
         >
           Sign out
         </button>
       </div>
-      <nav className="flex gap-2 px-4 pb-3 overflow-x-auto no-scrollbar">
+      <nav className="flex gap-2 px-[max(1rem,var(--safe-left))] pb-3 overflow-x-auto no-scrollbar">
         {navFor(user.role).map((item) => {
           const active =
             item.href === "/admin"
@@ -187,7 +187,7 @@ export function AdminMobileBar({
               key={item.href}
               href={item.href}
               className={cn(
-                "shrink-0 px-3 h-8 rounded-pill text-[10px] tracking-[0.22em] uppercase font-medium",
+                "shrink-0 inline-flex items-center px-3 h-9 rounded-pill text-[10px] tracking-[0.22em] uppercase font-medium",
                 active
                   ? "bg-terracotta text-warm-white"
                   : "bg-warm-white/[0.05] text-warm-white/65 border border-warm-white/[0.08]",

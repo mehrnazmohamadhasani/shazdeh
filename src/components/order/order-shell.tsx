@@ -20,7 +20,7 @@ export function OrderHeader({
   phone: string | null;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-black-iron/[0.07] bg-warm-white/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-black-iron/[0.07] bg-warm-white/95 pt-[var(--safe-top)] backdrop-blur">
       <div className="container-shazdeh flex h-[60px] items-center justify-between gap-4 md:h-[68px]">
         <div className="flex items-center gap-3">
           <Link

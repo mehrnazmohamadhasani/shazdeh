@@ -190,7 +190,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
       </section>
 
       {/* Sticky rail */}
-      <div className="sticky top-[60px] z-30 mt-6 border-y border-black-iron/[0.07] bg-warm-white/95 backdrop-blur md:top-[68px]">
+      <div className="sticky top-[calc(60px+var(--safe-top))] z-30 mt-6 border-y border-black-iron/[0.07] bg-warm-white/95 backdrop-blur md:top-[calc(68px+var(--safe-top))]">
         <div className="container-shazdeh flex items-center gap-2 py-2">
           <label className="relative shrink-0">
             <span className="sr-only">Search the menu</span>
@@ -309,7 +309,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
         </div>
 
         <aside className="hidden lg:block" aria-label="Basket">
-          <div className="sticky top-[132px] max-h-[calc(100svh-150px)] overflow-y-auto rounded-[18px] border border-black-iron/10 bg-white/70">
+          <div className="sticky top-[calc(132px+var(--safe-top))] max-h-[calc(100svh-150px-var(--safe-top))] overflow-y-auto rounded-[18px] border border-black-iron/10 bg-white/70">
             <BasketPanel
               onEdit={(product, line) => setSheet({ product, editing: line })}
               onChooseArea={() => setAreaOpen(true)}
@@ -320,7 +320,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
 
       {/* Mobile basket bar */}
       {hydrated && basket.count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 px-[max(1rem,var(--safe-left))] pb-[max(0.75rem,var(--safe-bottom))] pt-3 lg:hidden">
           <button
             type="button"
             onClick={() => setBasketOpen(true)}

@@ -195,7 +195,7 @@ export default async function DishPage({ params }: Props) {
               )}
 
               {dish.isAvailable ? (
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button asChild size="lg">
                     <Link href={`/order?dish=${dish.slug}`}>Order this dish</Link>
                   </Button>

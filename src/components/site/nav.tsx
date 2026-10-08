@@ -53,7 +53,7 @@ export function SiteNav({ logoUrl }: { logoUrl?: string | null }) {
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color,color,backdrop-filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "fixed inset-x-0 top-0 z-50 border-b pt-[var(--safe-top)] transition-[background-color,border-color,color,backdrop-filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
         overMedia
           ? "border-transparent bg-transparent text-warm-white"
           : scrolled
@@ -113,7 +113,8 @@ export function SiteNav({ logoUrl }: { logoUrl?: string | null }) {
             <DialogPrimitive.Trigger
               aria-label="Open menu"
               className={cn(
-                "grid h-11 w-11 place-items-center rounded-full border transition-colors md:hidden",
+                // The installed app navigates from its bottom tab bar instead.
+                "grid h-11 w-11 place-items-center rounded-full border transition-colors md:hidden standalone:hidden",
                 overMedia || scrolled
                   ? "border-white/40 hover:bg-white/10"
                   : "border-black-iron/20 hover:bg-black-iron/[0.04]",
@@ -125,7 +126,7 @@ export function SiteNav({ logoUrl }: { logoUrl?: string | null }) {
             <DialogPrimitive.Portal>
               <DialogPrimitive.Content
                 aria-describedby={undefined}
-                className="sheet-anim fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-warm-white text-black-iron md:hidden"
+                className="sheet-anim fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-warm-white pb-[var(--safe-bottom)] pt-[var(--safe-top)] text-black-iron md:hidden"
               >
                 <DialogPrimitive.Title className="sr-only">
                   Site menu

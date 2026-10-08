@@ -110,7 +110,7 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
               if (e.key === "ArrowLeft") go(-1);
               if (e.key === "ArrowRight") go(1);
             }}
-            className="overlay-anim fixed inset-0 z-50 flex flex-col text-warm-white focus:outline-none"
+            className="overlay-anim fixed inset-0 z-50 flex flex-col pb-[var(--safe-bottom)] pl-[var(--safe-left)] pr-[var(--safe-right)] pt-[var(--safe-top)] text-warm-white focus:outline-none"
           >
             <div className="flex items-center justify-between px-5 py-4 md:px-8">
               <DialogPrimitive.Title className="text-[11px] font-medium uppercase tracking-[0.22em] text-warm-white/75">
