@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
 
@@ -13,6 +15,12 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const user = await requireAdmin();
+  // The proxy checks the token's role; this re-checks the current role
+  // from the database so a demotion applies on the next page load.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  if (user.role === "STAFF" && !pathname.startsWith("/admin/orders")) {
+    redirect("/admin/orders");
+  }
 
   return (
     <div

@@ -16,6 +16,8 @@ datasource db {
 enum UserRole {
   ADMIN
   EDITOR
+  // Kitchen / front-of-house: manages orders only, never the CMS.
+  STAFF
 }
 
 model User {
@@ -75,11 +77,45 @@ model MenuItem {
   isBestseller  Boolean       @default(false)
   isNew         Boolean       @default(false)
   isSignature   Boolean       @default(false)
+  // false = hidden from the menu and ordering entirely ("disabled").
+  // isAvailable=false keeps it visible but marked sold out.
+  isActive      Boolean       @default(true)
   order         Int           @default(0)
+  modifierGroups ModifierGroup[]
+  orderItems    OrderItem[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([categoryId])
+}
+
+// ─── Online ordering: customisation ────────────────────────────────────────
+// Per-dish option groups, e.g. "Extras" (min 0, max 3) or "Rice" (min 1,
+// max 1). Prices are deltas in AED added to the dish price.
+
+model ModifierGroup {
+  id        String           @id @default(cuid())
+  itemId    String
+  item      MenuItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  name      String
+  minSelect Int              @default(0)
+  maxSelect Int              @default(1)
+  order     Int              @default(0)
+  options   ModifierOption[]
+
+  @@index([itemId])
+}
+
+model ModifierOption {
+  id          String        @id @default(cuid())
+  groupId     String
+  group       ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name        String
+  price       Float         @default(0)
+  isAvailable Boolean       @default(true)
+  order       Int           @default(0)
+
+  @@index([groupId])
 }
 
 model ItemVariant {
@@ -153,4 +189,289 @@ model RestaurantSettings {
   metaDesc      String?
   ogImageUrl    String?
   updatedAt     DateTime @updatedAt
+}
+
+// ─── Online ordering ────────────────────────────────────────────────────────
+// All money on orders is stored in integer minor units (fils, 1 AED = 100
+// fils) so totals never drift through floating-point rounding. Menu and
+// zone prices stay in AED (Float) because that is what staff type in.
+
+enum DeliveryModel {
+  OWN_FLEET
+  THIRD_PARTY
+  HYBRID
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  CARD_ON_DELIVERY
+  ONLINE
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // online payment started, not yet confirmed — hidden from the kitchen
+  RECEIVED
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING          // waiting for the gateway
+  PAY_ON_DELIVERY  // cash / card machine at the door
+  PAID
+  FAILED
+  REFUNDED
+  VOIDED
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+  FREE_DELIVERY
+}
+
+/// Single-row store (id = "default") for everything the kitchen tunes.
+model OrderingSettings {
+  id                 String          @id @default("default")
+  // Master switch — doubles as "busy mode" when the kitchen is slammed.
+  acceptingOrders    Boolean         @default(false)
+  pausedMessage      String?
+  // JSON object day → "12:00 — 23:00"; null falls back to opening hours.
+  deliveryHours      String?
+  timezone           String          @default("Asia/Dubai")
+  kitchenLat         Float?
+  kitchenLng         Float?
+  vatRate            Float           @default(5)
+  // UAE consumer prices must be shown VAT-inclusive; keep true unless
+  // your accountant says otherwise.
+  pricesIncludeVat   Boolean         @default(true)
+  serviceFee         Float           @default(0)
+  paymentMethods     PaymentMethod[] @default([CASH_ON_DELIVERY, CARD_ON_DELIVERY])
+  deliveryModel      DeliveryModel   @default(OWN_FLEET)
+  prepMinutes        Int             @default(25)
+  autoAccept         Boolean         @default(false)
+  cutleryDefault     Boolean         @default(false)
+  notifyEmail        String?
+  // Legal identity — printed on receipts (simplified tax invoice) and in
+  // the site's legal disclosure (Consumer Protection Law Art. 25).
+  legalName          String?
+  tradeLicenseNo     String?
+  licensingAuthority String?
+  trn                String?
+  updatedAt          DateTime        @updatedAt
+}
+
+model DeliveryZone {
+  id               String         @id @default(cuid())
+  name             String
+  description      String?
+  fee              Float          @default(0)
+  minOrder         Float          @default(0)
+  freeDeliveryOver Float?
+  etaMin           Int            @default(35)
+  etaMax           Int            @default(50)
+  // Optional straight-line limit from the kitchen, enforced when the
+  // customer shares their location and kitchen coordinates are set.
+  radiusKm         Float?
+  isActive         Boolean        @default(true)
+  order            Int            @default(0)
+  areas            DeliveryArea[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+/// A named community ("Dubai Marina", "JLT") — how people in Dubai
+/// describe where they live. Each belongs to exactly one zone.
+model DeliveryArea {
+  id       String       @id @default(cuid())
+  zoneId   String
+  zone     DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  name     String       @unique
+  lat      Float?
+  lng      Float?
+  isActive Boolean      @default(true)
+  order    Int          @default(0)
+
+  @@index([zoneId])
+}
+
+model Coupon {
+  id            String     @id @default(cuid())
+  code          String     @unique // stored upper-case
+  description   String?
+  type          CouponType
+  value         Float      @default(0) // percent (0-100) or AED
+  minSubtotal   Float      @default(0)
+  maxDiscount   Float?
+  startsAt      DateTime?
+  endsAt        DateTime?
+  usageLimit    Int?
+  perPhoneLimit Int?
+  usedCount     Int        @default(0)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+/// Guest customers, keyed by mobile number. No passwords — checkout
+/// never requires an account.
+model Customer {
+  id             String   @id @default(cuid())
+  phone          String   @unique // E.164, e.g. +971501234567
+  name           String
+  email          String?
+  marketingOptIn Boolean  @default(false)
+  orders         Order[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Order {
+  id               String        @id @default(cuid())
+  number           String        @unique // shown to humans, e.g. SZ-482913
+  trackingToken    String        @unique // unguessable, for the tracking link
+  idempotencyKey   String        @unique
+  status           OrderStatus
+  paymentMethod    PaymentMethod
+  paymentStatus    PaymentStatus
+
+  customerId       String?
+  customer         Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName     String
+  customerPhone    String
+  customerEmail    String?
+
+  // Address snapshot — never re-read from anywhere after placement.
+  zoneId           String?
+  zoneName         String
+  areaName         String
+  addressType      String        // apartment | villa | office
+  building         String
+  street           String?
+  unit             String?
+  floor            String?
+  instructions     String?
+  lat              Float?
+  lng              Float?
+
+  notes            String?
+  cutlery          Boolean       @default(false)
+
+  currency         String        @default("AED")
+  subtotalFils     Int
+  deliveryFeeFils  Int
+  serviceFeeFils   Int           @default(0)
+  discountFils     Int           @default(0)
+  vatFils          Int           @default(0) // VAT contained in (or added to) the total
+  totalFils        Int
+  couponId         String?
+  couponCode       String?
+
+  etaMin           Int
+  etaMax           Int
+  rejectionReason  String?
+
+  deliveryProvider String        @default("own_fleet")
+  deliveryRef      String?
+  trackingUrl      String?
+  driverName       String?
+  driverPhone      String?
+
+  placedAt         DateTime      @default(now())
+  confirmedAt      DateTime?
+  preparingAt      DateTime?
+  readyAt          DateTime?
+  dispatchedAt     DateTime?
+  deliveredAt      DateTime?
+  cancelledAt      DateTime?
+
+  items            OrderItem[]
+  events           OrderEvent[]
+  payments         Payment[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([status, placedAt])
+  @@index([customerPhone])
+  @@index([placedAt])
+}
+
+model OrderItem {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId    String?
+  menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  name          String
+  portion       String?
+  unitPriceFils Int       // dish + selected options
+  quantity      Int
+  lineTotalFils Int
+  notes         String?
+  /// [{ group, name, priceFils }]
+  modifiers     Json      @default("[]")
+
+  @@index([orderId])
+}
+
+/// Append-only audit trail: every status change, payment update and
+/// staff note, with who did it.
+model OrderEvent {
+  id        String       @id @default(cuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String       // status | payment | note | dispatch
+  status    OrderStatus?
+  message   String?
+  actor     String       // staff email, "customer", "system" or a provider id
+  createdAt DateTime     @default(now())
+
+  @@index([orderId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider      String        // cash | stripe | mock | …
+  providerRef   String?
+  method        PaymentMethod
+  amountFils    Int
+  currency      String        @default("AED")
+  status        PaymentStatus
+  failureReason String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([orderId])
+}
+
+/// Processed gateway webhook ids — makes webhook handling idempotent.
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
+/// Outbox / log of every customer or restaurant notification attempt.
+model Notification {
+  id        String   @id @default(cuid())
+  orderId   String?
+  event     String
+  channel   String   // email | webhook | log
+  recipient String?
+  status    String   // sent | failed | skipped
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }

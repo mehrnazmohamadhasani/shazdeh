@@ -44,6 +44,7 @@ export function SiteFooter({
           </div>
 
           <FooterColumn label="Order" className="md:col-span-3">
+            <FooterLink href="/order">Order online — direct</FooterLink>
             {partners.map((p) => (
               <FooterLink key={p.id} href={p.url} external>
                 {p.label}
@@ -65,7 +66,7 @@ export function SiteFooter({
             <FooterLink href="/menu">Menu</FooterLink>
             <FooterLink href="/about">Our story</FooterLink>
             <FooterLink href="/gallery">Gallery</FooterLink>
-            <FooterLink href="/order">Order &amp; contact</FooterLink>
+            <FooterLink href="/order/apps">Delivery apps &amp; contact</FooterLink>
           </FooterColumn>
 
           <FooterColumn label="Contact" className="md:col-span-2">
@@ -88,9 +89,17 @@ export function SiteFooter({
         </div>
 
         <div className="mt-20 flex flex-col-reverse gap-6 border-t border-warm-white/[0.12] pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-warm-white/50">
-            © {year} SHĀZDEH · Dubai
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-warm-white/50">
+              © {year} SHĀZDEH · Dubai
+            </p>
+            <nav aria-label="Policies" className="flex flex-wrap gap-x-4 text-[12px] text-warm-white/55">
+              <Link href="/legal/terms" className="min-h-11 content-center hover:text-warm-white">Terms</Link>
+              <Link href="/legal/privacy" className="min-h-11 content-center hover:text-warm-white">Privacy</Link>
+              <Link href="/legal/refunds" className="min-h-11 content-center hover:text-warm-white">Refunds</Link>
+              <Link href="/legal/delivery" className="min-h-11 content-center hover:text-warm-white">Delivery</Link>
+            </nav>
+          </div>
           {follow.length > 0 && (
             <ul className="-ml-3 flex items-center gap-1 sm:ml-0 sm:-mr-3">
               {follow.map((s) => {

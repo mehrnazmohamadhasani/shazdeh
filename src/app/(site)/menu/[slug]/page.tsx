@@ -196,17 +196,17 @@ export default async function DishPage({ params }: Props) {
 
               {dish.isAvailable ? (
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <Button asChild size="lg">
+                    <Link href={`/order?dish=${dish.slug}`}>Order this dish</Link>
+                  </Button>
                   {orderUrl && (
-                    <Button asChild size="lg">
+                    <Button asChild size="lg" variant="outline">
                       <a href={orderUrl} target="_blank" rel="noopener noreferrer">
                         <WhatsappIcon className="h-4 w-4" />
-                        Order on WhatsApp
+                        Ask on WhatsApp
                       </a>
                     </Button>
                   )}
-                  <Button asChild size="lg" variant="outline">
-                    <Link href="/order">Order via delivery apps</Link>
-                  </Button>
                 </div>
               ) : (
                 <p className="mt-8 rounded-sm bg-cream px-5 py-4 text-[15px] text-dark-grey">

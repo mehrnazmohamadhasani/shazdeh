@@ -24,8 +24,8 @@ const nextConfig: NextConfig = {
     ],
   },
   async redirects() {
-    // SHĀZDEH is delivery-only: "contact" became the order page.
-    return [{ source: "/contact", destination: "/order", permanent: true }];
+    // SHĀZDEH is delivery-only: "contact" lives with the delivery-apps page.
+    return [{ source: "/contact", destination: "/order/apps", permanent: true }];
   },
   async headers() {
     return [
@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            value: "camera=(), microphone=(), geolocation=(self)",
           },
         ],
       },

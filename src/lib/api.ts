@@ -2,14 +2,41 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, type SessionUser, type UserRoleValue } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-export async function requireAuth() {
-  const user = await getSessionUser();
+/** Who may edit content. Kitchen staff (STAFF) only manage orders. */
+export const CMS_ROLES: UserRoleValue[] = ["ADMIN", "EDITOR"];
+export const ORDER_ROLES: UserRoleValue[] = ["ADMIN", "EDITOR", "STAFF"];
+
+/**
+ * Verifies the session JWT *and* re-reads the user, so a removed
+ * account or a changed role takes effect immediately instead of when
+ * the 7-day token expires.
+ */
+export async function requireAuth(
+  roles: UserRoleValue[] = CMS_ROLES,
+): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const session = await getSessionUser();
+  const user = session
+    ? await prisma.user.findUnique({
+        where: { id: session.id },
+        select: { id: true, email: true, name: true, role: true },
+      })
+    : null;
   if (!user) {
     return {
       user: null,
       response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+  if (!roles.includes(user.role)) {
+    return {
+      user: null,
+      response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     };
   }
   return { user, response: null };

@@ -588,10 +588,181 @@ async function main() {
   });
   console.log("  ✓ Social links");
 
+  await seedOrdering();
+
   console.log("✓ Seed complete.\n");
   console.log(`  Login → ${adminEmail}`);
   console.log(`  Pass  → ${adminPassword}`);
 }
+
+/*
+ * Online ordering. The real seed only creates the settings row with
+ * ordering switched OFF — zones, fees and add-ons must come from the
+ * restaurant owner (Admin → Delivery zones / Ordering).
+ *
+ * SEED_DEMO_ORDERING=1 adds illustrative zones, Dubai communities,
+ * add-ons and a promo code so the full flow can be tried locally.
+ * Never run it against production: the fees, areas and add-ons are
+ * placeholders, not SHĀZDEH's real terms.
+ */
+const DEMO_ZONES = [
+  {
+    name: "Central",
+    fee: 7,
+    minOrder: 60,
+    freeDeliveryOver: 200,
+    etaMin: 30,
+    etaMax: 45,
+    areas: [
+      ["Downtown Dubai", 25.1972, 55.2744],
+      ["Business Bay", 25.185, 55.265],
+      ["DIFC", 25.212, 55.28],
+      ["City Walk", 25.205, 55.262],
+      ["Al Wasl", 25.195, 55.25],
+      ["Jumeirah 1", 25.221, 55.256],
+      ["Al Quoz", 25.14, 55.23],
+    ],
+  },
+  {
+    name: "Coast & Hills",
+    fee: 12,
+    minOrder: 80,
+    freeDeliveryOver: 250,
+    etaMin: 40,
+    etaMax: 55,
+    areas: [
+      ["Al Barsha", 25.11, 55.2],
+      ["Dubai Hills Estate", 25.11, 55.245],
+      ["Palm Jumeirah", 25.1124, 55.139],
+      ["Dubai Marina", 25.0805, 55.1403],
+      ["Jumeirah Lake Towers (JLT)", 25.07, 55.143],
+      ["Jumeirah Beach Residence (JBR)", 25.078, 55.133],
+    ],
+  },
+  {
+    name: "Outer Dubai",
+    fee: 18,
+    minOrder: 120,
+    freeDeliveryOver: null,
+    etaMin: 50,
+    etaMax: 65,
+    areas: [
+      ["Jumeirah Village Circle (JVC)", 25.06, 55.21],
+      ["Arabian Ranches", 25.055, 55.27],
+      ["Deira", 25.27, 55.31],
+      ["Bur Dubai", 25.255, 55.295],
+      ["Mirdif", 25.22, 55.42],
+    ],
+  },
+] as const;
+
+const DEMO_KHORESH = [
+  "gheimeh-bademjan",
+  "ghormeh-sabzi",
+  "karafs",
+  "fesenjan",
+  "gheimeh-bademjan-veg",
+  "ghormeh-sabzi-veg",
+  "karafs-veg",
+];
+
+async function seedOrdering() {
+  const demo = process.env.SEED_DEMO_ORDERING === "1";
+
+  await prisma.orderingSettings.upsert({
+    where: { id: "default" },
+    update: demo ? { acceptingOrders: true, deliveryHours: DEMO_HOURS } : {},
+    create: {
+      id: "default",
+      acceptingOrders: demo,
+      deliveryHours: demo ? DEMO_HOURS : null,
+    },
+  });
+  console.log(`  ✓ Ordering settings (accepting orders: ${demo ? "on — demo" : "off"})`);
+  if (!demo) return;
+
+  if ((await prisma.deliveryZone.count()) === 0) {
+    let order = 0;
+    for (const z of DEMO_ZONES) {
+      await prisma.deliveryZone.create({
+        data: {
+          name: z.name,
+          fee: z.fee,
+          minOrder: z.minOrder,
+          freeDeliveryOver: z.freeDeliveryOver,
+          etaMin: z.etaMin,
+          etaMax: z.etaMax,
+          order: order++,
+          areas: {
+            create: z.areas.map(([name, lat, lng]) => ({ name, lat, lng })),
+          },
+        },
+      });
+    }
+    console.log("  ✓ Demo delivery zones");
+  }
+
+  for (const slug of DEMO_KHORESH) {
+    const item = await prisma.menuItem.findUnique({
+      where: { slug },
+      include: { _count: { select: { modifierGroups: true } } },
+    });
+    if (!item || item._count.modifierGroups > 0) continue;
+    await prisma.modifierGroup.create({
+      data: {
+        itemId: item.id,
+        name: "Rice",
+        minSelect: 1,
+        maxSelect: 1,
+        order: 0,
+        options: {
+          create: [
+            { name: "Saffron basmati", price: 0, order: 0 },
+            { name: "Saffron basmati with tahdig", price: 10, order: 1 },
+          ],
+        },
+      },
+    });
+    await prisma.modifierGroup.create({
+      data: {
+        itemId: item.id,
+        name: "Extras",
+        minSelect: 0,
+        maxSelect: 3,
+        order: 1,
+        options: {
+          create: [
+            { name: "Extra saffron rice", price: 14, order: 0 },
+            { name: "Extra khoresh", price: 22, order: 1 },
+            { name: "Fresh herbs (sabzi)", price: 9, order: 2 },
+          ],
+        },
+      },
+    });
+  }
+  console.log("  ✓ Demo add-ons on khoresh dishes");
+
+  await prisma.coupon.upsert({
+    where: { code: "NOOSH10" },
+    update: {},
+    create: {
+      code: "NOOSH10",
+      description: "10% off — demo promo",
+      type: "PERCENT",
+      value: 10,
+      minSubtotal: 80,
+      maxDiscount: 30,
+      perPhoneLimit: 1,
+    },
+  });
+  console.log("  ✓ Demo promo code NOOSH10");
+}
+
+const DEMO_HOURS = JSON.stringify(
+  Object.fromEntries(
+    ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((d) => [d, "00:00 — 23:59"]),
+  ),
+);
 
 main()
   .catch((e) => {

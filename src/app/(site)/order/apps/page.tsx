@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ArrowUpRight, Mail, Phone } from "lucide-react";
 import { PageHero } from "@/components/shared/page-hero";
 import { Reveal, RevealItem, RevealStagger } from "@/components/shared/reveal";
@@ -11,10 +12,10 @@ import { telHref, whatsappHref } from "@/lib/links";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Order",
+  title: "Delivery apps & WhatsApp",
   description:
-    "Order SHĀZDEH Persian cuisine across Dubai — through Talabat, Careem and our other delivery partners, or directly with our kitchen on WhatsApp.",
-  alternates: { canonical: "/order" },
+    "Prefer an app? Find SHĀZDEH Persian cuisine on Talabat, Careem and our other delivery partners, or message our kitchen on WhatsApp.",
+  alternates: { canonical: "/order/apps" },
 };
 
 const FAQ = [
@@ -59,8 +60,25 @@ export default async function OrderPage() {
             to your home.
           </>
         }
-        description="SHĀZDEH is delivery-only. Order through your favourite app, or message our kitchen directly — we usually reply within minutes."
+        description="The best way to order is directly from us — but if you prefer your favourite app, or a quick WhatsApp message, we're there too."
       />
+
+      <div className="container-shazdeh pb-8">
+        <Link
+          href="/order"
+          className="group flex min-h-16 items-center justify-between gap-4 rounded-[18px] bg-black-iron px-6 py-5 text-warm-white md:px-8"
+        >
+          <span>
+            <span className="block text-[11px] font-medium uppercase tracking-[0.22em] text-warm-white/70">
+              Recommended
+            </span>
+            <span className="mt-1 block text-[1.25rem] font-bold tracking-[-0.03em]">
+              Order direct from our kitchen
+            </span>
+          </span>
+          <ArrowUpRight className="h-5 w-5 shrink-0 transition-transform duration-500 group-hover:translate-x-0.5" strokeWidth={1.5} />
+        </Link>
+      </div>
 
       <section aria-labelledby="order-heading" className="container-shazdeh pb-20 md:pb-28">
         <h2 id="order-heading" className="sr-only">

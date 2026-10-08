@@ -10,6 +10,8 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "SEED_DEMO_ORDERING=1 tsx prisma/seed.ts",
+    "test": "tsx --test src/lib/ordering/__tests__/*.test.ts",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
     "images:optimize": "tsx scripts/optimize-images.ts"
