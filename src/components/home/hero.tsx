@@ -1,36 +1,27 @@
 "use client";
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
-import { Pause, Play } from "lucide-react";
 import { EASE } from "@/lib/motion";
 
 /*
- * Home hero — full-bleed film of the kitchen with the brand line set
- * large. Mobile crops toward the dish and lets the type fill the frame.
- *
- *   – A dark base + poster frame keep the headline legible before the
- *     video arrives (slow networks, Save-Data, Low Power Mode).
- *   – Reduced-motion visitors get the still frame, and everyone gets a
- *     pause control (WCAG 2.2.2 for auto-playing media).
+ * Home hero — full-bleed photograph of the SHĀZDEH Mix with the brand
+ * line set large. The image is the LCP element, so it is preloaded and
+ * served responsively; a dark base keeps the headline legible while it
+ * loads.
  */
 
-const HERO_VIDEO =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_3KMJxreDoLWfE2avXYNCuzD8geX/hf_20261007_121509_a24fd74c-b626-400d-bcba-4023a46c2dff.mp4";
-const HERO_POSTER = "/menu/shazdeh-mix.jpg";
+const HERO_IMAGE = "/menu/shazdeh-mix.jpg";
 
 export function HomeHero({
   title,
   subtitle,
-  videoSrc,
 }: {
   title?: string;
   subtitle?: string | null;
-  videoSrc?: string | null;
 }) {
   const sectionRef = React.useRef<HTMLElement>(null);
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-  const [paused, setPaused] = React.useState(false);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -40,19 +31,6 @@ export function HomeHero({
   const scale = useTransform(scrollYProgress, [0, 1], [1, 1.06]);
   const fade = useTransform(scrollYProgress, [0, 0.65], [1, 0]);
 
-  // Respect reduced motion: hold the poster frame instead of playing.
-  React.useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mq.matches) videoRef.current?.pause();
-  }, []);
-
-  const toggle = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) void v.play();
-    else v.pause();
-  };
-
   return (
     <section
       ref={sectionRef}
@@ -60,21 +38,14 @@ export function HomeHero({
       className="relative h-[100svh] min-h-[620px] w-full overflow-hidden bg-[#2a1d16] text-warm-white"
     >
       <motion.div style={{ y, scale }} className="absolute inset-0 will-change-transform">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          poster={HERO_POSTER}
-          aria-hidden
-          onPlay={() => setPaused(false)}
-          onPause={() => setPaused(true)}
-          className="absolute inset-0 h-full w-full origin-center scale-[1.38] object-cover object-[72%_52%] brightness-[1.1] saturate-[1.08] sm:scale-100 sm:object-center"
-        >
-          <source src={videoSrc || HERO_VIDEO} type="video/mp4" />
-        </video>
+        <Image
+          src={HERO_IMAGE}
+          alt="SHĀZDEH Mix — three saffron rice crowns filled with khoresh"
+          fill
+          preload
+          sizes="100vw"
+          className="object-cover object-[50%_58%] brightness-[1.05] saturate-[1.05]"
+        />
         {/* Warm luminous wash at the top */}
         <div
           aria-hidden
@@ -148,18 +119,6 @@ export function HomeHero({
         </div>
       </motion.div>
 
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={paused ? "Play background video" : "Pause background video"}
-        className="absolute bottom-6 right-5 z-20 grid h-11 w-11 place-items-center rounded-full border border-warm-white/35 text-warm-white/85 backdrop-blur-sm transition-colors hover:bg-warm-white/10 sm:right-8 md:bottom-8"
-      >
-        {paused ? (
-          <Play className="h-4 w-4" strokeWidth={1.5} />
-        ) : (
-          <Pause className="h-4 w-4" strokeWidth={1.5} />
-        )}
-      </button>
     </section>
   );
 }
