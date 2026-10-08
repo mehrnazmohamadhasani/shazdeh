@@ -102,6 +102,11 @@ function SheetBody({
   }
 
   function submit() {
+    if (editing && quantity === 0) {
+      cart.setQuantity(editing.key, 0);
+      toast.success(`Removed ${product.title}`, { duration: 1800, position: "top-center" });
+      return onDone();
+    }
     setAttempted(true);
     if (error || !variant.orderable) return;
     if (editing) cart.replace(editing.key, variant.itemId, optionIds, quantity, notes);
@@ -280,7 +285,13 @@ function SheetBody({
 
       <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t border-black-iron/10 bg-warm-white/95 px-5 py-4 backdrop-blur pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8">
         {variant.orderable && canOrder && (
-          <QuantityStepper value={quantity} onChange={(q) => setQuantity(Math.max(1, q))} label={product.title} />
+          // Editing a basket line: going below 1 removes it.
+          <QuantityStepper
+            value={quantity}
+            onChange={(q) => setQuantity(Math.max(editing ? 0 : 1, q))}
+            removable={!!editing}
+            label={product.title}
+          />
         )}
         <button
           type="button"
@@ -288,8 +299,18 @@ function SheetBody({
           disabled={!variant.orderable || !canOrder}
           className="flex h-12 flex-1 items-center justify-between gap-3 rounded-full bg-terracotta px-6 text-[13px] font-semibold text-white transition-colors hover:bg-terracotta-ink disabled:bg-black-iron/25"
         >
-          <span>{!variant.orderable ? "Sold out" : !canOrder ? "Ordering paused" : editing ? "Update basket" : "Add to basket"}</span>
-          {variant.orderable && canOrder && <span className="tabular-nums">{formatFils(unit * quantity)}</span>}
+          <span>
+            {!variant.orderable
+              ? "Sold out"
+              : !canOrder
+                ? "Ordering paused"
+                : editing && quantity === 0
+                  ? "Remove from basket"
+                  : editing
+                    ? "Update basket"
+                    : "Add to basket"}
+          </span>
+          {variant.orderable && canOrder && quantity > 0 && <span className="tabular-nums">{formatFils(unit * quantity)}</span>}
         </button>
       </div>
     </div>

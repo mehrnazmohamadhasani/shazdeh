@@ -2,7 +2,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, Clock, Leaf, MapPin, Plus, Search } from "lucide-react";
+import { ChevronDown, Clock, Leaf, MapPin, Minus, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AreaPicker } from "@/components/order/area-picker";
@@ -112,6 +112,25 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
     for (const l of basket.lines) m.set(l.product.key, (m.get(l.product.key) ?? 0) + l.quantity);
     return m;
   }, [basket.lines]);
+
+  /** The basket line for a dish, when there is exactly one (same size, options and notes). */
+  function soleLine(p: OrderProduct) {
+    const lines = basket.lines.filter((l) => l.product.key === p.key);
+    return lines.length === 1 ? lines[0].line : null;
+  }
+
+  // Already in the basket → open it as that line, showing its real quantity.
+  function openProduct(p: OrderProduct) {
+    const line = soleLine(p);
+    setSheet(line ? { product: p, editing: line } : { product: p });
+  }
+
+  function decrement(p: OrderProduct) {
+    const line = soleLine(p);
+    if (line) cart.setQuantity(line.key, line.quantity - 1);
+    // Several versions of the dish (sizes/options): let them pick which in the basket.
+    else setBasketOpen(true);
+  }
 
   function quickAdd(p: OrderProduct) {
     const orderable = p.variants.filter((v) => v.orderable);
@@ -259,8 +278,9 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
                     <ProductRow
                       product={p}
                       count={counts.get(p.key) ?? 0}
-                      onOpen={() => setSheet({ product: p })}
+                      onOpen={() => openProduct(p)}
                       onAdd={() => quickAdd(p)}
+                      onRemove={() => decrement(p)}
                       canOrder={config.canOrder}
                     />
                   </li>
@@ -335,12 +355,14 @@ function ProductRow({
   count,
   onOpen,
   onAdd,
+  onRemove,
   canOrder,
 }: {
   product: OrderProduct;
   count: number;
   onOpen: () => void;
   onAdd: () => void;
+  onRemove: () => void;
   canOrder: boolean;
 }) {
   const soldOut = p.variants.every((v) => !v.orderable);
@@ -388,18 +410,43 @@ function ProductRow({
             </span>
           )}
         </div>
-        {!soldOut && canOrder && (
+        {!soldOut && canOrder && count === 0 && (
           <button
             type="button"
             onClick={onAdd}
             aria-label={`Add ${p.title}`}
-            className={cn(
-              "absolute -bottom-2 -right-2 z-[2] grid h-11 min-w-11 place-items-center rounded-full border-[3px] border-warm-white px-2 text-[13px] font-semibold shadow-sm transition-colors",
-              count > 0 ? "bg-black-iron text-warm-white" : "bg-terracotta text-white hover:bg-terracotta-ink",
-            )}
+            className="absolute -bottom-2 -right-2 z-[2] grid h-11 w-11 place-items-center rounded-full border-[3px] border-warm-white bg-terracotta text-white shadow-sm transition-colors hover:bg-terracotta-ink"
           >
-            {count > 0 ? <span className="tabular-nums">{count}</span> : <Plus className="h-5 w-5" strokeWidth={2} />}
+            <Plus className="h-5 w-5" strokeWidth={2} />
           </button>
+        )}
+        {/* In the basket: − count + right on the card, so an extra tap is one tap to undo. */}
+        {!soldOut && canOrder && count > 0 && (
+          <div
+            role="group"
+            aria-label={`${p.title} in basket`}
+            className="absolute -bottom-2 -right-2 z-[2] flex h-11 items-center rounded-full border-[3px] border-warm-white bg-black-iron text-warm-white shadow-sm"
+          >
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`One less ${p.title}`}
+              className="grid h-full w-10 place-items-center rounded-l-full hover:bg-white/10"
+            >
+              <Minus className="h-4 w-4" strokeWidth={2} />
+            </button>
+            <span aria-live="polite" className="min-w-5 text-center text-[13px] font-semibold tabular-nums">
+              {count}
+            </span>
+            <button
+              type="button"
+              onClick={onAdd}
+              aria-label={`One more ${p.title}`}
+              className="grid h-full w-10 place-items-center rounded-r-full hover:bg-white/10"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </div>
         )}
       </div>
     </article>
