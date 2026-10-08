@@ -63,7 +63,8 @@ export function Wordmark({
   return (
     <span
       className={cn(
-        "inline-flex flex-col items-center leading-none",
+        // The logotype is always brand terracotta, on every surface.
+        "inline-flex flex-col items-center leading-none text-terracotta",
         className,
       )}
     >

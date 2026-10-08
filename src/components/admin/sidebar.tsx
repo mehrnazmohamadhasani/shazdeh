@@ -78,7 +78,7 @@ export function AdminSidebar({
     >
       <div className="p-6 border-b border-warm-white/[0.08]">
         <Link href="/admin" className="block">
-          <Wordmark size="sm" className="text-warm-white" />
+          <Wordmark size="sm" />
         </Link>
         <p className="mt-3 text-[10px] tracking-[0.32em] uppercase text-terracotta">
           The Atelier
@@ -167,7 +167,7 @@ export function AdminMobileBar({
     >
       <div className="flex items-center justify-between px-[max(1rem,var(--safe-left))] h-14">
         <Link href="/admin">
-          <Wordmark size="xs" className="text-warm-white" />
+          <Wordmark size="xs" />
         </Link>
         <button
           onClick={handleLogout}

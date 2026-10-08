@@ -50,9 +50,6 @@ export function BasketPanel({
             <ShoppingBag className="h-6 w-6 text-terracotta-ink" strokeWidth={1.4} />
           </span>
           <p className="mt-4 text-[15px] font-semibold">Your basket is empty</p>
-          <p className="mt-1 max-w-[16rem] text-[13.5px] text-dark-grey">
-            Add a khoresh, some saffron rice and a cooling mast — we&apos;ll take it from there.
-          </p>
         </div>
       ) : (
         <>
@@ -158,7 +155,7 @@ export function BasketPanel({
               </div>
             </dl>
             <p className="mt-1.5 text-[11.5px] text-dark-grey">
-              {config.pricesIncludeVat ? `Prices include ${config.vatRate}% VAT. ` : ""}Promo codes can be added at checkout.
+              {config.pricesIncludeVat ? `Includes ${config.vatRate}% VAT` : ""}
             </p>
           </div>
 

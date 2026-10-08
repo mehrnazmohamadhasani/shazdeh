@@ -88,7 +88,7 @@ export function OrderFooter({
       <div className="container-shazdeh grid gap-6 py-8 text-[12px] leading-[1.7] text-dark-grey md:grid-cols-2">
         <div>
           <p className="font-medium text-black-iron">
-            {legal.legalName ?? brandName} · Direct ordering — no marketplace in between.
+            {legal.legalName ?? brandName}
           </p>
           <p>
             {[

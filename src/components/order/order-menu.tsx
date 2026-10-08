@@ -134,8 +134,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
   return (
     <>
       <section className="container-shazdeh pt-6 md:pt-10">
-        <p className="eyebrow eyebrow-accent">Order direct · Delivery across Dubai</p>
-        <h1 className="mt-3 text-[2.125rem] font-bold leading-[1] tracking-[-0.04em] md:text-[3.25rem]">
+        <h1 className="text-[2.125rem] font-bold leading-[1] tracking-[-0.04em] md:text-[3.25rem]">
           From our kitchen to your door.
         </h1>
 
@@ -287,7 +286,6 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
                 <h2 id={`h-${c.slug}`} className="text-[1.375rem] font-bold tracking-[-0.03em]">
                   {c.name}
                 </h2>
-                {c.tagline && <span className="caption hidden sm:inline">{c.tagline}</span>}
               </div>
               <ul className="grid md:grid-cols-2 md:gap-x-8">
                 {c.products.map((p) => (
@@ -456,7 +454,7 @@ function ClosedNotice({ partners, whatsapp }: { partners: Partner[]; whatsapp?: 
           : `We're closed — ${config.kitchenLabel.toLowerCase()}.`}
       </p>
       <p className="mt-1 text-[13.5px] text-dark-grey">
-        You can still browse the menu{partners.length || whatsapp ? ", or reach us here:" : "."}
+        {partners.length || whatsapp ? "Reach us here:" : "You can still browse the menu."}
       </p>
       {(partners.length > 0 || whatsapp) && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -489,14 +487,9 @@ function ClosedNotice({ partners, whatsapp }: { partners: Partner[]; whatsapp?: 
 
 function MenuFootnote({ config }: { config: { vatRate: number; pricesIncludeVat: boolean } }) {
   return (
-    <p className="mt-6 max-w-2xl text-[12px] leading-[1.6] text-dark-grey">
-      {config.pricesIncludeVat ? `All prices are in AED and include ${config.vatRate}% VAT. ` : "Prices are in AED, VAT is added at checkout. "}
-      Dishes may contain or come into contact with nuts, dairy, gluten, sesame and other allergens — open a dish for its
-      ingredients and allergens, and tell us about any allergy before ordering.{" "}
-      <Link href="/legal/delivery" className="underline underline-offset-2">
-        Delivery policy
-      </Link>
-      .
+    <p className="mt-6 text-[12px] text-dark-grey">
+      {config.pricesIncludeVat ? `Prices include ${config.vatRate}% VAT.` : "VAT added at checkout."} Allergens are listed on
+      each dish.
     </p>
   );
 }

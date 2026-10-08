@@ -13,9 +13,8 @@ import { cn } from "@/lib/utils";
 /*
  * SHĀZDEH navigation.
  *
- * Transparent over the home video, settling onto a frosted warm-white
- * bar on scroll (desktop) or the brand terracotta bar (mobile, per the
- * guidelines' mobile header). "Order" is the single primary action —
+ * Transparent over the home hero, settling onto a frosted warm-white
+ * bar on scroll. The logotype is always terracotta. "Order" is the single primary action —
  * SHĀZDEH is delivery-only, so ordering is the conversion that matters.
  */
 
@@ -57,7 +56,7 @@ export function SiteNav({ logoUrl }: { logoUrl?: string | null }) {
         overMedia
           ? "border-transparent bg-transparent text-warm-white"
           : scrolled
-            ? "border-black-iron/[0.07] max-md:border-transparent max-md:bg-terracotta max-md:text-white md:glass-soft md:text-black-iron"
+            ? "border-black-iron/[0.07] glass-soft text-black-iron"
             : "border-transparent bg-transparent text-black-iron",
       )}
     >
@@ -115,7 +114,7 @@ export function SiteNav({ logoUrl }: { logoUrl?: string | null }) {
               className={cn(
                 // The installed app navigates from its bottom tab bar instead.
                 "grid h-11 w-11 place-items-center rounded-full border transition-colors md:hidden standalone:hidden",
-                overMedia || scrolled
+                overMedia
                   ? "border-white/40 hover:bg-white/10"
                   : "border-black-iron/20 hover:bg-black-iron/[0.04]",
               )}

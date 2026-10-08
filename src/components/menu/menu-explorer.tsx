@@ -253,23 +253,10 @@ export function MenuExplorer({
                 aria-labelledby={`cat-${cat.slug}`}
                 className="scroll-mt-[150px] md:scroll-mt-[190px]"
               >
-                <header className="mb-10 grid gap-5 border-b border-black-iron/10 pb-8 md:mb-14 lg:grid-cols-12 lg:items-end">
-                  <div className="lg:col-span-7">
-                    <p className="eyebrow eyebrow-accent">
-                      <span className="tabular-nums">
-                        {String(ci + 1).padStart(2, "0")}
-                      </span>
-                      {cat.tagline ? ` · ${cat.tagline}` : ""}
-                    </p>
-                    <h2 id={`cat-${cat.slug}`} className="t-h2 mt-4">
-                      {cat.name}
-                    </h2>
-                  </div>
-                  {cat.description && (
-                    <p className="t-body max-w-md text-dark-grey lg:col-span-5 lg:justify-self-end lg:text-right">
-                      {cat.description}
-                    </p>
-                  )}
+                <header className="mb-10 border-b border-black-iron/10 pb-8 md:mb-14">
+                  <h2 id={`cat-${cat.slug}`} className="t-h2">
+                    {cat.name}
+                  </h2>
                 </header>
 
                 <div

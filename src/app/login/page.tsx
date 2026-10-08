@@ -27,7 +27,7 @@ export default async function LoginPage({
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black-iron/40 via-black-iron/55 to-black-iron" />
         <div className="absolute top-12 left-12 right-12">
-          <Wordmark size="sm" className="text-warm-white" />
+          <Wordmark size="sm" />
         </div>
         <div className="absolute bottom-12 left-12 right-12 max-w-md text-warm-white">
           <p className="text-[10px] tracking-[0.32em] uppercase text-terracotta">
@@ -47,7 +47,7 @@ export default async function LoginPage({
 
       <div className="relative flex flex-col items-center justify-center p-6 md:p-12 bg-warm-white">
         <div className="w-full max-w-sm">
-          <Wordmark size="sm" className="text-black-iron" />
+          <Wordmark size="sm" />
           <h1 className="mt-12 font-bold text-4xl md:text-5xl text-black-iron leading-[0.96] tracking-[-0.04em]">
             Welcome back.
           </h1>
