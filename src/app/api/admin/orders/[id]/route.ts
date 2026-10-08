@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ORDER_ROLES, notFound, ok, parseJson, requireAuth, serverError } from "@/lib/api";
+import { ORDER_ROLES, notFound, ok, parseJson, requireAuth, revalidateSite, serverError } from "@/lib/api";
 import { orderActionSchema } from "@/lib/ordering/admin-schemas";
 import { getOrderDetail } from "@/lib/ordering/admin";
-import { transitionOrder } from "@/lib/ordering/orders";
+import { acknowledgeOrder, claimPrint, reduceOrderItem, transitionOrder } from "@/lib/ordering/orders";
 import { getDeliveryProvider } from "@/lib/delivery";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -37,6 +37,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }
       const result = await transitionOrder(id, body.to, actor, { reason: body.reason, dispatch });
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+      return ok({ ok: true });
+    }
+
+    if (body.action === "ack") {
+      await acknowledgeOrder(id);
+      return ok({ ok: true });
+    }
+    if (body.action === "claimPrint") {
+      return ok({ claimed: await claimPrint(id) });
+    }
+    if (body.action === "reduceItem") {
+      const result = await reduceOrderItem(id, body.itemId, body.quantity, actor);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+      // Kitchen staff may mark a dish sold out from here, even without menu access.
+      if (body.markSoldOut && result.menuItemId) {
+        await prisma.menuItem.updateMany({ where: { id: result.menuItemId }, data: { isAvailable: false } });
+        revalidateSite();
+      }
       return ok({ ok: true });
     }
 

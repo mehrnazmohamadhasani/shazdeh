@@ -58,6 +58,24 @@ Portions stored as separate dishes ("Sabzi Khordan — Small/Large") are shown a
 
 `PENDING_PAYMENT → RECEIVED → CONFIRMED → PREPARING → READY → OUT_FOR_DELIVERY → DELIVERED`, plus `REJECTED` (only while new) and `CANCELLED` (any time before delivery). Rules live in `src/lib/ordering/status.ts`; updates use optimistic locking so two tablets can't double-apply. Reject/cancel require a customer-visible reason; promo use is returned. Cancelling a paid online order logs a "refund from gateway dashboard" note.
 
+**Auto-accept** (Online ordering → "Accept orders automatically") skips `RECEIVED`: the order lands in `CONFIRMED` and the customer is told it's confirmed. It still rings (see below) until someone taps **Got it**.
+
+**Sold out mid-order.** On the order page each dish has **Sold out…** (until the order is ready): choose how many can still be made, the rest comes off the order, the total is recalculated (fees kept; a percentage promo shrinks with the basket; a fixed promo never exceeds what's left — `repriceAfterRemoval`), the customer gets an "Your order has changed" email/push with the new total, and — by default — the dish is marked sold out on the menu so nobody else orders it (kitchen staff can do this without menu access). Paid online → a "refund the difference" note is logged. If it was the only dish, reject/cancel instead.
+
+### Admin alarm
+
+`src/components/admin/orders/order-alarm.tsx` is mounted in the admin layout, so it runs on **every admin page** and has **no off switch**. It rings while any active order has no `seenAt` — accepting, rejecting or any other status change sets it; auto-accepted orders need **Got it**. Browsers mute audio until the first tap after a full page load, so a full-screen "Tap to switch on the order alarm" prompt covers the admin until tapped (that tap also enables system notifications and staff push). The screen is kept awake, the tab title shows the waiting count, and a red banner shows on every admin page.
+
+### Printing tickets
+
+Each order prints two 80 mm tickets (`/api/admin/orders/<id>/tickets`, `?copy=kitchen|delivery`): **Kitchen** (number, deliver-by time, customer name + phone, dishes with options/notes, cutlery, order note) and **Delivery** (name, phone, full address + instructions, a boxed "COLLECT CASH / CARD MACHINE / PAID", itemised receipt with VAT and TRN). Print by hand from the board card or order page.
+
+**Automatic:** on the device next to the printer, switch on **Print tickets automatically on this device** on the Orders board. Every order is printed once as soon as it's accepted (immediately with auto-accept); the server hands each order to one device only (`printedAt`), so two tablets never double-print. Browsers show a print dialog for every page — for truly silent printing, start Chrome/Edge on that device with the receipt printer as the system default and:
+
+```
+chrome --kiosk-printing https://<your-domain>/admin/orders
+```
+
 ## 6. Payments (`src/lib/payments/`)
 
 `OnlinePaymentProvider` interface: `createCheckout`, `fetchStatus`, `parseWebhook` (signature-verified), optional `cancel`. Hosted pages only, so card data never touches this server (PCI DSS SAQ A). Included: **Stripe Checkout** reference adapter (REST, no SDK) and a **mock** gateway for development. Add Telr / N-Genius / Checkout.com by implementing the interface and registering it in `index.ts`. Online payment appears at checkout only when a provider is configured **and** the admin enables it. Unpaid online orders stay hidden from the kitchen; webhooks are processed once (`WebhookEvent`), and the return URL checks status server-to-server.
@@ -70,7 +88,7 @@ Cash on delivery and card on delivery work without any provider — the launch p
 
 ## 8. Notifications (`src/lib/notifications/`)
 
-Every attempt is logged to `Notification`. Channels switch on by env: **email** via Resend (customer receipts/status; kitchen inbox for new/paid/cancelled) and a signed **webhook** (`ORDER_WEBHOOK_URL`) to fan out to Slack / Make / Zapier / a WhatsApp Business or SMS provider. Sent after the response (`next/server` `after`). The kitchen never depends on them: the board polls every 8 s, chimes, and shows the waiting count in the tab title.
+Every attempt is logged to `Notification`. Channels switch on by env: **email** via Resend (customer receipts/status with an HTML order summary — including "Order confirmed" when accepted; kitchen inbox for new/paid/cancelled), **Web Push** (`VAPID_*`; customers tap "Notify me about every step" on the tracking page and get received → confirmed → preparing → ready → on its way → delivered, plus changes/cancellation; staff devices get new orders even with the admin closed; iPhone needs the site added to the Home Screen) and a signed **webhook** (`ORDER_WEBHOOK_URL`) to fan out to Slack / Make / Zapier / a WhatsApp Business or SMS provider. Sent after the response (`next/server` `after`). The kitchen never depends on them: the board polls every 8 s, chimes, and shows the waiting count in the tab title.
 
 ## 9. Security measures
 
@@ -95,15 +113,15 @@ Mobile-first: area sheet on first visit, sticky category rail with scroll-spy, t
 4. Admin → **Menu items**: allergens + ingredients for every dish; options & add-ons; hide anything not sold online.
 5. Admin → **Team**: create `Staff` logins for kitchen tablets; change the seeded admin password.
 6. Legal: lawyer reviews `/legal/*` (and Arabic versions) → set `LEGAL_REVIEWED=true`.
-7. Optional now / later: `RESEND_API_KEY` + `EMAIL_FROM`, `ORDER_WEBHOOK_URL`; payment provider keys + webhook endpoint.
+7. Optional now / later: `RESEND_API_KEY` + `EMAIL_FROM` (customer emails — email is optional at checkout, so only customers who give one get them), `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT` (push; generate with `npx web-push generate-vapid-keys`), `ORDER_WEBHOOK_URL`; payment provider keys + webhook endpoint.
 8. Place a real test order end-to-end on the production domain, then switch **Accept online orders** on.
 
 `npm run db:seed:demo` seeds illustrative zones, add-ons and the `NOOSH10` code — **local only**, never production. `npm test` runs the pricing/hours/status/phone tests.
 
 ## 12. Roadmap
 
-**MVP (built):** ordering menu with sizes/options, basket, area-based zones, guest checkout, cash/card on delivery, promo codes, VAT-inclusive totals, confirmation + tracking, kitchen board with chime and busy switch, order detail with print ticket, menu/zone/coupon/settings/team admin, provider-agnostic online payments (Stripe + mock), notification hooks, policy drafts.
+**MVP (built):** ordering menu with sizes/options, basket, area-based zones, guest checkout, cash/card on delivery, promo codes, VAT-inclusive totals, confirmation + tracking, kitchen board with an always-on admin-wide alarm and busy switch, order detail with sold-out handling, kitchen + delivery tickets (manual or auto-print), customer web push, menu/zone/coupon/settings/team admin, provider-agnostic online payments (Stripe + mock), notification hooks, policy drafts.
 
 **Phase 2:** go live with a UAE gateway (adapter for the chosen provider, refunds via API), SMS/WhatsApp OTP to verify phones (unlocks safe first-order offers and order history), WhatsApp Business notifications, Arabic UI, scheduled orders, a cron to expire stale `PENDING_PAYMENT` orders for gateways without expiry webhooks, Redis rate limiting, printable simplified tax invoice (PDF/email), sales reports & CSV export, shared option sets across dishes, real-time board via SSE.
 
-**Phase 3:** customer accounts & loyalty, reorder, polygon zones on a map, 3PL API dispatch (e.g. Careem Box / local couriers), live rider location if the fleet app provides it, ratings, upsell/cross-sell, multiple kitchens/branches, PWA install & push notifications.
+**Phase 3:** customer accounts & loyalty, reorder, polygon zones on a map, 3PL API dispatch (e.g. Careem Box / local couriers), live rider location if the fleet app provides it, ratings, upsell/cross-sell, multiple kitchens/branches.

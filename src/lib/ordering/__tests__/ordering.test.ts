@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTotals, priceLines, validateSelection, type PricingItem } from "../pricing";
+import { computeTotals, priceLines, repriceAfterRemoval, validateSelection, type PricingItem } from "../pricing";
 import { kitchenStatus, parseWindow } from "../hours";
 import { canTransition, nextStatus } from "../status";
 import { normalizeUaeMobile, maskPhone } from "../phone";
@@ -117,4 +117,23 @@ test("UAE mobile normalisation", () => {
   assert.equal(normalizeUaeMobile("04 123 4567"), null); // landline
   assert.equal(normalizeUaeMobile("051 123 4567"), null); // not a mobile prefix
   assert.equal(maskPhone("+971501234567"), "+971 50 ••• 4567");
+});
+
+test("removing a sold-out dish keeps fees, shrinks percent promos, never raises the total", () => {
+  const base = { deliveryFeeFils: 700, serviceFeeFils: 0, vatRate: 5, pricesIncludeVat: true };
+  // 20000 → 12000 subtotal, no promo
+  const plain = repriceAfterRemoval({ ...base, subtotalFils: 12000, discountFils: 0, coupon: null });
+  assert.equal(plain.totalFils, 12700);
+  assert.equal(plain.vatFils, Math.round((12700 * 5) / 105));
+  // 10% promo was 2000 on 20000 → 1200 on 12000
+  const pct = repriceAfterRemoval({ ...base, subtotalFils: 12000, discountFils: 2000, coupon: { type: "PERCENT", value: 10, maxDiscountFils: null } });
+  assert.equal(pct.discountFils, 1200);
+  assert.equal(pct.totalFils, 12000 + 700 - 1200);
+  // Capped percent promo stays capped
+  const capped = repriceAfterRemoval({ ...base, subtotalFils: 40000, discountFils: 3000, coupon: { type: "PERCENT", value: 10, maxDiscountFils: 3000 } });
+  assert.equal(capped.discountFils, 3000);
+  // Fixed promo is kept, but never more than what's left
+  const fixed = repriceAfterRemoval({ ...base, subtotalFils: 1000, discountFils: 5000, coupon: { type: "FIXED", value: 50, maxDiscountFils: null } });
+  assert.equal(fixed.discountFils, 1700);
+  assert.equal(fixed.totalFils, 0);
 });

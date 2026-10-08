@@ -191,21 +191,3 @@ export function DispatchDialog({
     </Dialog>
   );
 }
-
-/** Two soft tones — loud enough for a kitchen, no audio file needed. */
-export function playChime(ctx: AudioContext | null) {
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  [880, 1320].forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, now + i * 0.22);
-    gain.gain.exponentialRampToValueAtTime(0.35, now + i * 0.22 + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.22 + 0.5);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(now + i * 0.22);
-    osc.stop(now + i * 0.22 + 0.55);
-  });
-}

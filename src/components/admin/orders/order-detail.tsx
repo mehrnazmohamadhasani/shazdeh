@@ -2,9 +2,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Clock, ExternalLink, MapPin, MessageSquare, Phone, Printer } from "lucide-react";
+import { ArrowLeft, Check, Clock, ExternalLink, MapPin, MessageSquare, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { QuantityStepper } from "@/components/order/quantity-stepper";
+import { claimPrint, printTickets } from "@/components/admin/orders/print-tickets";
 import { Input } from "@/components/ui/input";
 import {
   DispatchDialog,
@@ -65,6 +69,7 @@ export type OrderDetailData = {
   trackingUrl: string | null;
   trackingToken: string;
   placedAt: string;
+  seenAt: string | null;
   items: { id: string; name: string; portion: string | null; quantity: number; lineTotalFils: number; notes: string | null; modifiers: string[] }[];
   events: { id: string; type: string; status: OrderStatusValue | null; message: string | null; actor: string; createdAt: string }[];
   previousOrders: number;
@@ -84,6 +89,9 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
   const [cancelling, setCancelling] = React.useState<"REJECTED" | "CANCELLED" | null>(null);
   const [dispatching, setDispatching] = React.useState(false);
   const [note, setNote] = React.useState("");
+  const [soldOut, setSoldOut] = React.useState<OrderDetailData["items"][number] | null>(null);
+  // Dishes can come off the order until it's packed.
+  const adjustable = o.status === "RECEIVED" || o.status === "CONFIRMED" || o.status === "PREPARING";
   const next = nextStatus(o.status);
   const phoneDigits = o.customerPhone.replace(/\D/g, "");
 
@@ -99,6 +107,7 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
     const ok = await patchOrder(o.id, body);
     if (ok) {
       toast.success(success);
+      window.dispatchEvent(new Event("shazdeh:orders-changed"));
       router.refresh();
     }
     setBusy(false);
@@ -127,6 +136,11 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
           {o.rejectionReason && <p className="mt-2 text-[14px] text-pomegranate-red">Reason: {o.rejectionReason}</p>}
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          {!o.seenAt && o.status !== "RECEIVED" && !isTerminal(o.status) && (
+            <Button size="lg" variant="secondary" disabled={busy} onClick={() => run({ action: "ack" }, "Alarm stopped")}>
+              <Check className="h-4 w-4" /> Got it
+            </Button>
+          )}
           {next && (
             <Button
               size="lg"
@@ -146,8 +160,15 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
               Cancel order
             </Button>
           )}
-          <Button size="lg" variant="ghost" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" /> Print ticket
+          <Button
+            size="lg"
+            variant="ghost"
+            onClick={() => {
+              void claimPrint(o.id);
+              void printTickets(o.id);
+            }}
+          >
+            <Printer className="h-4 w-4" /> Print tickets
           </Button>
         </div>
       </header>
@@ -165,7 +186,18 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
                   {i.modifiers.length > 0 && <p className="pl-7 text-[13px] text-dark-grey">{i.modifiers.join(" · ")}</p>}
                   {i.notes && <p className="pl-7 text-[13px] italic text-cinnamon-bark">“{i.notes}”</p>}
                 </div>
-                <span className="shrink-0 tabular-nums text-black-iron/80">{formatFils(i.lineTotalFils)}</span>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="tabular-nums text-black-iron/80">{formatFils(i.lineTotalFils)}</span>
+                  {adjustable && (
+                    <button
+                      type="button"
+                      onClick={() => setSoldOut(i)}
+                      className="min-h-8 rounded-full border border-black-iron/15 px-3 text-[12px] text-black-iron/80 hover:border-pomegranate-red hover:text-pomegranate-red print:hidden"
+                    >
+                      Sold out…
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -300,6 +332,24 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
           if (cancelling && (await run({ action: "status", to: cancelling, reason }, STAFF_LABEL[cancelling]))) setCancelling(null);
         }}
       />
+      {soldOut && (
+        <SoldOutDialog
+          item={soldOut}
+          onlyItem={o.items.length === 1}
+          paidOnline={o.paymentMethod === "ONLINE" && o.paymentStatus === "PAID"}
+          onClose={() => setSoldOut(null)}
+          onConfirm={async (quantity, markSoldOut) => {
+            const removed = soldOut.quantity - quantity;
+            if (await run({ action: "reduceItem", itemId: soldOut.id, quantity, markSoldOut }, `Removed ${removed}× ${soldOut.name} — customer notified`)) {
+              setSoldOut(null);
+            }
+          }}
+          onReject={() => {
+            setSoldOut(null);
+            setCancelling(o.status === "RECEIVED" ? "REJECTED" : "CANCELLED");
+          }}
+        />
+      )}
       {dispatching && (
         <DispatchDialog
           open
@@ -311,6 +361,87 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A dish ran out after the order came in. Staff choose how many can
+ * still be made; the rest comes off the order, the total drops, and the
+ * customer is told by email/push. Calling them first is still best.
+ */
+function SoldOutDialog({
+  item,
+  onlyItem,
+  paidOnline,
+  onClose,
+  onConfirm,
+  onReject,
+}: {
+  item: OrderDetailData["items"][number];
+  onlyItem: boolean;
+  paidOnline: boolean;
+  onClose: () => void;
+  onConfirm: (quantity: number, markSoldOut: boolean) => Promise<void>;
+  onReject: () => void;
+}) {
+  const [keep, setKeep] = React.useState(0);
+  const [markSoldOut, setMarkSoldOut] = React.useState(true);
+  const [busy, setBusy] = React.useState(false);
+  const empties = onlyItem && keep === 0;
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="bg-white text-black-iron sm:max-w-md">
+        <div className="space-y-5 p-6">
+          <DialogTitle className="text-2xl text-black-iron">{item.name} is sold out</DialogTitle>
+          <DialogDescription className="text-dark-grey">
+            We&apos;ll take it off this order, lower the total and tell the customer. A quick call first is kind.
+            {paidOnline && " They paid online — refund the difference from the payment dashboard."}
+          </DialogDescription>
+          {item.quantity > 1 && (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[14px] text-black-iron">
+                How many can we still make? <span className="text-dark-grey">(ordered {item.quantity})</span>
+              </span>
+              <QuantityStepper value={keep} min={0} max={item.quantity - 1} onChange={setKeep} label={item.name} />
+            </div>
+          )}
+          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-[12px] border border-black-iron/[0.08] px-4 py-3">
+            <span className="text-[14px] text-black-iron">
+              Also mark it sold out on the menu
+              <span className="block text-[12.5px] text-dark-grey">So no one else can order it. Switch it back on in Menu.</span>
+            </span>
+            <Switch checked={markSoldOut} onCheckedChange={setMarkSoldOut} />
+          </label>
+          {empties && (
+            <p className="rounded-sm bg-saffron-orange/[0.12] px-3 py-2 text-[13px] text-cinnamon-bark">
+              This is the only dish on the order — reject or cancel it instead.
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Back
+            </Button>
+            {empties ? (
+              <Button variant="destructive" onClick={onReject}>
+                Reject / cancel order
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await onConfirm(keep, markSoldOut);
+                  setBusy(false);
+                }}
+              >
+                Remove {item.quantity - keep}× from order
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

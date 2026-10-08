@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
+import { OrderAlarm } from "@/components/admin/orders/order-alarm";
+import { vapidPublicKey } from "@/lib/notifications/push";
 
 export const metadata: Metadata = {
   title: { default: "Admin · SHĀZDEH", template: "%s · SHĀZDEH Admin" },
@@ -33,6 +35,7 @@ export default async function AdminLayout({
       <AdminSidebar user={user} />
       <div className="flex-1 flex flex-col min-w-0">
         <AdminMobileBar user={user} />
+        <OrderAlarm vapidPublicKey={vapidPublicKey()} />
         <main className="flex-1">{children}</main>
       </div>
     </div>

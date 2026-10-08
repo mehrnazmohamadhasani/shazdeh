@@ -1,10 +1,11 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Check, ExternalLink, Loader2, Phone, XCircle } from "lucide-react";
+import { Bell, BellRing, Check, ExternalLink, Loader2, Phone, XCircle } from "lucide-react";
 import { WhatsappIcon } from "@/components/icons/social";
 import { ArchLines } from "@/components/brand/arch";
 import { cart } from "@/components/order/cart-store";
+import { pushSupported, requestNotifications, subscribePush } from "@/components/admin/orders/kitchen-alerts";
 import type { TrackingView } from "@/lib/ordering/orders";
 import { formatFils } from "@/lib/ordering/money";
 import { CUSTOMER_STEPS, PAYMENT_LABEL, PAYMENT_METHOD_LABEL, isTerminal } from "@/lib/ordering/status";
@@ -35,12 +36,14 @@ export function OrderTracker({
   placed,
   whatsapp,
   phoneHref,
+  vapidPublicKey,
 }: {
   token: string;
   initial: TrackingView;
   placed: boolean;
   whatsapp?: string;
   phoneHref?: string;
+  vapidPublicKey?: string | null;
 }) {
   const [view, setView] = React.useState(initial);
   const [stale, setStale] = React.useState(false);
@@ -158,6 +161,7 @@ export function OrderTracker({
                   <span className="text-[11.5px] text-dark-grey">{stale ? "Reconnecting…" : "Updates automatically"}</span>
                 )}
               </div>
+              {!done && vapidPublicKey && <NotifyMe token={token} vapidPublicKey={vapidPublicKey} />}
               <ol className="mt-5" aria-live="polite">
                 {CUSTOMER_STEPS.map((step, i) => {
                   const reached = i <= currentIndex;
@@ -292,5 +296,60 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-dark-grey">{label}</dt>
       <dd className="tabular-nums">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * Opt-in push for this order: every status change reaches the phone,
+ * even with the site closed. Hidden where the browser can't do push
+ * (e.g. iPhone Safari outside the Home Screen app).
+ */
+function NotifyMe({ token, vapidPublicKey }: { token: string; vapidPublicKey: string }) {
+  const [state, setState] = React.useState<"hidden" | "idle" | "busy" | "on" | "blocked">("hidden");
+
+  React.useEffect(() => {
+    if (!pushSupported()) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      if (Notification.permission === "denied") return setState("blocked");
+      // Already allowed (e.g. a previous order): follow this one silently.
+      if (Notification.permission === "granted" && (await subscribePush(vapidPublicKey, `/api/orders/track/${token}/push`))) {
+        if (!cancelled) setState("on");
+        return;
+      }
+      if (!cancelled) setState("idle");
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [token, vapidPublicKey]);
+
+  if (state === "hidden") return null;
+  if (state === "on") {
+    return (
+      <p className="mt-3 inline-flex items-center gap-2 text-[13px] text-olive-leaf">
+        <BellRing className="h-4 w-4" /> We&apos;ll notify you at every step.
+      </p>
+    );
+  }
+  if (state === "blocked") {
+    return <p className="mt-3 text-[12.5px] text-dark-grey">Notifications are blocked for this site in your browser settings.</p>;
+  }
+  return (
+    <button
+      type="button"
+      disabled={state === "busy"}
+      onClick={async () => {
+        setState("busy");
+        const allowed = await requestNotifications();
+        if (!allowed) return setState(Notification.permission === "denied" ? "blocked" : "idle");
+        setState((await subscribePush(vapidPublicKey, `/api/orders/track/${token}/push`)) ? "on" : "idle");
+      }}
+      className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-terracotta/40 px-4 text-[13px] font-medium text-terracotta-ink hover:bg-terracotta/[0.06] disabled:opacity-60"
+    >
+      {state === "busy" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+      Notify me about every step
+    </button>
   );
 }

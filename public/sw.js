@@ -252,8 +252,31 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Kitchen board notifications (src/components/admin/orders/kitchen-alerts.ts):
-// focus an open board, or open one.
+// Web Push (src/lib/notifications/push.ts): order status for customers,
+// new orders for staff. Arrives even when no SHĀZDEH tab is open.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "SHĀZDEH", body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "SHĀZDEH", {
+      body: data.body || "",
+      tag: data.tag,
+      renotify: Boolean(data.tag),
+      requireInteraction: Boolean(data.requireInteraction),
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+// Notification taps (push, and the kitchen alarm in
+// src/components/admin/orders/kitchen-alerts.ts): focus an open tab on
+// that page, or open one.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || "/admin/orders", self.location.origin);

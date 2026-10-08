@@ -2,8 +2,8 @@
 import * as React from "react";
 
 /*
- * Kitchen alerts beyond the chime: desktop notifications and keeping the
- * screen awake. Both degrade silently where the browser can't do them.
+ * Alerts beyond the chime: desktop notifications, Web Push and keeping
+ * the screen awake. All degrade silently where the browser can't do them.
  */
 
 /** Asks once (must run from a click); true when notifications may show. */
@@ -42,6 +42,43 @@ export async function notifyNewOrder(title: string, body: string, tag: string) {
     };
   } catch {
     // Blocked or unsupported — the chime and toast still fire.
+  }
+}
+
+function vapidBytes(base64url: string) {
+  const b64 = (base64url + "=".repeat((4 - (base64url.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+/** Whether this browser can receive Web Push at all (iPhone: only from the Home Screen app). */
+export function pushSupported() {
+  return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && typeof Notification !== "undefined";
+}
+
+/**
+ * Subscribes this browser to Web Push and registers it at `endpoint`.
+ * Needs notification permission (ask from a click first) and the
+ * service worker, which only runs in production builds.
+ */
+export async function subscribePush(vapidPublicKey: string, endpoint: string): Promise<boolean> {
+  if (!pushSupported() || Notification.permission !== "granted") return false;
+  try {
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((r) => setTimeout(() => r(null), 5000)),
+    ]);
+    if (!reg) return false;
+    const sub =
+      (await reg.pushManager.getSubscription()) ??
+      (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes(vapidPublicKey) }));
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

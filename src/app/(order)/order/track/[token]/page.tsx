@@ -5,6 +5,7 @@ import { getTrackingView } from "@/lib/ordering/orders";
 import { getSettings } from "@/lib/settings";
 import { findPlatform, getSocialLinks } from "@/lib/social";
 import { telHref, whatsappHref } from "@/lib/links";
+import { vapidPublicKey } from "@/lib/notifications/push";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function TrackPage({
       placed={placed === "1"}
       whatsapp={whatsapp}
       phoneHref={settings.phone ? telHref(settings.phone) : undefined}
+      vapidPublicKey={vapidPublicKey()}
     />
   );
 }

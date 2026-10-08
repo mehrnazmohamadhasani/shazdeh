@@ -11,6 +11,7 @@ import { normalizeUaeMobile } from "@/lib/ordering/phone";
 import {
   computeTotals,
   priceLines,
+  repriceAfterRemoval,
   type LineIssue,
   type PricedLine,
   type Totals,
@@ -25,7 +26,8 @@ import type { PlaceOrderInput, QuoteInput } from "@/lib/ordering/schemas";
 import { getOnlineProvider, getProviderById } from "@/lib/payments";
 import type { ProviderPaymentState } from "@/lib/payments/types";
 import type { DispatchResult } from "@/lib/delivery";
-import { notifyOrder, STATUS_EVENT, type OrderEventName } from "@/lib/notifications";
+import { notifyOrder, STATUS_EVENT, type NotifyOptions, type OrderEventName } from "@/lib/notifications";
+import { formatFils, toFils } from "@/lib/ordering/money";
 
 /*
  * The order service. Everything that decides money or status lives
@@ -280,7 +282,7 @@ export async function placeOrder(input: PlaceOrderInput, origin: string): Promis
   if (!created) return { ok: false, status: 503, error: "We couldn't place your order. Please try again." };
 
   if (!online) {
-    queueNotification(created.id, "order.received");
+    queueNotification(created.id, "order.received", { autoAccepted: initialStatus === "CONFIRMED" });
     return { ok: true, number: created.number, trackingToken: created.trackingToken, redirectUrl: null };
   }
 
@@ -370,7 +372,7 @@ export async function applyPaymentResult(
   });
   if (moved) {
     queueNotification(payment.orderId, "payment.received");
-    queueNotification(payment.orderId, "order.received");
+    queueNotification(payment.orderId, "order.received", { autoAccepted: next === "CONFIRMED" });
   }
 }
 
@@ -429,11 +431,11 @@ export async function abandonPendingOrder(trackingToken: string) {
  * `after`), so the customer never waits on email/webhook latency and
  * serverless hosts keep the function alive until it finishes.
  */
-function queueNotification(orderId: string, event: OrderEventName) {
+function queueNotification(orderId: string, event: OrderEventName, opts?: NotifyOptions) {
   try {
-    afterResponse(() => notifyOrder(orderId, event));
+    afterResponse(() => notifyOrder(orderId, event, opts));
   } catch {
-    void notifyOrder(orderId, event); // outside a request scope (scripts)
+    void notifyOrder(orderId, event, opts); // outside a request scope (scripts)
   }
 }
 
@@ -471,6 +473,8 @@ export async function transitionOrder(
       },
     });
     if (res.count === 0) return false;
+    // Any staff action on the order silences its alarm.
+    await tx.order.updateMany({ where: { id: orderId, seenAt: null }, data: { seenAt: new Date() } });
     await tx.orderEvent.create({
       data: { orderId, type: "status", status: to, message: opts.reason?.trim() || null, actor },
     });
@@ -492,6 +496,107 @@ export async function transitionOrder(
   const event = STATUS_EVENT[to];
   if (event) queueNotification(orderId, event);
   return { ok: true };
+}
+
+/** "Got it" on an auto-accepted order: stops the admin alarm. */
+export async function acknowledgeOrder(orderId: string) {
+  await prisma.order.updateMany({ where: { id: orderId, seenAt: null }, data: { seenAt: new Date() } });
+}
+
+/**
+ * Claims an order's tickets for printing. Only the first device to ask
+ * gets true, so two auto-printing tablets never print the same order.
+ */
+export async function claimPrint(orderId: string): Promise<boolean> {
+  const res = await prisma.order.updateMany({ where: { id: orderId, printedAt: null }, data: { printedAt: new Date() } });
+  return res.count === 1;
+}
+
+/** Statuses in which a dish can still be taken off an order. */
+const ADJUSTABLE: OrderStatusValue[] = ["RECEIVED", "CONFIRMED", "PREPARING"];
+
+/**
+ * A dish ran out after the order was placed: lower its quantity (0 =
+ * remove it), reprice the order and tell the customer. Returns the
+ * dish's menu id so the caller can also mark it sold out.
+ */
+export async function reduceOrderItem(
+  orderId: string,
+  orderItemId: string,
+  quantity: number,
+  actor: string,
+): Promise<{ ok: true; menuItemId: string | null } | { ok: false; status: number; error: string }> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true },
+  });
+  if (!order) return { ok: false, status: 404, error: "Order not found" };
+  if (!ADJUSTABLE.includes(order.status)) {
+    return { ok: false, status: 409, error: "Dishes can only be removed before the order is ready." };
+  }
+  const item = order.items.find((i) => i.id === orderItemId);
+  if (!item) return { ok: false, status: 404, error: "That dish isn't on this order." };
+  if (quantity >= item.quantity) return { ok: false, status: 422, error: "Choose fewer than the customer ordered." };
+  const left = order.items.reduce((n, i) => n + (i.id === item.id ? quantity : i.quantity), 0);
+  if (left === 0) {
+    return { ok: false, status: 409, error: "Nothing would be left — reject or cancel the order instead." };
+  }
+
+  const [settings, coupon] = await Promise.all([
+    getOrderingSettings(),
+    order.couponId ? prisma.coupon.findUnique({ where: { id: order.couponId } }) : null,
+  ]);
+  const removedFils = item.unitPriceFils * (item.quantity - quantity);
+  const totals = repriceAfterRemoval({
+    subtotalFils: order.subtotalFils - removedFils,
+    deliveryFeeFils: order.deliveryFeeFils,
+    serviceFeeFils: order.serviceFeeFils,
+    discountFils: order.discountFils,
+    coupon: coupon
+      ? { type: coupon.type, value: coupon.value, maxDiscountFils: coupon.maxDiscount !== null ? toFils(coupon.maxDiscount) : null }
+      : null,
+    vatRate: settings.vatRate,
+    pricesIncludeVat: settings.pricesIncludeVat,
+  });
+  const refundFils = order.totalFils - totals.totalFils;
+  const removed = `${item.quantity - quantity}× ${item.name}${item.portion ? ` (${item.portion})` : ""}`;
+  const paidOnline = order.paymentMethod === "ONLINE" && order.paymentStatus === "PAID";
+
+  const updated = await prisma.$transaction(async (tx) => {
+    // Optimistic lock: the totals we computed from must still be current.
+    const res = await tx.order.updateMany({
+      where: { id: orderId, status: order.status, subtotalFils: order.subtotalFils },
+      data: totals,
+    });
+    if (res.count === 0) return false;
+    if (quantity === 0) await tx.orderItem.delete({ where: { id: item.id } });
+    else await tx.orderItem.update({ where: { id: item.id }, data: { quantity, lineTotalFils: item.unitPriceFils * quantity } });
+    if (order.paymentStatus === "PAY_ON_DELIVERY") {
+      await tx.payment.updateMany({ where: { orderId, status: "PAY_ON_DELIVERY" }, data: { amountFils: totals.totalFils } });
+    }
+    await tx.orderEvent.create({
+      data: {
+        orderId,
+        type: "note",
+        message: `Removed ${removed} — sold out. Total ${formatFils(order.totalFils)} → ${formatFils(totals.totalFils)}`,
+        actor,
+      },
+    });
+    if (paidOnline && refundFils > 0) {
+      await tx.orderEvent.create({
+        data: { orderId, type: "note", message: `Refund ${formatFils(refundFils)} from the payment gateway dashboard.`, actor: "system" },
+      });
+    }
+    return true;
+  });
+  if (!updated) return { ok: false, status: 409, error: "This order was just updated by someone else — refresh and try again." };
+
+  queueNotification(orderId, "order.updated", {
+    detail:
+      `Sorry — ${removed} is sold out, so we've taken it off your order. Your new total is ${formatFils(totals.totalFils)}.` +
+      (paidOnline && refundFils > 0 ? ` We'll refund ${formatFils(refundFils)} to your card.` : ""),
+  });
+  return { ok: true, menuItemId: item.menuItemId };
 }
 
 /** Customer-safe view for the tracking page. */

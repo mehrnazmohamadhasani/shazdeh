@@ -155,7 +155,22 @@ export const orderActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("note"), message: text(500).min(1) }),
   z.object({ action: z.literal("delay"), minutes: z.number().int().min(5).max(120) }),
   z.object({ action: z.literal("markPaid") }),
+  z.object({ action: z.literal("ack") }),
+  z.object({ action: z.literal("claimPrint") }),
+  z.object({
+    action: z.literal("reduceItem"),
+    itemId: z.string().min(1).max(40),
+    // 0 removes the dish from the order.
+    quantity: z.number().int().min(0).max(30),
+    markSoldOut: z.boolean().default(true),
+  }),
 ]);
+
+/** A browser PushSubscription.toJSON(). */
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.url().max(1000).refine((v) => v.startsWith("https://"), "Push endpoint must be https"),
+  keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
+});
 
 export const teamMemberSchema = z.object({
   email: z.email().max(160),

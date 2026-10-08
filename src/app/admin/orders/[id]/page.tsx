@@ -20,6 +20,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         order={{
           ...order,
           placedAt: order.placedAt.toISOString(),
+          seenAt: order.seenAt?.toISOString() ?? null,
           items: order.items.map((i) => ({
             id: i.id,
             name: i.name,

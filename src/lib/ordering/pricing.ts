@@ -228,16 +228,7 @@ export function computeTotals({
     }
   }
 
-  const beforeVat = subtotalFils + deliveryFeeFils + serviceFeeFils - discountFils;
-  let vatFils: number;
-  let totalFils: number;
-  if (pricesIncludeVat) {
-    totalFils = beforeVat;
-    vatFils = Math.round((totalFils * vatRate) / (100 + vatRate));
-  } else {
-    vatFils = Math.round((beforeVat * vatRate) / 100);
-    totalFils = beforeVat + vatFils;
-  }
+  const { vatFils, totalFils } = applyVat(subtotalFils + deliveryFeeFils + serviceFeeFils - discountFils, vatRate, pricesIncludeVat);
 
   return {
     subtotalFils,
@@ -254,6 +245,48 @@ export function computeTotals({
     couponApplied,
     couponMessage,
   };
+}
+
+function applyVat(beforeVatFils: number, vatRate: number, pricesIncludeVat: boolean) {
+  if (pricesIncludeVat) {
+    return { totalFils: beforeVatFils, vatFils: Math.round((beforeVatFils * vatRate) / (100 + vatRate)) };
+  }
+  const vatFils = Math.round((beforeVatFils * vatRate) / 100);
+  return { vatFils, totalFils: beforeVatFils + vatFils };
+}
+
+/**
+ * New totals after staff remove a sold-out dish from a placed order.
+ * Fees stay as charged; a percentage promo shrinks with the basket, a
+ * fixed or free-delivery promo is kept (never more than what's left) —
+ * the customer is never charged more because we ran out of something.
+ */
+export function repriceAfterRemoval({
+  subtotalFils,
+  deliveryFeeFils,
+  serviceFeeFils,
+  discountFils,
+  coupon,
+  vatRate,
+  pricesIncludeVat,
+}: {
+  subtotalFils: number;
+  deliveryFeeFils: number;
+  serviceFeeFils: number;
+  discountFils: number;
+  coupon: Pick<CouponTerms, "type" | "value" | "maxDiscountFils"> | null;
+  vatRate: number;
+  pricesIncludeVat: boolean;
+}) {
+  let discount = discountFils;
+  if (coupon?.type === "PERCENT") {
+    discount = Math.floor((subtotalFils * Math.min(100, Math.max(0, coupon.value))) / 100);
+    if (coupon.maxDiscountFils !== null) discount = Math.min(discount, coupon.maxDiscountFils);
+    discount = Math.min(discount, discountFils);
+  }
+  discount = Math.max(0, Math.min(discount, subtotalFils + deliveryFeeFils));
+  const { vatFils, totalFils } = applyVat(subtotalFils + deliveryFeeFils + serviceFeeFils - discount, vatRate, pricesIncludeVat);
+  return { subtotalFils, discountFils: discount, vatFils, totalFils };
 }
 
 function formatShort(fils: number) {

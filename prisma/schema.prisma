@@ -26,6 +26,7 @@ model User {
   name          String?
   passwordHash  String
   role          UserRole @default(ADMIN)
+  pushSubscriptions PushSubscription[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -329,10 +330,17 @@ model Order {
   dispatchedAt     DateTime?
   deliveredAt      DateTime?
   cancelledAt      DateTime?
+  // Staff acknowledged the order — the admin alarm rings until this is
+  // set (accepting does it; auto-accepted orders need a "Got it").
+  seenAt           DateTime?
+  // Kitchen + delivery tickets printed. Claimed atomically so only one
+  // auto-printing device prints each order.
+  printedAt        DateTime?
 
   items            OrderItem[]
   events           OrderEvent[]
   payments         Payment[]
+  pushSubscriptions PushSubscription[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -407,11 +415,28 @@ model Notification {
   id        String   @id @default(cuid())
   orderId   String?
   event     String
-  channel   String   // email | webhook | log
+  channel   String   // email | push | webhook | log
   recipient String?
   status    String   // sent | failed | skipped
   error     String?
   createdAt DateTime @default(now())
 
   @@index([orderId])
+}
+
+/// Web Push endpoints. A customer subscribes for one order (orderId);
+/// staff subscribe for new-order alerts (userId).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([userId])
 }
