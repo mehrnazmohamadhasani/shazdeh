@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { WhatsappIcon } from "@/components/icons/social";
-import { DishBadges, DishSubtitle } from "@/components/menu/dish-card";
+import { DishSubtitle } from "@/components/menu/dish-card";
 import type { DishCardData } from "@/lib/dish";
 import { whatsappHref } from "@/lib/links";
 import { formatPrice } from "@/lib/utils";
@@ -74,8 +74,6 @@ export function DishDialog({
                 {d.title} from the SHĀZDEH menu.
               </DialogDescription>
             )}
-
-            <DishBadges dish={d} className="mt-6" />
 
             {(d.ingredients || d.allergens) && (
               <dl className="mt-7 space-y-4 border-t border-black-iron/10 pt-6 text-[14px]">

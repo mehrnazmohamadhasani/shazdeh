@@ -2,7 +2,6 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Leaf } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { DishCardData } from "@/lib/dish";
 import { formatPrice, cn } from "@/lib/utils";
@@ -89,7 +88,6 @@ export function DishCard({
               {dish.description}
             </p>
           )}
-          <DishBadges dish={dish} className="mt-4" />
         </div>
       </article>
     );
@@ -159,7 +157,6 @@ export function DishCard({
           {dish.description}
         </p>
       )}
-      <DishBadges dish={dish} className="mt-3 sm:mt-3.5" />
     </article>
   );
 }
@@ -200,17 +197,5 @@ function Price({ dish, className }: { dish: DishCardData; className?: string }) 
     >
       {formatPrice(dish.price)}
     </span>
-  );
-}
-
-export function DishBadges({ dish, className }: { dish: DishCardData; className?: string }) {
-  if (!dish.isVegetarian) return null;
-  return (
-    <div className={cn("flex flex-wrap gap-1.5", className)}>
-      <Badge variant="veg">
-        <Leaf className="h-2.5 w-2.5" strokeWidth={1.8} aria-hidden />
-        Vegetarian
-      </Badge>
-    </div>
   );
 }

@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WhatsappIcon } from "@/components/icons/social";
 import { ArchLines } from "@/components/brand/arch";
-import { DishBadges, DishCard, DishSubtitle } from "@/components/menu/dish-card";
+import { DishCard, DishSubtitle } from "@/components/menu/dish-card";
 import { JsonLd } from "@/components/shared/json-ld";
 import { Reveal } from "@/components/shared/reveal";
 import { getMenuItemBySlug, getRelatedDishes } from "@/lib/menu";
@@ -144,8 +144,6 @@ export default async function DishPage({ params }: Props) {
                 {dish.description}
               </p>
             )}
-
-            <DishBadges dish={dish} className="mt-8" />
 
             {(dish.ingredients || dish.allergens) && (
               <dl className="mt-10 grid gap-6 border-t border-black-iron/10 pt-8 sm:grid-cols-2">

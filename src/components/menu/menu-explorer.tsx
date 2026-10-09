@@ -10,19 +10,12 @@ import { cn } from "@/lib/utils";
 /*
  * Menu explorer.
  *
- * Phones: only a slim category rail is sticky (search & filters sit in
+ * Phones: only a slim category rail is sticky (search & layout sit in
  * the flow above the dishes) so the plates keep the screen. Dishes are
  * a two-up grid — photography stays the hero while a 30-dish menu
  * remains a comfortable scroll.
- * Desktop: one sticky bar carrying categories, search and filters.
+ * Desktop: one sticky bar carrying categories and search.
  */
-
-type Filter = "all" | "veg";
-
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "veg", label: "Vegetarian" },
-];
 
 export function MenuExplorer({
   categories,
@@ -32,7 +25,6 @@ export function MenuExplorer({
   whatsapp?: string;
 }) {
   const [active, setActive] = React.useState(categories[0]?.slug ?? "");
-  const [filter, setFilter] = React.useState<Filter>("all");
   const [query, setQuery] = React.useState("");
   const [layout, setLayout] = React.useState<"grid" | "list">("grid");
   const [selected, setSelected] = React.useState<DishCardData | null>(null);
@@ -48,7 +40,6 @@ export function MenuExplorer({
       .map((c) => ({
         ...c,
         items: c.items.filter((i) => {
-          if (filter === "veg" && !i.isVegetarian) return false;
           if (q) {
             const hay = [i.name, i.nameFa, i.description, i.ingredients]
               .filter(Boolean)
@@ -60,10 +51,10 @@ export function MenuExplorer({
         }),
       }))
       .filter((c) => c.items.length > 0);
-  }, [categories, filter, deferredQuery]);
+  }, [categories, deferredQuery]);
 
   const total = filtered.reduce((n, c) => n + c.items.length, 0);
-  const isFiltering = filter !== "all" || deferredQuery.trim() !== "";
+  const isFiltering = deferredQuery.trim() !== "";
 
   const scrollToCategory = (slug: string) => {
     sectionRefs.current[slug]?.scrollIntoView({ block: "start" });
@@ -93,10 +84,7 @@ export function MenuExplorer({
     return () => observer.disconnect();
   }, [filtered]);
 
-  const reset = () => {
-    setFilter("all");
-    setQuery("");
-  };
+  const reset = () => setQuery("");
 
   const search = (idSuffix: string, className?: string) => (
     <div className={cn("relative", className)}>
@@ -171,35 +159,13 @@ export function MenuExplorer({
         </div>
       </div>
 
-      {/* Search (phones/tablets), filters and layout — in the flow */}
+      {/* Search (phones/tablets) and layout — in the flow */}
       <div className="container-shazdeh flex flex-col gap-3 pt-8 sm:flex-row sm:items-center sm:justify-between md:pt-10">
         {search("mobile", "sm:w-80 lg:hidden")}
         <div
           role="group"
-          aria-label="Filter dishes"
-          className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1"
-        >
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={filter === f.id}
-              onClick={() => setFilter(f.id)}
-              className={cn(
-                "h-10 shrink-0 rounded-pill border px-4 text-[10.5px] font-medium uppercase tracking-[0.18em] transition-colors duration-300",
-                filter === f.id
-                  ? "border-black-iron bg-black-iron text-warm-white"
-                  : "border-black-iron/15 text-dark-grey hover:border-black-iron/40 hover:text-black-iron",
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div
-          role="group"
           aria-label="Layout"
-          className="hidden items-center gap-1 rounded-pill border border-black-iron/15 p-1 sm:flex"
+          className="hidden items-center gap-1 rounded-pill border border-black-iron/15 p-1 sm:ml-auto sm:flex"
         >
           <LayoutToggle
             active={layout === "grid"}

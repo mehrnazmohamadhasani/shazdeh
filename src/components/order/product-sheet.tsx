@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Image from "next/image";
-import { Check, ChevronDown, Leaf } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { QuantityStepper } from "@/components/order/quantity-stepper";
@@ -144,13 +144,6 @@ function SheetBody({
         ) : (
           <DialogDescription className="sr-only">Customise {product.title}</DialogDescription>
         )}
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-dark-grey">
-          {product.isVegetarian && (
-            <span className="inline-flex items-center gap-1.5 text-olive-leaf">
-              <Leaf className="h-3.5 w-3.5" strokeWidth={1.6} aria-hidden /> Vegetarian
-            </span>
-          )}
-        </div>
 
         {(product.ingredients || product.allergens) ? (
           <details className="group mt-5 rounded-[12px] border border-black-iron/10 px-4">

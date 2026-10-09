@@ -2,7 +2,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, Clock, Leaf, MapPin, Minus, Plus, Search } from "lucide-react";
+import { ChevronDown, Clock, MapPin, Minus, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AreaPicker } from "@/components/order/area-picker";
@@ -41,7 +41,6 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
   const [areaOpen, setAreaOpen] = React.useState(false);
   const [basketOpen, setBasketOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [vegOnly, setVegOnly] = React.useState(false);
   const [active, setActive] = React.useState(categories[0]?.slug ?? "");
   const hydrated = React.useSyncExternalStore(noopSubscribe, () => true, () => false);
 
@@ -78,15 +77,14 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
           ...c,
           products: c.products.filter(
             (p) =>
-              (!vegOnly || p.isVegetarian) &&
-              (!q ||
-                p.title.toLowerCase().includes(q) ||
-                p.description?.toLowerCase().includes(q) ||
-                p.nameFa?.includes(query.trim())),
+              !q ||
+              p.title.toLowerCase().includes(q) ||
+              p.description?.toLowerCase().includes(q) ||
+              p.nameFa?.includes(query.trim()),
           ),
         }))
         .filter((c) => c.products.length > 0),
-    [categories, q, query, vegOnly],
+    [categories, q, query],
   );
 
   // Scroll-spy for the category rail.
@@ -217,17 +215,6 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
               className="h-10 w-[7.5rem] rounded-full border border-black-iron/12 bg-transparent pl-9 pr-3 text-[13.5px] transition-[width] focus:w-[12rem] focus:border-terracotta/60 focus:outline-none sm:w-44 sm:focus:w-56"
             />
           </label>
-          <button
-            type="button"
-            aria-pressed={vegOnly}
-            onClick={() => setVegOnly((v) => !v)}
-            className={cn(
-              "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-medium transition-colors",
-              vegOnly ? "border-olive-leaf bg-olive-leaf text-white" : "border-black-iron/12 hover:border-olive-leaf",
-            )}
-          >
-            <Leaf className="h-3.5 w-3.5" strokeWidth={1.7} /> Veg
-          </button>
           <nav aria-label="Menu categories" className="no-scrollbar -mr-6 flex flex-1 gap-1 overflow-x-auto pr-6">
             {visible.map((c) => (
               <a
@@ -251,13 +238,10 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
         <div className="min-w-0">
           {visible.length === 0 && (
             <div className="rounded-[14px] bg-cream px-6 py-12 text-center">
-              <p className="text-[16px] font-semibold">Nothing matches “{query || "vegetarian"}”.</p>
+              <p className="text-[16px] font-semibold">Nothing matches “{query}”.</p>
               <button
                 type="button"
-                onClick={() => {
-                  setQuery("");
-                  setVegOnly(false);
-                }}
+                onClick={() => setQuery("")}
                 className="mt-3 min-h-11 text-[13px] font-medium text-terracotta-ink underline underline-offset-4"
               >
                 Clear search
@@ -385,11 +369,6 @@ function ProductRow({
             {p.variants.length > 1 && <span className="font-normal text-dark-grey">from </span>}
             {formatFils(p.fromPriceFils)}
           </span>
-          {p.isVegetarian && (
-            <span className="inline-flex items-center gap-1 text-[12px] text-olive-leaf">
-              <Leaf className="h-3 w-3" strokeWidth={1.8} aria-hidden /> Veg
-            </span>
-          )}
           {soldOut && <span className="text-[12px] font-medium text-rose-sumac">Sold out today</span>}
         </div>
       </div>

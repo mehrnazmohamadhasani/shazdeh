@@ -175,7 +175,6 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
         <div className="grid gap-3 sm:grid-cols-2">
           <SwitchRow label="Shown on menu" description="Off hides it everywhere." checked={draft.isActive} onCheckedChange={(v) => update("isActive", v)} />
           <SwitchRow label="In stock" description="Off shows it as sold out." checked={draft.isAvailable} onCheckedChange={(v) => update("isAvailable", v)} />
-          <SwitchRow label="Vegetarian" checked={draft.isVegetarian} onCheckedChange={(v) => update("isVegetarian", v)} />
         </div>
         <details className="group mt-5 border-t border-black-iron/[0.06] pt-4">
           <summary className="cursor-pointer list-none text-[13px] font-medium text-dark-grey hover:text-black-iron [&::-webkit-details-marker]:hidden">
