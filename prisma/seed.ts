@@ -83,7 +83,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "باقالی پلو با ماهیچه",
         description:
           "Fava beans and dill scented basmati rice, paired with melt-off-the-bone braised lamb shank.",
-        price: 128,
+        price: 138,
         imageUrl: IMG("baghali-polo-mahiche.jpg"),
       },
       {
@@ -119,7 +119,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "عدس پلو",
         description:
           "Lentil basmati rice layered with caramelized onions, raisins and dates — finished with cinnamon-spiced lamb.",
-        price: 98,
+        price: 108,
         imageUrl: IMG("adas-polo.jpg"),
       },
       {
@@ -137,7 +137,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "ماکارونی",
         description:
           "Tehran-style pasta with spiced tomato beef ragu — slow-built tahdig crust, golden and crisp on top.",
-        price: 88,
+        price: 98,
         imageUrl: IMG("makaroni.jpg"),
       },
       {
@@ -148,6 +148,54 @@ const CATEGORIES: SeedCategory[] = [
           "Our signature tasting plate — chef's selection of three rotating khoresh, served with saffron rice and tahdig.",
         price: 98,
         imageUrl: IMG("shazdeh-mix.jpg"),
+      },
+      {
+        slug: "ghormeh-sabzi-tahchin",
+        name: "Ghormeh Sabzi Tahchin",
+        nameFa: "ته‌چین قورمه سبزی",
+        description:
+          "Ghormeh sabzi — slow-cooked herbs, kidney beans, dried lime and lamb — baked inside a golden saffron tahdig crust.",
+        price: 98,
+      },
+      {
+        slug: "gheimeh-bademjan-tahchin",
+        name: "Gheimeh Bademjan Tahchin",
+        nameFa: "ته‌چین قیمه بادمجان",
+        description:
+          "Lamb, split peas, tomato and fried aubergine, baked inside a golden saffron tahdig crust.",
+        price: 98,
+      },
+      {
+        slug: "karafs-tahchin",
+        name: "Karafs Tahchin",
+        nameFa: "ته‌چین خورش کرفس",
+        description:
+          "Celery, fresh herbs and tender lamb stew, baked inside a golden saffron tahdig crust.",
+        price: 98,
+      },
+      {
+        slug: "zereshk-polo-tahchin",
+        name: "Zereshk Polo Tahchin",
+        nameFa: "ته‌چین زرشک پلو",
+        description:
+          "Saffron chicken and tart barberries baked inside a golden saffron tahdig crust.",
+        price: 88,
+      },
+      {
+        slug: "baghali-polo-tahchin",
+        name: "Baghali Polo Tahchin",
+        nameFa: "ته‌چین باقالی پلو",
+        description:
+          "Tender braised lamb baked between layers of dill and fava bean saffron rice, with a golden tahdig crust.",
+        price: 115,
+      },
+      {
+        slug: "kabab-digi-tahchin",
+        name: "Kabab Digi Tahchin",
+        nameFa: "ته‌چین کباب دیگی",
+        description:
+          "Tehran-style pan-cooked kabab and tomato baked inside a golden saffron tahdig crust.",
+        price: 99,
       },
     ],
   },
@@ -162,7 +210,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "قیمه بادمجان (گیاهی)",
         description:
           "Yellow split peas braised with tomato, dried lime, and roasted aubergine. Served with saffron basmati.",
-        price: 88,
+        price: 98,
         imageUrl: IMG("gheimeh-bademjan-veg.jpg"),
         isVegetarian: true,
       },
@@ -172,7 +220,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "قورمه سبزی (گیاهی)",
         description:
           "Slow-cooked herbs, kidney beans and dried lime — a fully plant-based take on Iran's national stew.",
-        price: 88,
+        price: 98,
         imageUrl: IMG("ghormeh-sabzi-veg.jpg"),
         isVegetarian: true,
       },
@@ -182,7 +230,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "خورش کرفس (گیاهی)",
         description:
           "Celery and parsley simmered in fresh herbs and lime — a green, bright vegetarian khoresh.",
-        price: 88,
+        price: 98,
         imageUrl: IMG("karafs-veg.jpg"),
         isVegetarian: true,
       },
@@ -219,7 +267,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "ماست بادمجان",
         description:
           "Smoked aubergine folded into thick yoghurt with caramelized onion and saffron oil.",
-        price: 34,
+        price: 36,
         imageUrl: IMG("mast-bademjoon.jpg"),
         isVegetarian: true,
       },
@@ -249,7 +297,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "ترشی خانگی",
         description:
           "House-pickled vegetables in aged vinegar — sharp, briny, traditional.",
-        price: 36,
+        price: 38,
         imageUrl: IMG("homemade-torshi.jpg"),
         isVegetarian: true,
       },
@@ -259,7 +307,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "سالاد شیرازی",
         description:
           "Diced cucumber, tomato and red onion, dressed in lime, mint and olive oil.",
-        price: 29,
+        price: 36,
         isVegetarian: true,
       },
       {
@@ -278,7 +326,7 @@ const CATEGORIES: SeedCategory[] = [
         nameFa: "سبزی خوردن (کوچک)",
         description:
           "A small platter of fresh herbs, walnuts and feta, served with warm bread.",
-        price: 22,
+        price: 25,
         isVegetarian: true,
       },
     ],

@@ -38,7 +38,6 @@ export default async function MenuPage() {
             The art of <span className="text-terracotta">Persian</span> rice.
           </>
         }
-        description="Slow-cooked khoresh, saffron-jewelled polo and the golden crunch of tahdig — every plate made from scratch, every day, and delivered across Dubai."
         aside={
           <dl className="grid grid-cols-3 gap-4 border-t border-black-iron/10 pt-6 lg:ml-auto lg:max-w-sm">
             <HeroStat label="Dishes" value={String(dishCount)} />

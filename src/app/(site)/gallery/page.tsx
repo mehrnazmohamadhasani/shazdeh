@@ -25,7 +25,6 @@ export default async function GalleryPage() {
             Where food becomes <span className="text-terracotta">art</span>.
           </>
         }
-        description="Slow stews, saffron rice, the golden crackle of tahdig — a visual journal from inside the SHĀZDEH kitchen."
       />
       <GalleryGrid images={images} />
     </>
