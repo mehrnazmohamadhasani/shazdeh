@@ -1,28 +1,39 @@
+import { parsePhoneNumberFromString } from "libphonenumber-js/core";
+// Mobile-number rules for every country, passed explicitly so the same
+// code works in Next.js and under the tsx test runner.
+import metadata from "libphonenumber-js/mobile/metadata";
+
 /*
- * UAE mobile numbers. Riders call or WhatsApp the customer, so checkout
- * asks for a UAE mobile (05x / +9715x) and stores it in E.164.
+ * Customer mobile numbers. Riders call or WhatsApp the customer, so
+ * checkout asks for a mobile number — from any country — and stores it in
+ * E.164. A number typed without a country code is read as a UAE number
+ * ("050 123 4567"); others need theirs ("+44 7911 123456"). Validation
+ * uses libphonenumber's per-country mobile rules.
  */
 
-const UAE_MOBILE = /^5[024568]\d{7}$/;
+const DEFAULT_COUNTRY = "AE";
 
-/** "050 123 4567" | "+971 50 123 4567" | "00971501234567" → "+971501234567" */
-export function normalizeUaeMobile(input: string): string | null {
-  let digits = input.replace(/[^\d+]/g, "");
-  if (digits.startsWith("+")) digits = digits.slice(1);
-  if (digits.startsWith("00")) digits = digits.slice(2);
-  if (digits.startsWith("971")) digits = digits.slice(3);
-  if (digits.startsWith("0")) digits = digits.slice(1);
-  return UAE_MOBILE.test(digits) ? `+971${digits}` : null;
+function parse(input: string) {
+  let v = input.trim();
+  if (v.startsWith("00")) v = `+${v.slice(2)}`; // 00 44 … is the same as +44 …
+  return parsePhoneNumberFromString(v, DEFAULT_COUNTRY, metadata);
+}
+
+/** "050 123 4567" | "+971 50 123 4567" | "0044 7911 123456" → "+971501234567" | "+447911123456"; null if not a valid mobile. */
+export function normalizeMobile(input: string): string | null {
+  const phone = parse(input);
+  return phone?.isValid() ? phone.number : null;
 }
 
 /** "+971501234567" → "+971 50 123 4567" */
-export function formatUaeMobile(e164: string): string {
-  const m = e164.match(/^\+971(\d{2})(\d{3})(\d{4})$/);
-  return m ? `+971 ${m[1]} ${m[2]} ${m[3]}` : e164;
+export function formatPhone(e164: string): string {
+  return parse(e164)?.formatInternational() ?? e164;
 }
 
 /** "+971501234567" → "+971 50 ••• 4567" — for customer-visible pages. */
 export function maskPhone(e164: string): string {
-  const m = e164.match(/^\+971(\d{2})\d{3}(\d{4})$/);
-  return m ? `+971 ${m[1]} ••• ${m[2]}` : "••••";
+  const phone = parse(e164);
+  if (!phone) return "••••";
+  const national = String(phone.nationalNumber);
+  return `+${phone.countryCallingCode} ${national.slice(0, 2)} ••• ${national.slice(-4)}`;
 }

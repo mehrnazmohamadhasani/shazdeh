@@ -7,7 +7,7 @@ import { getOrderingConfig, getOrderingSettings } from "@/lib/ordering/config";
 import { loadPricingItems } from "@/lib/ordering/catalog";
 import { resolveDelivery } from "@/lib/ordering/zones";
 import { lookupCoupon } from "@/lib/ordering/coupons";
-import { normalizeUaeMobile } from "@/lib/ordering/phone";
+import { normalizeMobile } from "@/lib/ordering/phone";
 import {
   computeTotals,
   priceLines,
@@ -60,7 +60,7 @@ export async function quoteOrder(input: QuoteInput): Promise<Quote & { couponId:
 
   let couponLookup: Awaited<ReturnType<typeof lookupCoupon>> | null = null;
   if (input.couponCode?.trim()) {
-    const phone = input.phone ? normalizeUaeMobile(input.phone) : null;
+    const phone = input.phone ? normalizeMobile(input.phone) : null;
     couponLookup = await lookupCoupon(input.couponCode, phone);
   }
 
@@ -269,12 +269,12 @@ export async function placeOrder(input: PlaceOrderInput, origin: string): Promis
         return { ok: false, status: 409, code: "coupon", error: "That promo code has just been fully redeemed." };
       }
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const target = String(e.meta?.target ?? "");
-        if (target.includes("idempotencyKey")) {
-          const again = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-          if (again) return { ok: true, number: again.number, trackingToken: again.trackingToken, redirectUrl: null };
-        }
-        continue; // order number collision — try another
+        // A double-tap racing this request may have just created the order
+        // (same idempotency key): return that one. Prisma 7 adapters don't
+        // say which column clashed, so always look before retrying.
+        const again = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+        if (again) return { ok: true, number: again.number, trackingToken: again.trackingToken, redirectUrl: null };
+        continue; // order number (or tracking token) collision — try another
       }
       throw e;
     }
@@ -647,3 +647,17 @@ export async function getTrackingView(token: string) {
 }
 
 export type TrackingView = NonNullable<Awaited<ReturnType<typeof getTrackingView>>>;
+
+/**
+ * Number, status and time of several orders at once, by tracking token —
+ * enough for the "your orders" list. Unknown tokens are simply left out.
+ */
+export async function getTrackingSummaries(tokens: string[]) {
+  const orders = await prisma.order.findMany({
+    where: { trackingToken: { in: tokens } },
+    select: { trackingToken: true, number: true, status: true, placedAt: true },
+  });
+  return orders.map((o) => ({ token: o.trackingToken, number: o.number, status: o.status, placedAt: o.placedAt.toISOString() }));
+}
+
+export type TrackingSummary = Awaited<ReturnType<typeof getTrackingSummaries>>[number];

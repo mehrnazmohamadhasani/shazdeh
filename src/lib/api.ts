@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
-import { getSessionUser, type SessionUser, type UserRoleValue } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { currentUser, getSessionUser, type SessionUser, type UserRoleValue } from "@/lib/auth";
 
 /** Who may edit content. Kitchen staff (STAFF) only manage orders. */
 export const CMS_ROLES: UserRoleValue[] = ["ADMIN", "EDITOR"];
@@ -20,13 +19,7 @@ export async function requireAuth(
   | { user: SessionUser; response: null }
   | { user: null; response: NextResponse }
 > {
-  const session = await getSessionUser();
-  const user = session
-    ? await prisma.user.findUnique({
-        where: { id: session.id },
-        select: { id: true, email: true, name: true, role: true },
-      })
-    : null;
+  const user = await currentUser(await getSessionUser());
   if (!user) {
     return {
       user: null,
@@ -93,6 +86,19 @@ export function notFound(message = "Not found") {
  * is logged server-side and returned as a generic 500 so internals
  * (queries, hostnames, stack details) never reach the client.
  */
+/**
+ * The field(s) behind a unique-constraint error (P2002). Prisma 7 driver
+ * adapters don't fill `meta.target`; the constraint is on the adapter's
+ * error instead.
+ */
+export function uniqueViolationFields(err: Prisma.PrismaClientKnownRequestError): string {
+  const target = err.meta?.target as string[] | string | undefined;
+  if (target) return Array.isArray(target) ? target.join(", ") : target;
+  const constraint = (err.meta?.driverAdapterError as { cause?: { constraint?: { fields?: string[]; index?: string } } } | undefined)
+    ?.cause?.constraint;
+  return constraint?.fields?.join(", ") ?? constraint?.index ?? "";
+}
+
 export function serverError(
   err: unknown,
   opts?: {
@@ -103,8 +109,7 @@ export function serverError(
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     switch (err.code) {
       case "P2002": {
-        const target = (err.meta?.target as string[] | string | undefined) ?? "";
-        const field = Array.isArray(target) ? target.join(", ") : target;
+        const field = uniqueViolationFields(err);
         return NextResponse.json(
           {
             error: field

@@ -31,7 +31,9 @@ export default async function TrackPage({
     `Hello SHĀZDEH — about my order ${view.number}.`,
   );
   return (
+    // Keyed by order: switching between orders must not keep the previous one's state.
     <OrderTracker
+      key={token}
       token={token}
       initial={view}
       placed={placed === "1"}

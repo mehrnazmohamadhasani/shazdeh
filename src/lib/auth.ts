@@ -28,7 +28,10 @@ export type SessionUser = {
 
 export type UserRoleValue = "ADMIN" | "EDITOR" | "STAFF";
 
-export async function signSession(user: SessionUser): Promise<string> {
+/** What the session cookie carries: the user plus the session version it was signed with. */
+export type SessionClaims = SessionUser & { sessionVersion: number };
+
+export async function signSession(user: SessionClaims): Promise<string> {
   const secret = getAuthSecret();
   if (!secret) throw new Error("Admin sign-in is not configured");
   return new SignJWT({
@@ -36,6 +39,7 @@ export async function signSession(user: SessionUser): Promise<string> {
     email: user.email,
     name: user.name,
     role: user.role,
+    sv: user.sessionVersion,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -45,7 +49,7 @@ export async function signSession(user: SessionUser): Promise<string> {
     .sign(secret);
 }
 
-export async function verifySession(token: string): Promise<SessionUser | null> {
+export async function verifySession(token: string): Promise<SessionClaims | null> {
   const secret = getAuthSecret();
   if (!secret) return null;
   try {
@@ -60,13 +64,15 @@ export async function verifySession(token: string): Promise<SessionUser | null> 
       email: String(payload.email),
       name: (payload.name as string | null) ?? null,
       role: payload.role as UserRoleValue,
+      // Tokens from before session versions existed count as version 0.
+      sessionVersion: typeof payload.sv === "number" ? payload.sv : 0,
     };
   } catch {
     return null;
   }
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+export async function getSessionUser(): Promise<SessionClaims | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -74,20 +80,27 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 }
 
 /**
- * Gate for admin pages. Re-reads the user so a removed account (or a
- * changed role) takes effect immediately, not when the JWT expires.
+ * The signed-in user, re-read from the database so a removed account, a
+ * changed role or a changed password (session version) takes effect
+ * immediately, not when the JWT expires. Null when signed out or stale.
  */
+export async function currentUser(session: SessionClaims | null): Promise<SessionUser | null> {
+  if (!session) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { id: true, email: true, name: true, role: true, sessionVersion: true },
+  });
+  if (!user || user.sessionVersion !== session.sessionVersion) return null;
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
+}
+
+/** Gate for admin pages. */
 export async function requireAdmin(): Promise<SessionUser> {
   const session = await getSessionUser();
-  const user = session
-    ? await prisma.user.findUnique({
-        where: { id: session.id },
-        select: { id: true, email: true, name: true, role: true },
-      })
-    : null;
-  // A valid token for a removed account: send them to sign in and have
-  // the proxy drop the stale cookie (otherwise /login would bounce
-  // straight back here).
+  const user = await currentUser(session);
+  // A valid token for a removed account or an old password: send them to
+  // sign in and have the proxy drop the stale cookie (otherwise /login
+  // would bounce straight back here).
   if (!user) redirect(session ? "/login?signed-out=1" : "/login");
   return user;
 }
@@ -95,9 +108,10 @@ export async function requireAdmin(): Promise<SessionUser> {
 export async function authenticate(
   email: string,
   password: string,
-): Promise<SessionUser | null> {
-  const user = await prisma.user.findUnique({
-    where: { email: email.trim() },
+): Promise<SessionClaims | null> {
+  // Emails are matched without regard to capital letters.
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email.trim(), mode: "insensitive" } },
   });
   const ok = await bcrypt.compare(
     password,
@@ -109,6 +123,7 @@ export async function authenticate(
     email: user.email,
     name: user.name,
     role: user.role,
+    sessionVersion: user.sessionVersion,
   };
 }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_LINES, MAX_QUANTITY_PER_LINE } from "@/lib/ordering/pricing";
-import { normalizeUaeMobile } from "@/lib/ordering/phone";
+import { normalizeMobile } from "@/lib/ordering/phone";
 
 /*
  * Request schemas for the public ordering API. Note what is absent:
@@ -51,9 +51,9 @@ export const placeOrderSchema = z.object({
       .trim()
       .max(32)
       .transform((v, ctx) => {
-        const e164 = normalizeUaeMobile(v);
+        const e164 = normalizeMobile(v);
         if (!e164) {
-          ctx.addIssue({ code: "custom", message: "Enter a UAE mobile number, e.g. 050 123 4567" });
+          ctx.addIssue({ code: "custom", message: "Enter a mobile number. Include the country code if it isn't a UAE number, e.g. +44 7911 123456" });
           return z.NEVER;
         }
         return e164;
@@ -67,6 +67,11 @@ export const placeOrderSchema = z.object({
   cutlery: z.boolean().optional().default(false),
   /** What the customer saw. If the server's total differs, we stop and re-confirm. */
   expectedTotalFils: z.number().int().nonnegative(),
+});
+
+/** Tracking tokens this device remembers, for the "your orders" list. */
+export const trackStatusesSchema = z.object({
+  tokens: z.array(z.string().regex(/^[A-Za-z0-9_-]{16,64}$/)).min(1).max(10),
 });
 
 export type QuoteInput = z.infer<typeof quoteSchema>;

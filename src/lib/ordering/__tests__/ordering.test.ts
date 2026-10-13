@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { computeTotals, priceLines, repriceAfterRemoval, validateSelection, type PricingItem } from "../pricing";
 import { kitchenStatus, parseWindow } from "../hours";
 import { canTransition, nextStatus } from "../status";
-import { normalizeUaeMobile, maskPhone } from "../phone";
+import { formatPhone, maskPhone, normalizeMobile } from "../phone";
 
 const khoresh: PricingItem = {
   id: "k",
@@ -110,13 +110,23 @@ test("status machine: accept first, no skipping to delivered, reject only when n
   assert.equal(nextStatus("DELIVERED"), null);
 });
 
-test("UAE mobile normalisation", () => {
+test("mobile numbers: UAE without a country code, any country with one", () => {
   for (const v of ["050 123 4567", "+971 50 123 4567", "00971501234567", "501234567"]) {
-    assert.equal(normalizeUaeMobile(v), "+971501234567");
+    assert.equal(normalizeMobile(v), "+971501234567");
   }
-  assert.equal(normalizeUaeMobile("04 123 4567"), null); // landline
-  assert.equal(normalizeUaeMobile("051 123 4567"), null); // not a mobile prefix
+  assert.equal(normalizeMobile("04 123 4567"), null); // UAE landline
+  assert.equal(normalizeMobile("051 123 4567"), null); // not a mobile prefix
+  assert.equal(normalizeMobile("+44 7911 123456"), "+447911123456"); // UK
+  assert.equal(normalizeMobile("0044 7911 123456"), "+447911123456");
+  assert.equal(normalizeMobile("+98 912 345 6789"), "+989123456789"); // Iran
+  assert.equal(normalizeMobile("+966 50 123 4567"), "+966501234567"); // Saudi Arabia
+  assert.equal(normalizeMobile("+91 98765 43210"), "+919876543210"); // India
+  assert.equal(normalizeMobile("+1 415 555 2671"), "+14155552671"); // US
+  assert.equal(normalizeMobile("0912 345 6789"), null); // foreign number without its country code
+  assert.equal(normalizeMobile("12345"), null);
+  assert.equal(formatPhone("+971501234567"), "+971 50 123 4567");
   assert.equal(maskPhone("+971501234567"), "+971 50 ••• 4567");
+  assert.equal(maskPhone("+447911123456"), "+44 79 ••• 3456");
 });
 
 test("removing a sold-out dish keeps fees, shrinks percent promos, never raises the total", () => {
