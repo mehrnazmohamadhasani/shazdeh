@@ -8,21 +8,21 @@ import { InvoiceReview } from "@/components/admin/ops/invoice-review";
 import { DiscardButton, MarkPaidButton, RetryRead, UndoInvoiceButton } from "@/components/admin/ops/document-actions";
 import { getDocument, parseStoredReading } from "@/lib/ops/documents";
 import { reconcileStatement } from "@/lib/ops/catalog";
-import { formatFils, toFils } from "@/lib/ordering/money";
-import { formatAmount, type BaseUnit } from "@/lib/ops/units";
+import { toFils } from "@/lib/ordering/money";
 import { prisma } from "@/lib/prisma";
+import { UNIT, amountText, day } from "@/components/admin/ops/format";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Invoice" };
-
-const UNIT: Record<string, BaseUnit> = { G: "g", ML: "ml", PCS: "pcs" };
-
-function day(d: Date) {
-  return new Intl.DateTimeFormat("en-AE", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dubai" }).format(d);
+export async function generateMetadata() {
+  const { t } = await getAdminI18n();
+  return { title: t("Invoice") };
 }
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const { t, money, intl, locale } = await getAdminI18n();
+  const date = (d: Date) => day(d, true, intl);
   const doc = await getDocument(id);
   if (!doc) notFound();
   const stored = parseStoredReading(doc.extraction);
@@ -31,28 +31,29 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const original = (
     <Card
-      title="Original"
+      title={t("Original")}
       actions={
         <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-terracotta-ink underline-offset-4 hover:underline">
-          Full size <ExternalLink className="h-3.5 w-3.5" />
+          {t("Full size")} <ExternalLink className="h-3.5 w-3.5" />
         </a>
       }
       bodyClassName="p-3"
     >
       {doc.mimeType === "application/pdf" ? (
         <object data={fileUrl} type="application/pdf" className="h-[45vh] w-full rounded-[10px] lg:h-[70vh]">
-          <a href={fileUrl}>Open the PDF</a>
+          <a href={fileUrl}>{t("Open the PDF")}</a>
         </object>
       ) : (
         <a href={fileUrl} target="_blank" rel="noopener noreferrer">
           {/* Phones: keep the form in reach — tap for full size. */}
-          <img src={fileUrl} alt="Uploaded invoice" className="max-h-[40vh] w-full rounded-[10px] object-contain lg:max-h-none" />
+          <img src={fileUrl} alt={t("Uploaded invoice")} className="max-h-[40vh] w-full rounded-[10px] object-contain lg:max-h-none" />
         </a>
       )}
       <p className="mt-2 px-1 text-[12px] text-dark-grey">
-        Uploaded {day(doc.createdAt)}
-        {doc.uploadedBy ? ` by ${doc.uploadedBy.name ?? doc.uploadedBy.email}` : ""}
-        {doc.aiModel ? ` · read by ${doc.aiModel}` : ""}
+        {doc.uploadedBy
+          ? t("Uploaded {date} by {name}", { date: date(doc.createdAt), name: doc.uploadedBy.name ?? doc.uploadedBy.email })
+          : t("Uploaded {date}", { date: date(doc.createdAt) })}
+        {doc.aiModel ? ` · ${t("read by {model}", { model: doc.aiModel })}` : ""}
       </p>
     </Card>
   );
@@ -66,11 +67,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <div className="space-y-5">
         <Card
           title={
-            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} className="hover:underline">
+            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} dir="auto" className="hover:underline">
               {inv.supplier.name}
             </Link>
           }
-          description={`${inv.invoiceNo ? `Invoice ${inv.invoiceNo} · ` : ""}${day(inv.invoiceDate)}`}
+          description={
+            inv.invoiceNo
+              ? t("Invoice {number} · {date}", { number: inv.invoiceNo, date: date(inv.invoiceDate) })
+              : date(inv.invoiceDate)
+          }
           actions={<UndoInvoiceButton invoiceId={inv.id} />}
           bodyClassName="p-0"
         >
@@ -78,65 +83,67 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             {inv.lines.map((l) => (
               <li key={l.id} className="flex items-start justify-between gap-4 px-5 py-3 md:px-6">
                 <div className="min-w-0">
-                  <p className="font-medium">{l.rawName}</p>
+                  <p dir="auto" className="font-medium">{l.rawName}</p>
                   <p className="text-[12.5px] text-dark-grey">
                     {l.quantity} {l.unit ?? ""}
                     {l.ingredient && l.baseQty ? (
                       <>
                         {" → +"}
-                        {formatAmount(l.baseQty, UNIT[l.ingredient.unit])}{" "}
-                        <Link href={`/admin/ops/ingredients/${l.ingredientId}`} className="underline-offset-2 hover:underline">
+                        {amountText(l.baseQty, UNIT[l.ingredient.unit], locale)}{" "}
+                        <Link href={`/admin/ops/ingredients/${l.ingredientId}`} dir="auto" className="underline-offset-2 hover:underline">
                           {l.ingredient.name}
                         </Link>
                       </>
                     ) : (
-                      ` · ${l.category.toLowerCase()}`
+                      ` · ${t(l.category.toLowerCase())}`
                     )}
                   </p>
                 </div>
-                <div className="shrink-0 text-right tabular-nums">
-                  <p>{formatFils(l.lineTotalFils)}</p>
-                  {l.netFils != null && l.netFils !== l.lineTotalFils && <p className="text-[12px] text-dark-grey">{formatFils(l.netFils)} ex VAT</p>}
+                <div className="shrink-0 text-end tabular-nums">
+                  <p>{money(l.lineTotalFils)}</p>
+                  {l.netFils != null && l.netFils !== l.lineTotalFils && <p className="text-[12px] text-dark-grey">{t("{amount} ex VAT", { amount: money(l.netFils) })}</p>}
                 </div>
               </li>
             ))}
             <li className="flex justify-between px-5 py-3 font-semibold md:px-6">
-              <span>Total</span>
-              <span className="text-right tabular-nums">
-                {formatFils(inv.totalFils)}
-                {netTotal > 0 && netTotal !== inv.totalFils && <span className="block text-[12px] font-normal text-dark-grey">{formatFils(netTotal)} cost ex VAT</span>}
+              <span>{t("Total")}</span>
+              <span className="text-end tabular-nums">
+                {money(inv.totalFils)}
+                {netTotal > 0 && netTotal !== inv.totalFils && <span className="block text-[12px] font-normal text-dark-grey">{t("{amount} cost ex VAT", { amount: money(netTotal) })}</span>}
               </span>
             </li>
           </ul>
-          {inv.notes && <p className="border-t border-black-iron/[0.06] px-5 py-3 text-[13px] text-dark-grey md:px-6">Notes: {inv.notes}</p>}
+          {inv.notes && <p className="border-t border-black-iron/[0.06] px-5 py-3 text-[13px] text-dark-grey md:px-6">
+              {t("Notes:")} <span dir="auto">{inv.notes}</span>
+            </p>}
         </Card>
 
-        <Card title="Payment">
+        <Card title={t("Payment")}>
           {inv.paidAt ? (
             <p className="text-[14px]">
-              <StatusPill tone="good">Paid</StatusPill> <span className="ml-2">{day(inv.paidAt)}</span>
-              {inv.paidBy && <span className="text-dark-grey"> · by {inv.paidBy}</span>}
-              {inv.paymentMode && <span className="text-dark-grey"> · {inv.paymentMode}</span>}
-              {inv.paymentNote && <span className="block mt-1 text-[13px] text-dark-grey">{inv.paymentNote}</span>}
+              <StatusPill tone="good">{t("Paid")}</StatusPill> <span className="ms-2">{date(inv.paidAt)}</span>
+              {inv.paidBy && <span className="text-dark-grey"> · {t("by {name}", { name: inv.paidBy })}</span>}
+              {inv.paymentMode && <span className="text-dark-grey"> · {t(inv.paymentMode)}</span>}
+              {inv.paymentNote && <span dir="auto" className="block mt-1 text-[13px] text-dark-grey">{inv.paymentNote}</span>}
             </p>
           ) : inv.paymentMode === "credit" ? (
             <div className="space-y-3">
               <p className="text-[14px]">
-                <StatusPill tone={overdue ? "bad" : "warn"}>{overdue ? "Overdue" : "Unpaid"}</StatusPill>
-                <span className="ml-2">{inv.dueDate ? `Due ${day(inv.dueDate)}` : "No due date"}</span>
+                <StatusPill tone={overdue ? "bad" : "warn"}>{overdue ? t("Overdue") : t("Unpaid")}</StatusPill>
+                <span className="ms-2">{inv.dueDate ? t("Due {date}", { date: date(inv.dueDate) }) : t("No due date")}</span>
               </p>
               <MarkPaidButton invoiceId={inv.id} />
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-[14px] text-dark-grey">Payment not recorded.</p>
+              <p className="text-[14px] text-dark-grey">{t("Payment not recorded.")}</p>
               <MarkPaidButton invoiceId={inv.id} />
             </div>
           )}
         </Card>
 
         <Link href="/admin/ops/stock" className="inline-block text-[13px] font-medium text-terracotta-ink underline-offset-4 hover:underline">
-          See stock →
+          {t("See stock →")}
         </Link>
       </div>
     );
@@ -152,13 +159,17 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     body = (
       <div className="space-y-5">
         <Card
-          title={`Statement from ${supplier?.name ?? reading.supplier.name ?? "a supplier"}`}
-          description={`${rows.length} invoice${rows.length === 1 ? "" : "s"}${reading.total != null ? ` · total ${formatFils(toFils(reading.total))}` : ""}. Compared with the invoices saved here.`}
+          title={t("Statement from {name}", { name: supplier?.name ?? reading.supplier.name ?? t("a supplier") })}
+          description={t("{summary}. Compared with the invoices saved here.", {
+            summary: `${t(rows.length === 1 ? "{n} invoice" : "{n} invoices", { n: rows.length })}${
+              reading.total != null ? ` · ${t("total {amount}", { amount: money(toFils(reading.total)) })}` : ""
+            }`,
+          })}
           bodyClassName="p-0"
         >
           {!supplier && (
             <p className="border-b border-black-iron/[0.06] px-5 py-3 text-[13.5px] text-cinnamon-bark md:px-6">
-              No saved supplier matches “{reading.supplier.name}” yet — save one of its invoices first.
+              {t("No saved supplier matches “{name}” yet — save one of its invoices first.", { name: reading.supplier.name ?? "" })}
             </p>
           )}
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
@@ -166,41 +177,48 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               <li key={i} className="flex flex-wrap items-center gap-3 px-5 py-3 md:px-6">
                 <span className="min-w-0 flex-1">
                   <span className="font-medium">{r.invoiceNo}</span>
-                  {r.date && <span className="text-dark-grey"> · {day(new Date(r.date))}</span>}
+                  {r.date && <span className="text-dark-grey"> · {date(new Date(r.date))}</span>}
                 </span>
                 {r.match ? (
                   <Link href={r.match.documentId ? `/admin/ops/invoices/${r.match.documentId}` : "#"} className="hover:underline">
                     <StatusPill tone={r.how === "number" ? "good" : "warn"}>
-                      {r.how === "number" ? "Saved" : `Saved as #${r.match.invoiceNo ?? "—"}`}
+                      {r.how === "number" ? t("Saved") : t("Saved as #{number}", { number: r.match.invoiceNo ?? "—" })}
                     </StatusPill>
                   </Link>
                 ) : (
-                  <StatusPill tone="bad">Missing</StatusPill>
+                  <StatusPill tone="bad">{t("Missing")}</StatusPill>
                 )}
-                {r.match && !r.match.paidAt && <StatusPill tone="neutral">Unpaid</StatusPill>}
-                <span className="w-24 text-right tabular-nums">{r.amountFils != null ? formatFils(r.amountFils) : "—"}</span>
+                {r.match && !r.match.paidAt && <StatusPill tone="neutral">{t("Unpaid")}</StatusPill>}
+                <span className="w-24 text-end tabular-nums">{r.amountFils != null ? money(r.amountFils) : "—"}</span>
               </li>
             ))}
           </ul>
           <p className="border-t border-black-iron/[0.06] px-5 py-3 text-[13.5px] md:px-6">
             {missing.length === 0 ? (
-              <span className="text-olive-leaf">Every invoice on this statement is saved.</span>
+              <span className="text-olive-leaf">{t("Every invoice on this statement is saved.")}</span>
             ) : (
               <span className="text-pomegranate-red">
-                {missing.length} missing ({formatFils(missingFils)}) — add their photos so stock and costs are complete.
+                {t("{n} missing ({amount}) — add their photos so stock and costs are complete.", {
+                  n: missing.length,
+                  amount: money(missingFils),
+                })}
               </span>
             )}
           </p>
         </Card>
-        <DiscardButton documentId={doc.id} label="Done — remove from the list" />
+        <DiscardButton documentId={doc.id} label={t("Done — remove from the list")} />
       </div>
     );
   } else if (doc.status === "NEEDS_REVIEW" && stored?.reading.documentType === "platform_order") {
+    const [saleBefore, saleAfter] = t(
+      "It is a customer's order from SHĀZDEH — a {sale}, not a purchase — so it doesn't belong in invoices or stock.",
+    ).split("{sale}");
     body = (
-      <Card title={`This is a ${stored.reading.supplier.name ?? "delivery platform"} order`}>
+      <Card title={t("This is a {platform} order", { platform: stored.reading.supplier.name ?? t("delivery platform") })}>
         <p className="text-[14px] leading-relaxed text-dark-grey">
-          It is a customer&apos;s order from SHĀZDEH — a <strong className="text-black-iron">sale</strong>, not a purchase — so it
-          doesn&apos;t belong in invoices or stock. Reading platform orders and their fees comes in the next step.
+          {saleBefore}
+          <strong className="text-black-iron">{t("sale")}</strong>
+          {saleAfter} {t("Reading platform orders and their fees comes in the next step.")}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <DiscardButton documentId={doc.id} />
@@ -218,7 +236,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <>
         {undone?.voidedAt && (
           <p className="mb-5 rounded-[16px] border border-saffron-orange/30 bg-saffron-orange/[0.08] px-4 py-3 text-[13.5px] text-cinnamon-bark">
-            Saved before and undone on {day(undone.voidedAt)}{undone.voidReason ? ` — “${undone.voidReason}”` : ""}. Correct it and save again.
+            {undone.voidReason
+              ? t("Saved before and undone on {date} — “{reason}”. Correct it and save again.", {
+                  date: date(undone.voidedAt),
+                  reason: undone.voidReason,
+                })
+              : t("Saved before and undone on {date}. Correct it and save again.", { date: date(undone.voidedAt) })}
           </p>
         )}
         <InvoiceReview
@@ -232,10 +255,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     );
   } else {
     body = (
-      <Card title={doc.status === "FAILED" ? "AI couldn't read this document" : status.label}>
-        {doc.error && <p className="text-[14px] text-pomegranate-red">{doc.error}</p>}
+      <Card title={doc.status === "FAILED" ? t("AI couldn't read this document") : t(status.label)}>
+        {doc.error && <p className="text-[14px] text-pomegranate-red">{t(doc.error)}</p>}
         {doc.status === "DISCARDED" ? (
-          <p className="text-[14px] text-dark-grey">This document was discarded. Nothing was saved from it.</p>
+          <p className="text-[14px] text-dark-grey">{t("This document was discarded. Nothing was saved from it.")}</p>
         ) : (
           <div className="mt-4">
             <RetryRead documentId={doc.id} />
@@ -249,11 +272,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     <AdminPage
       title={
         <span className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/ops/invoices" aria-label="Back to invoices" className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
-            <ArrowLeft className="h-5 w-5" />
+          <Link href="/admin/ops/invoices" aria-label={t("Back to invoices")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+            <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
-          {stored?.reading.supplier.name ?? doc.invoice?.supplier.name ?? "Invoice"}
-          <StatusPill tone={status.tone}>{status.label}</StatusPill>
+          <span dir="auto">{stored?.reading.supplier.name ?? doc.invoice?.supplier.name ?? t("Invoice")}</span>
+          <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
         </span>
       }
       className="max-w-[1400px]"

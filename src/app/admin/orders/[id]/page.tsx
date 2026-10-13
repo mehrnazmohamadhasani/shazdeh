@@ -3,9 +3,13 @@ import { OrderDetail } from "@/components/admin/orders/order-detail";
 import { getOrderDetail } from "@/lib/ordering/admin";
 import { getOrderingSettings } from "@/lib/ordering/config";
 import { providersForModel } from "@/lib/delivery";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Order" };
+export async function generateMetadata() {
+  const { t } = await getAdminI18n();
+  return { title: t("Order") };
+}
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

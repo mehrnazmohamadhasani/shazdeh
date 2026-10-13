@@ -64,7 +64,7 @@
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font-inter), sans-serif;
-  --font-persian: var(--font-vazirmatn), "Vazirmatn", Tahoma, sans-serif;
+  --font-persian: var(--font-vazirmatn), "Vazirmatn", var(--font-inter), Tahoma, sans-serif;
   --font-logo: var(--font-bodoni), "Bodoni 72", "Didot", serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
 
@@ -187,6 +187,30 @@
     font-family: var(--font-persian);
     letter-spacing: 0;
     font-feature-settings: normal;
+  }
+
+  /*
+   * Persian admin panel. Utility tracking (tracking-[-0.03em]…) is tuned
+   * for Inter and pulls joined Persian letters apart, and Vazirmatn reads
+   * thin at Inter's light body weight — so both are reset here.
+   */
+  .admin-root:lang(fa) *:lang(fa),
+  .admin-root:lang(fa) {
+    letter-spacing: 0 !important;
+  }
+  .admin-root:lang(fa),
+  .admin-root:lang(fa) p {
+    font-weight: 400;
+  }
+
+  /*
+   * Data typed by people (names, dishes, addresses) is marked dir="auto"
+   * so Latin text keeps its own order and truncates at its own end. In
+   * the Persian panel it should still sit on the right with everything
+   * else; form fields keep the natural alignment of what is typed.
+   */
+  .admin-root[dir="rtl"] [dir="auto"]:not(input, textarea, select) {
+    text-align: right;
   }
 
   :focus-visible {

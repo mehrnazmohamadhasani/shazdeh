@@ -13,7 +13,7 @@ import {
 } from "@/components/admin/orders/order-actions";
 import { claimPrint, printTickets, useAutoPrint } from "@/components/admin/orders/print-tickets";
 import type { BoardOrder } from "@/lib/ordering/admin";
-import { formatFils } from "@/lib/ordering/money";
+import { useAdminI18n } from "@/components/admin/i18n";
 import { formatUaeMobile } from "@/lib/ordering/phone";
 import { STAFF_ACTION, STAFF_LABEL, nextStatus, type OrderStatusValue } from "@/lib/ordering/status";
 import { cn } from "@/lib/utils";
@@ -54,6 +54,7 @@ function minutesSince(iso: string, now: number) {
 }
 
 export function OrdersBoard({ initial, providers }: { initial: BoardData; providers: DispatchProviderOption[] }) {
+  const { t } = useAdminI18n();
   const [view, setView] = React.useState<"active" | "done" | "history">("active");
   const [data, setData] = React.useState<BoardData>(initial);
   const [loading, setLoading] = React.useState(false);
@@ -88,21 +89,21 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
   React.useEffect(() => {
     // Fetch now (fresh data for the selected tab), then keep polling.
     const first = setTimeout(() => load().finally(() => setLoading(false)), 0);
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       load();
       setNow(Date.now());
     }, POLL_MS);
     return () => {
       clearTimeout(first);
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [load]);
 
   async function act(order: BoardOrder, to: OrderStatusValue, extra: Record<string, unknown> = {}) {
     setBusyId(order.id);
-    const okay = await patchOrder(order.id, { action: "status", to, ...extra });
+    const okay = await patchOrder(order.id, { action: "status", to, ...extra }, t);
     if (okay) {
-      toast.success(`${order.number} → ${STAFF_LABEL[to]}`);
+      toast.success(`${order.number} → ${t(STAFF_LABEL[to])}`);
       ordersChanged();
       await load();
     }
@@ -112,7 +113,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
 
   async function acknowledge(order: BoardOrder) {
     setBusyId(order.id);
-    if (await patchOrder(order.id, { action: "ack" })) {
+    if (await patchOrder(order.id, { action: "ack" }, t)) {
       ordersChanged();
       await load();
     }
@@ -127,8 +128,8 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
     });
     if (res.ok) {
       setData((d) => ({ ...d, acceptingOrders: value }));
-      toast.success(value ? "Now accepting orders" : "Online ordering paused");
-    } else toast.error("Couldn't change ordering status");
+      toast.success(value ? t("Now accepting orders") : t("Online ordering paused"));
+    } else toast.error(t("Couldn't change ordering status"));
   }
 
   return (
@@ -139,9 +140,9 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
           <Switch checked={data.acceptingOrders} onCheckedChange={toggleAccepting} />
           <span>
             <span className={cn("block text-[15px] font-semibold", data.acceptingOrders ? "text-olive-leaf" : "text-pomegranate-red")}>
-              {data.acceptingOrders ? "Accepting online orders" : "Online ordering paused"}
+              {data.acceptingOrders ? t("Accepting online orders") : t("Online ordering paused")}
             </span>
-            <span className="block text-[12px] text-dark-grey">Pause when the kitchen is overloaded.</span>
+            <span className="block text-[12px] text-dark-grey">{t("Pause when the kitchen is overloaded.")}</span>
           </span>
         </label>
         <div className="flex flex-col gap-2 sm:items-end">
@@ -152,11 +153,11 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
             )}
           >
             <BellRing className={cn("h-4 w-4", data.counts.unseen > 0 && "animate-pulse")} />
-            {data.counts.unseen > 0 ? "Ringing — accept, or tap “Got it”, to stop" : "Order alarm on"}
+            {data.counts.unseen > 0 ? t("Ringing — accept, or tap “Got it”, to stop") : t("Order alarm on")}
           </span>
           <label className="flex cursor-pointer items-center gap-2 text-[12px] text-black-iron/80">
             <Switch checked={autoPrint} onCheckedChange={setAutoPrint} />
-            <Printer className="h-4 w-4" /> Print tickets automatically on this device
+            <Printer className="h-4 w-4" /> {t("Print tickets automatically on this device")}
           </label>
         </div>
       </div>
@@ -165,9 +166,9 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
       <div role="tablist" className="flex gap-1.5 overflow-x-auto no-scrollbar">
         {(
           [
-            ["active", `Active · ${data.counts.active}`],
-            ["done", "Completed today"],
-            ["history", "History"],
+            ["active", t("Active · {n}", { n: data.counts.active })],
+            ["done", t("Completed today")],
+            ["history", t("History")],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -187,7 +188,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
             {label}
           </button>
         ))}
-        {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin self-center text-dark-grey" />}
+        {loading && <Loader2 className="ms-2 h-4 w-4 animate-spin self-center text-dark-grey" />}
       </div>
 
       {view === "active" ? (
@@ -204,7 +205,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
                     mobileCol === i ? "bg-black-iron text-black-iron" : "bg-black-iron/[0.05] text-black-iron/80",
                   )}
                 >
-                  {c.title} <span className="tabular-nums">{n}</span>
+                  {t(c.title)} <span className="tabular-nums">{n}</span>
                 </button>
               );
             })}
@@ -213,14 +214,14 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
             {COLUMNS.map((c, i) => {
               const orders = data.orders.filter((o) => c.statuses.includes(o.status));
               return (
-                <section key={c.title} className={cn("space-y-3", mobileCol !== i && "max-lg:hidden")} aria-label={c.title}>
+                <section key={c.title} className={cn("space-y-3", mobileCol !== i && "max-lg:hidden")} aria-label={t(c.title)}>
                   <h2 className="hidden items-center justify-between text-[11px] font-medium uppercase tracking-[0.22em] text-dark-grey lg:flex">
-                    {c.title}
+                    {t(c.title)}
                     <span className="tabular-nums">{orders.length}</span>
                   </h2>
                   {orders.length === 0 && (
                     <p className="rounded-[16px] border border-dashed border-black-iron/15 px-4 py-8 text-center text-[13px] text-dark-grey">
-                      Nothing here
+                      {t("Nothing here")}
                     </p>
                   )}
                   {orders.map((o) => (
@@ -250,21 +251,21 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
               }}
               className="relative max-w-md"
             >
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order number, phone or name" className="pl-10" />
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Order number, phone or name")} className="ps-10" />
             </form>
           )}
           <HistoryTable orders={data.orders} />
           {view === "history" && data.pages > 1 && (
             <div className="flex items-center gap-3 text-[13px] text-black-iron/80">
               <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="min-h-10 px-3 disabled:opacity-30">
-                ← Newer
+                <span className="inline-block rtl:-scale-x-100">←</span> {t("Newer")}
               </button>
               <span className="tabular-nums">
-                Page {page} of {data.pages}
+                {t("Page {page} of {pages}", { page, pages: data.pages })}
               </span>
               <button disabled={page >= data.pages} onClick={() => setPage((p) => p + 1)} className="min-h-10 px-3 disabled:opacity-30">
-                Older →
+                {t("Older")} <span className="inline-block rtl:-scale-x-100">→</span>
               </button>
             </div>
           )}
@@ -274,8 +275,8 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
       <ReasonDialog
         open={!!rejecting}
         onOpenChange={(o) => !o && setRejecting(null)}
-        title={`Reject ${rejecting?.number ?? ""}?`}
-        confirmLabel="Reject order"
+        title={t("Reject {number}?", { number: rejecting?.number ?? "" })}
+        confirmLabel={t("Reject order")}
         onConfirm={async (reason) => {
           if (rejecting && (await act(rejecting, "REJECTED", { reason }))) setRejecting(null);
         }}
@@ -295,6 +296,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
 }
 
 function PaymentBadge({ order }: { order: BoardOrder }) {
+  const { t } = useAdminI18n();
   const paid = order.paymentStatus === "PAID";
   const Icon = order.paymentMethod === "CASH_ON_DELIVERY" ? Banknote : CreditCard;
   return (
@@ -305,7 +307,7 @@ function PaymentBadge({ order }: { order: BoardOrder }) {
       )}
     >
       <Icon className="h-3.5 w-3.5" strokeWidth={1.6} />
-      {paid ? "Paid" : order.paymentMethod === "CASH_ON_DELIVERY" ? "Collect cash" : "Card at door"}
+      {paid ? t("Paid") : order.paymentMethod === "CASH_ON_DELIVERY" ? t("Collect cash") : t("Card at door")}
     </span>
   );
 }
@@ -325,6 +327,7 @@ function OrderCard({
   onReject: () => void;
   onAck: () => void;
 }) {
+  const { t, money } = useAdminI18n();
   const waited = minutesSince(o.placedAt, now);
   const next = nextStatus(o.status);
   const late = waited > o.etaMax;
@@ -342,40 +345,44 @@ function OrderCard({
           <Link href={`/admin/orders/${o.id}`} className="whitespace-nowrap text-[20px] font-bold tabular-nums tracking-[-0.02em] text-black-iron hover:text-terracotta-ink">
             {o.number}
           </Link>
-          <p className="mt-0.5 text-[14px] font-semibold text-black-iron">{o.customerName}</p>
+          <p dir="auto" className="mt-0.5 text-[14px] font-semibold text-black-iron">{o.customerName}</p>
           <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-8 items-center gap-1.5 text-[13px] tabular-nums text-terracotta-ink">
-            <Phone className="h-3.5 w-3.5" /> {formatUaeMobile(o.customerPhone)}
+            <Phone className="h-3.5 w-3.5" /> <span dir="ltr">{formatUaeMobile(o.customerPhone)}</span>
           </a>
-          <p className="text-[12.5px] text-dark-grey">{o.areaName}</p>
+          <p dir="auto" className="text-[12.5px] text-dark-grey">{o.areaName}</p>
         </div>
-        <div className="text-right">
+        <div className="text-end">
           <p className={cn("text-[13px] font-semibold tabular-nums", urgent || late ? "text-terracotta-ink" : "text-black-iron/80")}>
-            {waited} min
+            {t("{n} min", { n: waited })}
           </p>
-          <p className="text-[11px] text-dark-grey">{STAFF_LABEL[o.status]}</p>
+          <p className="text-[11px] text-dark-grey">{t(STAFF_LABEL[o.status])}</p>
         </div>
       </div>
 
       <ul className="mt-3 space-y-1.5 border-t border-black-iron/[0.06] pt-3 text-[14px] text-black-iron">
         {o.items.map((i, idx) => (
           <li key={idx}>
-            <span className="font-bold tabular-nums text-terracotta-ink">{i.quantity}×</span> {i.name}
-            {i.portion && <span className="text-dark-grey"> ({i.portion})</span>}
-            {i.modifiers.length > 0 && <span className="block pl-6 text-[12.5px] text-dark-grey">{i.modifiers.join(" · ")}</span>}
-            {i.notes && <span className="block pl-6 text-[12.5px] italic text-cinnamon-bark">“{i.notes}”</span>}
+            <span className="font-bold tabular-nums text-terracotta-ink">{i.quantity}×</span> <span dir="auto">
+              {i.name}
+              {i.portion && <span className="text-dark-grey"> ({i.portion})</span>}
+            </span>
+            {i.modifiers.length > 0 && <span dir="auto" className="block ps-6 text-[12.5px] text-dark-grey">{i.modifiers.join(" · ")}</span>}
+            {i.notes && <span dir="auto" className="block ps-6 text-[12.5px] italic text-cinnamon-bark">“{i.notes}”</span>}
           </li>
         ))}
       </ul>
       {o.notes && (
-        <p className="mt-2 rounded-sm bg-saffron-orange/[0.12] px-2.5 py-1.5 text-[12.5px] text-cinnamon-bark">Note: {o.notes}</p>
+        <p className="mt-2 rounded-sm bg-saffron-orange/[0.12] px-2.5 py-1.5 text-[12.5px] text-cinnamon-bark">
+          {t("Note:")} <span dir="auto">{o.notes}</span>
+        </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <PaymentBadge order={o} />
-        <span className="text-[13px] font-semibold tabular-nums text-black-iron">{formatFils(o.totalFils)}</span>
+        <span className="text-[13px] font-semibold tabular-nums text-black-iron">{money(o.totalFils)}</span>
         {o.cutlery && (
           <span className="inline-flex items-center gap-1 text-[11px] text-dark-grey">
-            <Utensils className="h-3 w-3" /> Cutlery
+            <Utensils className="h-3 w-3" /> {t("Cutlery")}
           </span>
         )}
       </div>
@@ -388,7 +395,7 @@ function OrderCard({
             onClick={onAck}
             className="flex min-h-12 items-center justify-center gap-1.5 rounded-md bg-black-iron px-4 text-[13px] font-semibold text-white disabled:opacity-50"
           >
-            <Check className="h-4 w-4" /> Got it
+            <Check className="h-4 w-4" /> {t("Got it")}
           </button>
         )}
         {next && (
@@ -399,7 +406,7 @@ function OrderCard({
             className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md bg-terracotta px-3 text-[13px] font-semibold text-white hover:bg-terracotta-ink disabled:opacity-50"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {STAFF_ACTION[next]}
+            {t(STAFF_ACTION[next] ?? "")}
           </button>
         )}
         {o.status === "RECEIVED" && (
@@ -408,13 +415,13 @@ function OrderCard({
             onClick={onReject}
             className="min-h-12 rounded-md border border-black-iron/15 px-4 text-[13px] text-black-iron/80 hover:border-pomegranate-red hover:text-pomegranate-red"
           >
-            Reject
+            {t("Reject")}
           </button>
         )}
         <button
           type="button"
-          aria-label={`Print tickets for ${o.number}`}
-          title="Print kitchen + delivery tickets"
+          aria-label={t("Print tickets for {number}", { number: o.number })}
+          title={t("Print kitchen + delivery tickets")}
           onClick={() => {
             void claimPrint(o.id);
             void printTickets(o.id);
@@ -429,43 +436,44 @@ function OrderCard({
 }
 
 function HistoryTable({ orders }: { orders: BoardOrder[] }) {
+  const { t, money, date } = useAdminI18n();
   if (orders.length === 0) {
-    return <p className="rounded-[16px] border border-black-iron/[0.07] bg-white py-16 text-center text-[14px] text-dark-grey">No orders.</p>;
+    return <p className="rounded-[16px] border border-black-iron/[0.07] bg-white py-16 text-center text-[14px] text-dark-grey">{t("No orders.")}</p>;
   }
   return (
     <div className="overflow-hidden rounded-[16px] border border-black-iron/[0.07] bg-white">
-      <table className="w-full text-left text-[13px]">
+      <table className="w-full text-start text-[13px]">
         <thead className="border-b border-black-iron/[0.08] text-[10px] uppercase tracking-[0.2em] text-dark-grey">
           <tr>
-            <th className="px-4 py-3 font-medium">Order</th>
-            <th className="px-4 py-3 font-medium max-md:hidden">Placed</th>
-            <th className="px-4 py-3 font-medium max-sm:hidden">Customer</th>
-            <th className="px-4 py-3 font-medium max-lg:hidden">Phone</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 text-right font-medium">Total</th>
+            <th className="px-4 py-3 font-medium">{t("Order")}</th>
+            <th className="px-4 py-3 font-medium max-md:hidden">{t("Placed")}</th>
+            <th className="px-4 py-3 font-medium max-sm:hidden">{t("Customer")}</th>
+            <th className="px-4 py-3 font-medium max-lg:hidden">{t("Phone")}</th>
+            <th className="px-4 py-3 font-medium">{t("Status")}</th>
+            <th className="px-4 py-3 text-end font-medium">{t("Total")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-black-iron/[0.06]">
           {orders.map((o) => (
             <tr key={o.id} className="hover:bg-black-iron/[0.03]">
-              <td className="px-4 py-3">
+              <td className="whitespace-nowrap px-4 py-3">
                 <Link href={`/admin/orders/${o.id}`} className="font-semibold tabular-nums text-black-iron hover:text-terracotta-ink">
                   {o.number}
                 </Link>
               </td>
-              <td className="px-4 py-3 tabular-nums text-dark-grey max-md:hidden">
-                {new Date(o.placedAt).toLocaleString("en-AE", { timeZone: "Asia/Dubai", dateStyle: "medium", timeStyle: "short" })}
+              <td className="whitespace-nowrap px-4 py-3 tabular-nums text-dark-grey max-md:hidden">
+                {date(o.placedAt, { dateStyle: "medium", timeStyle: "short" })}
               </td>
-              <td className="px-4 py-3 text-black-iron/80 max-sm:hidden">
+              <td dir="auto" className="px-4 py-3 text-black-iron/80 max-sm:hidden">
                 {o.customerName} · {o.areaName}
               </td>
-              <td className="px-4 py-3 tabular-nums max-lg:hidden">
-                <a href={`tel:${o.customerPhone}`} className="text-black-iron/80 hover:text-terracotta-ink">
+              <td className="whitespace-nowrap px-4 py-3 tabular-nums max-lg:hidden">
+                <a href={`tel:${o.customerPhone}`} dir="ltr" className="text-black-iron/80 hover:text-terracotta-ink">
                   {formatUaeMobile(o.customerPhone)}
                 </a>
               </td>
-              <td className="px-4 py-3 text-black-iron/80">{STAFF_LABEL[o.status]}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-black-iron">{formatFils(o.totalFils)}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-black-iron/80">{t(STAFF_LABEL[o.status])}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-black-iron">{money(o.totalFils)}</td>
             </tr>
           ))}
         </tbody>

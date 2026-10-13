@@ -3,9 +3,13 @@ import { AdminPage } from "@/components/admin/ui";
 import { MenuItemForm } from "@/components/admin/menu-item-form";
 import { ModifiersEditor } from "@/components/admin/ordering/modifiers-editor";
 import { prisma } from "@/lib/prisma";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Edit dish" };
+export async function generateMetadata() {
+  const { t } = await getAdminI18n();
+  return { title: t("Edit dish") };
+}
 
 export default async function EditMenuItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,7 +25,7 @@ export default async function EditMenuItemPage({ params }: { params: Promise<{ i
   if (!item) notFound();
 
   return (
-    <AdminPage title={item.name}>
+    <AdminPage title={<span dir="auto">{item.name}</span>}>
       <MenuItemForm
         categories={categories}
         initial={{

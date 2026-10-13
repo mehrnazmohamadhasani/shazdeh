@@ -5,17 +5,22 @@ import { requireAdmin } from "@/lib/auth";
 import { getOrderingSettings } from "@/lib/ordering/config";
 import { getSettings } from "@/lib/settings";
 import { getOnlineProvider } from "@/lib/payments";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Online ordering" };
+export async function generateMetadata() {
+  const { t } = await getAdminI18n();
+  return { title: t("Online ordering") };
+}
 
 export default async function OrderingSettingsPage() {
   const user = await requireAdmin();
   if (user.role !== "ADMIN") redirect("/admin");
   const [s, site] = await Promise.all([getOrderingSettings(), getSettings()]);
   const provider = getOnlineProvider();
+  const { t } = await getAdminI18n();
   return (
-    <AdminPage title="Online ordering">
+    <AdminPage title={t("Online ordering")}>
       <OrderingSettingsForm
         onlineProvider={provider ? provider.id : null}
         siteHours={site.openingHours}

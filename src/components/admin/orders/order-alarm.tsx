@@ -6,7 +6,7 @@ import { BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { notifyNewOrder, requestNotifications, subscribePush, useWakeLock } from "@/components/admin/orders/kitchen-alerts";
 import { claimPrint, printTickets, useAutoPrint } from "@/components/admin/orders/print-tickets";
-import { formatFils } from "@/lib/ordering/money";
+import { useAdminI18n } from "@/components/admin/i18n";
 
 /*
  * The new-order alarm. Lives in the admin layout, so it rings on every
@@ -49,6 +49,7 @@ function playAlarm(ctx: AudioContext) {
 }
 
 export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }) {
+  const { t, money } = useAdminI18n();
   const pathname = usePathname();
   const audio = React.useRef<AudioContext | null>(null);
   const [locked, setLocked] = React.useState(false);
@@ -106,8 +107,11 @@ export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }
       fresh.forEach((o) => seen.add(o.id));
       if (fresh.length && !first) {
         const o = fresh[0];
-        const title = `New order ${o.number}${fresh.length > 1 ? ` (+${fresh.length - 1})` : ""}`;
-        const description = `${o.customerName} · ${o.areaName} · ${formatFils(o.totalFils)}`;
+        const title =
+          fresh.length > 1
+            ? t("New order {number} (+{more})", { number: o.number, more: fresh.length - 1 })
+            : t("New order {number}", { number: o.number });
+        const description = `${o.customerName} · ${o.areaName} · ${money(o.totalFils)}`;
         toast(title, { description });
         void notifyNewOrder(title, description, `order-${o.id}`);
       }
@@ -115,16 +119,16 @@ export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }
     } catch {
       /* offline — try again next tick */
     }
-  }, []);
+  }, [t, money]);
 
   React.useEffect(() => {
     const first = setTimeout(poll, 0);
-    const t = setInterval(poll, POLL_MS);
+    const timer = setInterval(poll, POLL_MS);
     const onVisible = () => document.visibilityState === "visible" && poll();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearTimeout(first);
-      clearInterval(t);
+      clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [poll]);
@@ -145,8 +149,8 @@ export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }
       playAlarm(ctx);
     };
     ring();
-    const t = setInterval(ring, RING_MS);
-    return () => clearInterval(t);
+    const timer = setInterval(ring, RING_MS);
+    return () => clearInterval(timer);
   }, [ringing]);
 
   // Tab title nags even when the tab is in the background.
@@ -162,12 +166,12 @@ export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }
       printing.current.add(o.id);
       void claimPrint(o.id).then((mine) => {
         if (mine) {
-          toast(`Printing ${o.number}`);
+          toast(t("Printing {number}", { number: o.number }));
           void printTickets(o.id);
         }
       });
     }
-  }, [autoPrint, alerts.toPrint]);
+  }, [autoPrint, alerts.toPrint, t]);
 
   return (
     <>
@@ -175,15 +179,15 @@ export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }
         <div role="alert" className="z-40 flex items-center justify-between gap-3 bg-terracotta print:hidden lg:sticky lg:top-0 px-4 py-2.5 text-white md:px-8">
           <span className="flex min-w-0 items-center gap-2 text-[14px] font-semibold">
             <BellRing className="h-5 w-5 shrink-0 animate-pulse" />
-            <span className="truncate">
+            <span dir="auto" className="truncate">
               {alerts.unseen.length === 1
-                ? `New order ${alerts.unseen[0].number} · ${alerts.unseen[0].customerName}`
-                : `${alerts.unseen.length} new orders waiting`}
+                ? t("New order {number} · {name}", { number: alerts.unseen[0].number, name: alerts.unseen[0].customerName })
+                : t("{n} new orders waiting", { n: alerts.unseen.length })}
             </span>
           </span>
           {pathname !== "/admin/orders" && (
             <Link href="/admin/orders" className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[13px] font-semibold text-terracotta-ink">
-              Open orders
+              {t("Open orders")}
             </Link>
           )}
         </div>
@@ -198,10 +202,10 @@ export function OrderAlarm({ vapidPublicKey }: { vapidPublicKey: string | null }
           >
             <BellRing className="h-10 w-10 text-terracotta" />
             <span id="alarm-title" className="text-[20px] font-bold text-black-iron">
-              Tap to switch on the order alarm
+              {t("Tap to switch on the order alarm")}
             </span>
             <span className="text-[13.5px] text-dark-grey">
-              Your browser keeps sound off until you tap. The alarm rings for every new order until it is accepted.
+              {t("Your browser keeps sound off until you tap. The alarm rings for every new order until it is accepted.")}
             </span>
           </button>
         </div>

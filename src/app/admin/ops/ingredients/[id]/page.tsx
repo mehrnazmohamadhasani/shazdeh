@@ -3,13 +3,16 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
-import { UNIT, day, unitPrice } from "@/components/admin/ops/format";
+import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { getIngredient } from "@/lib/ops/catalog";
-import { formatAmount } from "@/lib/ops/units";
 import { prisma } from "@/lib/prisma";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Ingredient" };
+export async function generateMetadata() {
+  const { t } = await getAdminI18n();
+  return { title: t("Ingredient") };
+}
 
 const MOVEMENT_LABEL: Record<string, string> = {
   PURCHASE: "Bought",
@@ -21,6 +24,7 @@ const MOVEMENT_LABEL: Record<string, string> = {
 };
 
 export default async function IngredientPage({ params }: { params: Promise<{ id: string }> }) {
+  const { t, locale, intl } = await getAdminI18n();
   const { id } = await params;
   const ingredient = await getIngredient(id);
   if (!ingredient) notFound();
@@ -51,10 +55,10 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
     <AdminPage
       title={
         <span className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/ops/stock" aria-label="Back to stock" className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
-            <ArrowLeft className="h-5 w-5" />
+          <Link href="/admin/ops/stock" aria-label={t("Back to stock")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+            <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
-          {ingredient.name}
+          <span dir="auto">{ingredient.name}</span>
           {ingredient.nameFa && (
             <span lang="fa" dir="rtl" className="text-[0.75em] font-normal text-dark-grey">
               {ingredient.nameFa}
@@ -65,36 +69,36 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
     >
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-[12.5px] text-dark-grey">On hand</p>
-          <p className="mt-1 text-[24px] font-bold tabular-nums">{formatAmount(ingredient.onHand, unit)}</p>
+          <p className="text-[12.5px] text-dark-grey">{t("On hand")}</p>
+          <p className="mt-1 text-[24px] font-bold tabular-nums">{amountText(ingredient.onHand, unit, locale)}</p>
         </Card>
         <Card>
-          <p className="text-[12.5px] text-dark-grey">Last price (ex VAT)</p>
-          <p className="mt-1 text-[24px] font-bold tabular-nums">{prices[0] ? unitPrice(prices[0].perBase, unit) : "—"}</p>
+          <p className="text-[12.5px] text-dark-grey">{t("Last price (ex VAT)")}</p>
+          <p className="mt-1 text-[24px] font-bold tabular-nums">{prices[0] ? unitPrice(prices[0].perBase, unit, locale) : "—"}</p>
         </Card>
         <Card>
-          <p className="text-[12.5px] text-dark-grey">Cheapest now</p>
-          <p className="mt-1 text-[16px] font-semibold">{bySupplier[0]?.supplier.name ?? "—"}</p>
-          {bySupplier.length > 1 && <p className="text-[12.5px] text-dark-grey">of {bySupplier.length} suppliers</p>}
+          <p className="text-[12.5px] text-dark-grey">{t("Cheapest now")}</p>
+          <p dir="auto" className="mt-1 text-[16px] font-semibold">{bySupplier[0]?.supplier.name ?? "—"}</p>
+          {bySupplier.length > 1 && <p className="text-[12.5px] text-dark-grey">{t("of {n} suppliers", { n: bySupplier.length })}</p>}
         </Card>
       </div>
 
-      <Card title="Waste, staff meal or correction">
+      <Card title={t("Waste, staff meal or correction")}>
         <MovementForm ingredientId={ingredient.id} unit={unit} />
       </Card>
 
       {bySupplier.length > 1 && (
-        <Card title="By supplier" description="Latest price from each supplier, cheapest first." bodyClassName="p-0">
+        <Card title={t("By supplier")} description={t("Latest price from each supplier, cheapest first.")} bodyClassName="p-0">
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
             {bySupplier.map((p, i) => (
               <li key={p.supplier.id} className="flex items-center justify-between gap-3 px-5 py-3 md:px-6">
-                <Link href={`/admin/ops/suppliers/${p.supplier.id}`} className="font-medium hover:underline">
+                <Link href={`/admin/ops/suppliers/${p.supplier.id}`} dir="auto" className="font-medium hover:underline">
                   {p.supplier.name}
                 </Link>
                 <span className="flex items-center gap-2 tabular-nums">
-                  {i === 0 && <StatusPill tone="good">Cheapest</StatusPill>}
-                  {unitPrice(p.perBase, unit)}
-                  <span className="text-[12.5px] text-dark-grey">{day(p.at)}</span>
+                  {i === 0 && <StatusPill tone="good">{t("Cheapest")}</StatusPill>}
+                  {unitPrice(p.perBase, unit, locale)}
+                  <span className="text-[12.5px] text-dark-grey">{day(p.at, false, intl)}</span>
                 </span>
               </li>
             ))}
@@ -102,15 +106,15 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
         </Card>
       )}
 
-      <Card title="Price history" bodyClassName="p-0">
+      <Card title={t("Price history")} bodyClassName="p-0">
         {prices.length === 0 ? (
-          <p className="px-5 py-4 text-[14px] text-dark-grey md:px-6">No purchases yet.</p>
+          <p className="px-5 py-4 text-[14px] text-dark-grey md:px-6">{t("No purchases yet.")}</p>
         ) : (
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
             {prices.map((p) => (
               <li key={p.id} className="flex items-center gap-3 px-5 py-3 md:px-6">
-                <span className="w-16 shrink-0 text-dark-grey">{day(p.at)}</span>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="w-16 shrink-0 text-dark-grey">{day(p.at, false, intl)}</span>
+                <span dir="auto" className="min-w-0 flex-1 truncate">
                   {p.documentId ? (
                     <Link href={`/admin/ops/invoices/${p.documentId}`} className="hover:underline">
                       {p.supplier.name}
@@ -118,30 +122,35 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
                   ) : (
                     p.supplier.name
                   )}
-                  <span className="text-dark-grey"> · {formatAmount(p.qty, unit)}</span>
+                  <span className="text-dark-grey"> · {amountText(p.qty, unit, locale)}</span>
                 </span>
-                <span className="shrink-0 tabular-nums">{unitPrice(p.perBase, unit)}</span>
+                <span className="shrink-0 tabular-nums">{unitPrice(p.perBase, unit, locale)}</span>
               </li>
             ))}
           </ul>
         )}
       </Card>
 
-      <Card title="Stock history" bodyClassName="p-0">
+      <Card title={t("Stock history")} bodyClassName="p-0">
         {ingredient.movements.length === 0 ? (
-          <p className="px-5 py-4 text-[14px] text-dark-grey md:px-6">Nothing yet.</p>
+          <p className="px-5 py-4 text-[14px] text-dark-grey md:px-6">{t("Nothing yet.")}</p>
         ) : (
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
             {ingredient.movements.map((m) => (
               <li key={m.id} className="flex items-center gap-3 px-5 py-3 md:px-6">
-                <span className="w-16 shrink-0 text-dark-grey">{day(m.at)}</span>
+                <span className="w-16 shrink-0 text-dark-grey">{day(m.at, false, intl)}</span>
                 <span className="min-w-0 flex-1 truncate">
-                  {MOVEMENT_LABEL[m.type] ?? m.type}
-                  {m.note && <span className="text-dark-grey"> · {m.note}</span>}
+                  {MOVEMENT_LABEL[m.type] ? t(MOVEMENT_LABEL[m.type]) : m.type}
+                  {m.note && (
+                    <span className="text-dark-grey">
+                      {" · "}
+                      <span dir="auto">{m.note}</span>
+                    </span>
+                  )}
                 </span>
                 <span className={m.quantity < 0 ? "shrink-0 tabular-nums text-pomegranate-red" : "shrink-0 tabular-nums text-olive-leaf"}>
                   {m.quantity < 0 ? "−" : "+"}
-                  {formatAmount(Math.abs(m.quantity), unit)}
+                  {amountText(Math.abs(m.quantity), unit, locale)}
                 </span>
               </li>
             ))}
@@ -149,11 +158,16 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
         )}
       </Card>
 
-      <Card title="Details">
+      <Card title={t("Details")}>
         <IngredientForm ingredient={{ id: ingredient.id, name: ingredient.name, nameFa: ingredient.nameFa, category: ingredient.category === "PACKAGING" ? "PACKAGING" : "FOOD" }} />
       </Card>
 
-      <Card title="Merge" description={`Same ingredient saved twice? Move everything into the right one (both counted in ${unit === "g" ? "kg" : unit === "ml" ? "litres" : "pieces"}).`}>
+      <Card
+        title={t("Merge")}
+        description={t("Same ingredient saved twice? Move everything into the right one (both counted in {unit}).", {
+          unit: t(unit === "g" ? "kg" : unit === "ml" ? "litres" : "pieces"),
+        })}
+      >
         <MergeForm url={`/api/admin/ops/ingredients/${ingredient.id}/merge`} options={sameUnit} noun="ingredient" redirectTo="/admin/ops/ingredients/{id}" />
       </Card>
     </AdminPage>

@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { messageFromUnknown } from "@/lib/error-message";
+import { useAdminI18n } from "@/components/admin/i18n";
+import type { Translate } from "@/lib/admin-i18n";
 
 /*
  * One big button: on a phone it offers camera, photo library or files
@@ -34,7 +36,7 @@ async function shrink(file: File): Promise<Blob> {
 }
 
 /** Splits multi-page PDFs into one file per page, if the person says each page is an invoice. */
-async function splitPdfs(files: File[]): Promise<File[]> {
+async function splitPdfs(files: File[], t: Translate): Promise<File[]> {
   const out: File[] = [];
   for (const file of files) {
     if (file.type !== "application/pdf") {
@@ -47,7 +49,7 @@ async function splitPdfs(files: File[]): Promise<File[]> {
     if (
       pages < 2 ||
       !window.confirm(
-        `"${file.name}" has ${pages} pages.\n\nOK — each page is a separate invoice\nCancel — all pages are one invoice`,
+        `${t("\"{name}\" has {n} pages.", { name: file.name, n: pages })}\n\n${t("OK — each page is a separate invoice")}\n${t("Cancel — all pages are one invoice")}`,
       )
     ) {
       out.push(file);
@@ -65,7 +67,8 @@ async function splitPdfs(files: File[]): Promise<File[]> {
   return out;
 }
 
-export function UploadButton({ label = "Add invoice" }: { label?: string }) {
+export function UploadButton({ label }: { label?: string }) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const input = React.useRef<HTMLInputElement>(null);
   const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
@@ -87,9 +90,9 @@ export function UploadButton({ label = "Add invoice" }: { label?: string }) {
     setProgress({ done: 0, total: picked.length });
     let files: File[];
     try {
-      files = await splitPdfs(picked);
+      files = await splitPdfs(picked, t);
     } catch (e) {
-      toast.error(messageFromUnknown(e, "Could not open the PDF"));
+      toast.error(t(messageFromUnknown(e, "Could not open the PDF")));
       setProgress(null);
       return;
     }
@@ -98,11 +101,11 @@ export function UploadButton({ label = "Add invoice" }: { label?: string }) {
     if (files.length === 1) {
       try {
         const { id, duplicate } = await upload(files[0]);
-        if (duplicate) toast.info("Already uploaded — opening it.");
+        if (duplicate) toast.info(t("Already uploaded — opening it."));
         router.push(`/admin/ops/invoices/${id}`);
         router.refresh();
       } catch (e) {
-        toast.error(messageFromUnknown(e, "Upload failed"));
+        toast.error(t(messageFromUnknown(e, "Upload failed")));
         setProgress(null);
       }
       return;
@@ -116,12 +119,12 @@ export function UploadButton({ label = "Add invoice" }: { label?: string }) {
         if (r.duplicate) duplicates++;
         else ok++;
       } catch (e) {
-        failed.push(`${file.name}: ${messageFromUnknown(e, "failed")}`);
+        failed.push(`${file.name}: ${t(messageFromUnknown(e, "failed"))}`);
       }
       setProgress({ done: i + 1, total: files.length });
     }
-    if (ok) toast.success(`${ok} read — check and save each one`);
-    if (duplicates) toast.info(`${duplicates} already uploaded before`);
+    if (ok) toast.success(t("{n} read — check and save each one", { n: ok }));
+    if (duplicates) toast.info(t("{n} already uploaded before", { n: duplicates }));
     if (failed.length) toast.error(failed.join("\n"));
     setProgress(null);
     router.push("/admin/ops/invoices");
@@ -145,7 +148,11 @@ export function UploadButton({ label = "Add invoice" }: { label?: string }) {
       />
       <Button size="md" disabled={!!progress} onClick={() => input.current?.click()}>
         {progress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-        {progress ? (progress.total > 1 ? `Reading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…` : "Reading… up to a minute") : label}
+        {progress
+          ? progress.total > 1
+            ? t("Reading {done} of {total}…", { done: Math.min(progress.done + 1, progress.total), total: progress.total })
+            : t("Reading… up to a minute")
+          : (label ?? t("Add invoice"))}
       </Button>
     </>
   );

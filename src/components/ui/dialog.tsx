@@ -53,7 +53,7 @@ const DialogContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close
         className={cn(
-          "absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-warm-white/90 text-black-iron/80 backdrop-blur transition-colors hover:bg-warm-white hover:text-black-iron",
+          "absolute end-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-warm-white/90 text-black-iron/80 backdrop-blur transition-colors hover:bg-warm-white hover:text-black-iron",
           closeClassName,
         )}
       >

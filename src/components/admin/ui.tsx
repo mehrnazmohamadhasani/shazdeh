@@ -93,7 +93,7 @@ export function Field({
     <div className={cn("space-y-1.5", className)}>
       <label htmlFor={htmlFor} className="block text-[13px] font-medium text-black-iron">
         {label}
-        {required && <span className="ml-0.5 text-terracotta-ink">*</span>}
+        {required && <span className="ms-0.5 text-terracotta-ink">*</span>}
       </label>
       {children}
       {hint && <p className="text-[12px] text-dark-grey">{hint}</p>}
@@ -118,7 +118,7 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
 TextArea.displayName = "TextArea";
 
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, ...props }, ref) => <select ref={ref} className={cn(controlClass, "h-11 pr-8", className)} {...props} />,
+  ({ className, ...props }, ref) => <select ref={ref} className={cn(controlClass, "h-11 pe-8", className)} {...props} />,
 );
 Select.displayName = "Select";
 

@@ -7,8 +7,22 @@ import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { Card, Field, Select, SwitchRow, TextArea, TextInput } from "@/components/admin/ui";
 import { slugify } from "@/lib/utils";
+import { useAdminI18n } from "@/components/admin/i18n";
+import type { Translate } from "@/lib/admin-i18n";
 
 type Cat = { id: string; name: string };
+
+/**
+ * API errors in the admin language. Validation errors arrive as
+ * "field: message"; in Persian the field path is dropped and the message
+ * translated (or a general "check your input" when there's no entry).
+ */
+function apiErrorText(msg: string, t: Translate, fa: boolean) {
+  const m = fa ? /^[\w.]+: (.+)$/.exec(msg) : null;
+  if (!m) return t(msg);
+  const text = t(m[1]);
+  return text !== m[1] ? text : t("Validation failed");
+}
 
 export type MenuItemDraft = {
   id?: string;
@@ -43,6 +57,7 @@ const EMPTY: MenuItemDraft = {
 
 export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuItemDraft>; categories: Cat[] }) {
   const router = useRouter();
+  const { t, locale } = useAdminI18n();
   const [draft, setDraft] = React.useState<MenuItemDraft>(() => ({
     ...EMPTY,
     categoryId: categories[0]?.id ?? "",
@@ -77,9 +92,9 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "Couldn't save the dish");
+        throw new Error(err?.error ? apiErrorText(err.error, t, locale === "fa") : t("Couldn't save the dish"));
       }
-      toast.success(isEditing ? "Dish saved" : "Dish created");
+      toast.success(isEditing ? t("Dish saved") : t("Dish created"));
       router.push("/admin/menu-items");
       router.refresh();
     } catch (err) {
@@ -91,12 +106,12 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
 
   async function handleDelete() {
     if (!isEditing) return;
-    if (!confirm(`Delete "${draft.name}"? This can't be undone. To take it off the menu temporarily, switch off "Shown on menu" instead.`)) return;
+    if (!confirm(t('Delete "{name}"? This can\'t be undone. To take it off the menu temporarily, switch off "Shown on menu" instead.', { name: draft.name }))) return;
     setRemoving(true);
     try {
       const res = await fetch(`/api/menu-items/${initial!.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Couldn't delete the dish");
-      toast.success("Dish deleted");
+      if (!res.ok) throw new Error(t("Couldn't delete the dish"));
+      toast.success(t("Dish deleted"));
       router.push("/admin/menu-items");
       router.refresh();
     } catch (e) {
@@ -108,12 +123,12 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <Card title="Dish">
+      <Card title={t("Dish")}>
         <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
-          <ImageUploader value={draft.imageUrl} onChange={(url) => update("imageUrl", url)} folder="menu" label="Photo" aspect="portrait" />
+          <ImageUploader value={draft.imageUrl} onChange={(url) => update("imageUrl", url)} folder="menu" label={t("Photo")} aspect="portrait" />
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Name" required>
+              <Field label={t("Name")} required>
                 <TextInput
                   value={draft.name}
                   onChange={(e) => {
@@ -125,23 +140,24 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
                       slug: !isEditing && (!d.slug || d.slug === slugify(d.name)) ? slugify(name) : d.slug,
                     }));
                   }}
-                  placeholder="e.g. Ghormeh Sabzi"
+                  placeholder={t("e.g. Ghormeh Sabzi")}
+                  dir="auto"
                   required
                 />
               </Field>
-              <Field label="Persian name">
+              <Field label={t("Persian name")}>
                 <TextInput value={draft.nameFa} onChange={(e) => update("nameFa", e.target.value)} placeholder="قورمه سبزی" lang="fa" dir="rtl" />
               </Field>
-              <Field label="Category" required>
+              <Field label={t("Category")} required>
                 <Select value={draft.categoryId} onChange={(e) => update("categoryId", e.target.value)} required>
                   {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option key={c.id} value={c.id} dir="auto">
                       {c.name}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label="Price (AED)" required>
+              <Field label={t("Price (AED)")} required>
                 <TextInput
                   type="number"
                   inputMode="decimal"
@@ -149,39 +165,40 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
                   min={0}
                   value={draft.price}
                   onChange={(e) => update("price", Number(e.target.value))}
+                  dir="ltr"
                   required
                 />
               </Field>
             </div>
-            <Field label="Description" hint="One or two sentences shown on the menu.">
-              <TextArea value={draft.description} onChange={(e) => update("description", e.target.value)} rows={3} />
+            <Field label={t("Description")} hint={t("One or two sentences shown on the menu.")}>
+              <TextArea value={draft.description} onChange={(e) => update("description", e.target.value)} rows={3} dir="auto" />
             </Field>
           </div>
         </div>
       </Card>
 
-      <Card title="Ingredients & allergens" description="Dubai food rules expect allergens to be shown before ordering.">
+      <Card title={t("Ingredients & allergens")} description={t("Dubai food rules expect allergens to be shown before ordering.")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Ingredients">
-            <TextArea value={draft.ingredients} onChange={(e) => update("ingredients", e.target.value)} rows={3} placeholder="Lamb, kidney beans, parsley, fenugreek…" />
+          <Field label={t("Ingredients")}>
+            <TextArea value={draft.ingredients} onChange={(e) => update("ingredients", e.target.value)} rows={3} placeholder={t("Lamb, kidney beans, parsley, fenugreek…")} dir="auto" />
           </Field>
-          <Field label="Allergens">
-            <TextArea value={draft.allergens} onChange={(e) => update("allergens", e.target.value)} rows={3} placeholder="Contains: dairy, walnuts." />
+          <Field label={t("Allergens")}>
+            <TextArea value={draft.allergens} onChange={(e) => update("allergens", e.target.value)} rows={3} placeholder={t("Contains: dairy, walnuts.")} dir="auto" />
           </Field>
         </div>
       </Card>
 
-      <Card title="Availability">
+      <Card title={t("Availability")}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <SwitchRow label="Shown on menu" description="Off hides it everywhere." checked={draft.isActive} onCheckedChange={(v) => update("isActive", v)} />
-          <SwitchRow label="In stock" description="Off shows it as sold out." checked={draft.isAvailable} onCheckedChange={(v) => update("isAvailable", v)} />
+          <SwitchRow label={t("Shown on menu")} description={t("Off hides it everywhere.")} checked={draft.isActive} onCheckedChange={(v) => update("isActive", v)} />
+          <SwitchRow label={t("In stock")} description={t("Off shows it as sold out.")} checked={draft.isAvailable} onCheckedChange={(v) => update("isAvailable", v)} />
         </div>
         <details className="group mt-5 border-t border-black-iron/[0.06] pt-4">
           <summary className="cursor-pointer list-none text-[13px] font-medium text-dark-grey hover:text-black-iron [&::-webkit-details-marker]:hidden">
-            Advanced <span className="text-black-iron/40 group-open:hidden">· web address</span>
+            {t("Advanced")} <span className="text-black-iron/40 group-open:hidden">· {t("web address")}</span>
           </summary>
-          <Field label="Web address" hint={`shazdeh.ae/menu/${draft.slug || slugify(draft.name) || "…"}`} className="mt-3 max-w-md">
-            <TextInput value={draft.slug} onChange={(e) => update("slug", slugify(e.target.value))} placeholder={slugify(draft.name)} className="font-mono text-[13px]" />
+          <Field label={t("Web address")} hint={<span dir="ltr">{`shazdeh.ae/menu/${draft.slug || slugify(draft.name) || "…"}`}</span>} className="mt-3 max-w-md">
+            <TextInput value={draft.slug} onChange={(e) => update("slug", slugify(e.target.value))} placeholder={slugify(draft.name)} className="font-mono text-[13px]" dir="ltr" />
           </Field>
         </details>
       </Card>
@@ -190,18 +207,18 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
         {isEditing ? (
           <Button type="button" variant="ghost" size="sm" onClick={handleDelete} disabled={removing} className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]">
             <Trash2 className="h-4 w-4" />
-            {removing ? "Deleting…" : "Delete dish"}
+            {removing ? t("Deleting…") : t("Delete dish")}
           </Button>
         ) : (
           <span />
         )}
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button type="submit" size="sm" disabled={pending}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isEditing ? "Save changes" : "Create dish"}
+            {isEditing ? t("Save changes") : t("Create dish")}
           </Button>
         </div>
       </div>

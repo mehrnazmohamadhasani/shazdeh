@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { cn } from "@/lib/utils";
+import { LanguageSwitch, LanguageToggle, useAdminI18n } from "@/components/admin/i18n";
 
 type Role = "ADMIN" | "EDITOR" | "STAFF";
 const ALL: Role[] = ["ADMIN", "EDITOR", "STAFF"];
@@ -61,13 +62,14 @@ function isActive(pathname: string, href: string) {
 
 function useSignOut() {
   const router = useRouter();
+  const { t } = useAdminI18n();
   return async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       router.push("/login");
       router.refresh();
     } catch {
-      toast.error("Could not sign out");
+      toast.error(t("Could not sign out"));
     }
   };
 }
@@ -75,17 +77,18 @@ function useSignOut() {
 export function AdminSidebar({ user }: { user: { email: string; name: string | null; role: Role } }) {
   const pathname = usePathname();
   const signOut = useSignOut();
+  const { t } = useAdminI18n();
   const items = navFor(user.role);
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-black-iron/[0.07] bg-white pb-[var(--safe-bottom)] pt-[var(--safe-top)] lg:flex print:!hidden">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-e border-black-iron/[0.07] bg-white pb-[var(--safe-bottom)] pt-[var(--safe-top)] lg:flex print:!hidden">
       <div className="flex h-16 items-center px-5">
-        <Link href={user.role === "STAFF" ? "/admin/orders" : "/admin"} aria-label="SHĀZDEH admin home">
+        <Link href={user.role === "STAFF" ? "/admin/orders" : "/admin"} aria-label={t("SHĀZDEH admin home")}>
           <Wordmark size="sm" />
         </Link>
       </div>
 
-      <nav aria-label="Admin" className="flex-1 overflow-y-auto px-3 pb-4">
+      <nav aria-label={t("Admin menu")} className="flex-1 overflow-y-auto px-3 pb-4">
         {items.map((item, i) => {
           const heading = item.group !== items[i - 1]?.group ? item.group : null;
           const active = isActive(pathname, item.href);
@@ -94,7 +97,7 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
             <React.Fragment key={item.href}>
               {heading && items.length > 1 && (
                 <p className={cn("px-3 pb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-black-iron/40", i > 0 ? "pt-5" : "pt-2")}>
-                  {heading}
+                  {t(heading)}
                 </p>
               )}
               <Link
@@ -108,7 +111,7 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
                 )}
               >
                 <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.6} />
-                {item.label}
+                {t(item.label)}
               </Link>
             </React.Fragment>
           );
@@ -116,6 +119,7 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
       </nav>
 
       <div className="space-y-1 border-t border-black-iron/[0.07] p-3">
+        <LanguageSwitch className="mb-2" />
         <a
           href="/"
           target="_blank"
@@ -123,24 +127,24 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
           className="flex min-h-10 items-center gap-3 rounded-[10px] px-3 text-[13px] text-dark-grey hover:bg-black-iron/[0.04] hover:text-black-iron"
         >
           <ExternalLink className="h-4 w-4" strokeWidth={1.6} />
-          View website
+          {t("View website")}
         </a>
         <div className="flex items-center gap-3 rounded-[10px] px-3 py-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-terracotta/[0.12] text-[13px] font-semibold text-terracotta-ink">
             {(user.name ?? user.email).charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium text-black-iron">{user.name ?? "Admin"}</span>
-            <span className="block truncate text-[11.5px] text-dark-grey">{user.email}</span>
+            <span dir="auto" className="block truncate text-[13px] font-medium text-black-iron">{user.name ?? t("Admin")}</span>
+            <span dir="auto" className="block truncate text-[11.5px] text-dark-grey">{user.email}</span>
           </span>
           <button
             type="button"
             onClick={signOut}
-            aria-label="Sign out"
-            title="Sign out"
+            aria-label={t("Sign out")}
+            title={t("Sign out")}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-dark-grey hover:bg-pomegranate-red/[0.08] hover:text-pomegranate-red"
           >
-            <LogOut className="h-4 w-4" strokeWidth={1.6} />
+            <LogOut className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.6} />
           </button>
         </div>
       </div>
@@ -151,25 +155,29 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
 export function AdminMobileBar({ user }: { user: { email: string; name: string | null; role: Role } }) {
   const pathname = usePathname();
   const signOut = useSignOut();
+  const { t } = useAdminI18n();
   const items = navFor(user.role);
 
   return (
     <header className="sticky top-0 z-40 border-b border-black-iron/[0.07] bg-white/95 pt-[var(--safe-top)] backdrop-blur lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between px-[max(1rem,var(--safe-left))]">
-        <Link href={user.role === "STAFF" ? "/admin/orders" : "/admin"} aria-label="SHĀZDEH admin home">
+        <Link href={user.role === "STAFF" ? "/admin/orders" : "/admin"} aria-label={t("SHĀZDEH admin home")}>
           <Wordmark size="xs" />
         </Link>
-        <button
-          type="button"
-          onClick={signOut}
-          className="-mr-2 inline-flex min-h-11 items-center gap-2 px-2 text-[13px] text-dark-grey hover:text-pomegranate-red"
-        >
-          <LogOut className="h-4 w-4" strokeWidth={1.6} />
-          Sign out
-        </button>
+        <div className="-me-2 flex items-center">
+          <LanguageToggle />
+          <button
+            type="button"
+            onClick={signOut}
+            className="inline-flex min-h-11 items-center gap-2 px-2 text-[13px] text-dark-grey hover:text-pomegranate-red"
+          >
+            <LogOut className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.6} />
+            {t("Sign out")}
+          </button>
+        </div>
       </div>
       {items.length > 1 && (
-        <nav aria-label="Admin" className="no-scrollbar flex gap-1.5 overflow-x-auto px-[max(1rem,var(--safe-left))] pb-3">
+        <nav aria-label={t("Admin menu")} className="no-scrollbar flex gap-1.5 overflow-x-auto px-[max(1rem,var(--safe-left))] pb-3">
           {items.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -182,7 +190,7 @@ export function AdminMobileBar({ user }: { user: { email: string; name: string |
                   active ? "bg-terracotta text-white" : "bg-black-iron/[0.04] text-black-iron/75",
                 )}
               >
-                {item.label}
+                {t(item.label)}
               </Link>
             );
           })}

@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
 import { Wordmark } from "@/components/brand/wordmark";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
-export const metadata: Metadata = {
-  title: "Sign in",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getAdminI18n();
+  return {
+    title: t("Sign in"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string | string[] }>;
 }) {
-  const sp = await searchParams;
+  const [sp, { t, locale, dir }] = await Promise.all([searchParams, getAdminI18n()]);
 
   return (
-    <div className="relative min-h-screen grid lg:grid-cols-2 overflow-hidden bg-warm-white">
+    <div lang={locale} dir={dir} className="admin-root relative min-h-screen grid lg:grid-cols-2 overflow-hidden bg-warm-white">
       <div
         aria-hidden
         className="hidden lg:block relative overflow-hidden bg-black-iron"
@@ -31,10 +35,10 @@ export default async function LoginPage({
       <div className="relative flex flex-col items-center justify-center p-6 md:p-12 bg-warm-white">
         <div className="w-full max-w-sm">
           <Wordmark size="md" />
-          <h1 className="mt-10 text-[30px] font-bold leading-tight tracking-[-0.03em] text-black-iron">Sign in</h1>
+          <h1 className="mt-10 text-[30px] font-bold leading-tight tracking-[-0.03em] text-black-iron">{t("Sign in")}</h1>
 
           <div className="mt-8">
-            <LoginForm redirectTo={safeAdminPath(sp.from)} />
+            <LoginForm redirectTo={safeAdminPath(sp.from)} locale={locale} />
           </div>
 
         </div>

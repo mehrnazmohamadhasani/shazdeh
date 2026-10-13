@@ -11,7 +11,10 @@ import { checkExtraction, type Flag } from "@/lib/ops/checks";
 import { SPEND_CATEGORIES, type Extraction } from "@/lib/ops/extraction";
 import type { Suggestions } from "@/lib/ops/match";
 import type { SaveInvoiceInput } from "@/lib/ops/save-schema";
-import { formatAmount, type BaseUnit } from "@/lib/ops/units";
+import type { BaseUnit } from "@/lib/ops/units";
+import type { Translate } from "@/lib/admin-i18n";
+import { useAdminI18n } from "@/components/admin/i18n";
+import { amountText } from "@/components/admin/ops/format";
 
 /*
  * Review screen for one AI reading. Everything is pre-filled and
@@ -80,6 +83,7 @@ export function InvoiceReview({
   suppliers: KnownSupplier[];
   ingredients: KnownIngredient[];
 }) {
+  const { t, locale } = useAdminI18n();
   const router = useRouter();
   const [busy, setBusy] = React.useState<null | "save" | "read" | "discard">(null);
   const [supplierName, setSupplierName] = React.useState(suggestions.supplierName ?? reading.supplier.name ?? "");
@@ -179,15 +183,19 @@ export function InvoiceReview({
 
   async function save() {
     const missing: string[] = [];
-    if (!supplierName.trim()) missing.push("supplier");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) missing.push("date");
-    if (num(total) == null) missing.push("total");
+    if (!supplierName.trim()) missing.push(t("supplier"));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) missing.push(t("date"));
+    if (num(total) == null) missing.push(t("total"));
     lines.forEach((l, i) => {
-      if (!(num(l.quantity)! > 0) || num(l.lineTotal) == null) missing.push(`line ${i + 1} quantity/total`);
-      if (isStock(l.category) && l.ingredientName.trim() && !(num(l.stock)! > 0)) missing.push(`line ${i + 1} stock amount`);
+      if (!(num(l.quantity)! > 0) || num(l.lineTotal) == null) missing.push(t("line {n} quantity/total", { n: i + 1 }));
+      if (isStock(l.category) && l.ingredientName.trim() && !(num(l.stock)! > 0)) missing.push(t("line {n} stock amount", { n: i + 1 }));
     });
-    if (missing.length) return toast.error(`Please fill in: ${missing.join(", ")}`);
-    if (errors && !window.confirm(`${errors} number${errors > 1 ? "s don't" : " doesn't"} add up. Save anyway?`)) return;
+    if (missing.length) return toast.error(t("Please fill in: {list}", { list: missing.join(t(", ")) }));
+    if (
+      errors &&
+      !window.confirm(t(errors > 1 ? "{n} numbers don't add up. Save anyway?" : "{n} number doesn't add up. Save anyway?", { n: errors }))
+    )
+      return;
 
     const input: SaveInvoiceInput = {
       supplier: { id: supplier?.id ?? null, name: supplier?.name ?? supplierName.trim(), trn: trn.trim() || null },
@@ -224,10 +232,14 @@ export function InvoiceReview({
     setBusy("save");
     try {
       const result = await post("save", input);
-      toast.success(result.movements ? `Saved — ${result.movements} item${result.movements > 1 ? "s" : ""} added to stock` : "Saved");
+      toast.success(
+        result.movements
+          ? t(result.movements > 1 ? "Saved — {n} items added to stock" : "Saved — {n} item added to stock", { n: result.movements })
+          : t("Saved"),
+      );
       router.refresh();
     } catch (e) {
-      toast.error(messageFromUnknown(e, "Could not save"));
+      toast.error(t(messageFromUnknown(e, "Could not save")));
     } finally {
       setBusy(null);
     }
@@ -239,21 +251,21 @@ export function InvoiceReview({
       await post("read");
       router.refresh();
     } catch (e) {
-      toast.error(messageFromUnknown(e, "Could not read again"));
+      toast.error(t(messageFromUnknown(e, "Could not read again")));
     } finally {
       setBusy(null);
     }
   }
 
   async function discard() {
-    if (!window.confirm("Discard this document? Nothing will be saved from it.")) return;
+    if (!window.confirm(t("Discard this document? Nothing will be saved from it."))) return;
     setBusy("discard");
     try {
       await post("discard");
       router.push("/admin/ops/invoices");
       router.refresh();
     } catch (e) {
-      toast.error(messageFromUnknown(e, "Could not discard"));
+      toast.error(t(messageFromUnknown(e, "Could not discard")));
       setBusy(null);
     }
   }
@@ -262,41 +274,64 @@ export function InvoiceReview({
     <div className="space-y-5">
       {docFlags.length > 0 && <Flags flags={docFlags} />}
 
-      <Card title="Supplier & invoice">
+      <Card title={t("Supplier & invoice")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Supplier" required hint={supplier ? "Existing supplier" : supplierName.trim() ? "Will be added as a new supplier" : undefined}>
-            <TextInput list="ops-suppliers" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="e.g. Unknown (handwritten veg)" />
+          <Field
+            label={t("Supplier")}
+            required
+            hint={supplier ? t("Existing supplier") : supplierName.trim() ? t("Will be added as a new supplier") : undefined}
+          >
+            <TextInput
+              list="ops-suppliers"
+              dir="auto"
+              value={supplierName}
+              onChange={(e) => setSupplierName(e.target.value)}
+              placeholder={t("e.g. Unknown (handwritten veg)")}
+            />
             <datalist id="ops-suppliers">
               {suppliers.map((s) => (
                 <option key={s.id} value={s.name} />
               ))}
             </datalist>
           </Field>
-          <Field label="TRN">
-            <TextInput value={trn} onChange={(e) => setTrn(e.target.value)} inputMode="numeric" placeholder="15 digits" />
+          <Field label={t("TRN")}>
+            <TextInput dir="ltr" value={trn} onChange={(e) => setTrn(e.target.value)} inputMode="numeric" placeholder={t("15 digits")} />
           </Field>
-          <Field label="Invoice number">
-            <TextInput value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
+          <Field label={t("Invoice number")}>
+            <TextInput dir="ltr" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
           </Field>
-          <Field label="Invoice date" required>
+          <Field label={t("Invoice date")} required>
             <TextInput type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
           </Field>
-          <Field label="Paid by">
+          <Field label={t("Paid by")}>
             <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as typeof paymentMode)}>
-              <option value="">Not shown</option>
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="credit">Credit (pay later)</option>
-              <option value="transfer">Bank transfer</option>
+              <option value="">{t("Not shown")}</option>
+              <option value="cash">{t("Cash")}</option>
+              <option value="card">{t("Card")}</option>
+              <option value="credit">{t("Credit (pay later)")}</option>
+              <option value="transfer">{t("Bank transfer")}</option>
             </Select>
           </Field>
           {paymentMode === "credit" ? (
-            <Field label="Payment due" hint={supplier?.paymentTermsDays != null ? `${supplier.name}: ${supplier.paymentTermsDays} days` : "Shows in Payables until paid"}>
+            <Field
+              label={t("Payment due")}
+              hint={
+                supplier?.paymentTermsDays != null
+                  ? t("{name}: {n} days", { name: supplier.name, n: supplier.paymentTermsDays })
+                  : t("Shows in Payables until paid")
+              }
+            >
               <TextInput type="date" value={dueDate || suggestedDue} onChange={(e) => setDueDate(e.target.value)} />
             </Field>
           ) : paymentMode ? (
-            <Field label="Who paid">
-              <TextInput list="ops-payers" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} placeholder="Owner, a staff name, company card…" />
+            <Field label={t("Who paid")}>
+              <TextInput
+                list="ops-payers"
+                dir="auto"
+                value={paidBy}
+                onChange={(e) => setPaidBy(e.target.value)}
+                placeholder={t("Owner, a staff name, company card…")}
+              />
               <datalist id="ops-payers">
                 <option value="Owner" />
                 <option value="Company card" />
@@ -306,17 +341,21 @@ export function InvoiceReview({
           ) : null}
           <label className="flex min-h-11 items-center gap-3 self-end text-[14px]">
             <input type="checkbox" className="h-5 w-5 accent-terracotta" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
-            Line prices already include VAT
+            {t("Line prices already include VAT")}
           </label>
-          <Field label="Notes" hint="Handwritten words on the paper are read here (e.g. «باقلی» = fava beans)." className="sm:col-span-2">
-            <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Field
+            label={t("Notes")}
+            hint={t("Handwritten words on the paper are read here (e.g. «باقلی» = fava beans).")}
+            className="sm:col-span-2"
+          >
+            <TextArea dir="auto" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Field>
         </div>
       </Card>
 
       <Card
-        title={`Items (${lines.length})`}
-        description="Food and packaging go into stock. Check the ingredient name and how much came in."
+        title={t("Items ({n})", { n: lines.length })}
+        description={t("Food and packaging go into stock. Check the ingredient name and how much came in.")}
         bodyClassName="p-0"
       >
         <ul className="divide-y divide-black-iron/[0.06]">
@@ -328,57 +367,75 @@ export function InvoiceReview({
               <li key={l.key} className={cn("space-y-3 px-5 py-4 md:px-6", l.confidence < 0.7 && "bg-saffron-orange/[0.05]")}>
                 <div className="flex items-start gap-3">
                   <span className="mt-2.5 w-5 shrink-0 text-[12px] tabular-nums text-dark-grey">{i + 1}</span>
-                  <TextInput aria-label={`Item ${i + 1} as printed`} value={l.rawName} onChange={(e) => update(l.key, { rawName: e.target.value })} className="font-medium" />
-                  <IconButton label={`Remove item ${i + 1}`} danger onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>
+                  <TextInput
+                    aria-label={t("Item {n} as printed", { n: i + 1 })}
+                    dir="auto"
+                    value={l.rawName} onChange={(e) => update(l.key, { rawName: e.target.value })} className="font-medium" />
+                  <IconButton label={t("Remove item {n}", { n: i + 1 })} danger onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>
                     <Trash2 className="h-4 w-4" />
                   </IconButton>
                 </div>
-                <div className="grid grid-cols-2 gap-3 pl-8 sm:grid-cols-5">
-                  <Field label="Qty">
-                    <TextInput inputMode="decimal" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} />
+                <div className="grid grid-cols-2 gap-3 ps-8 sm:grid-cols-5">
+                  <Field label={t("Qty")}>
+                    <TextInput dir="ltr" inputMode="decimal" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} />
                   </Field>
-                  <Field label="Unit">
-                    <TextInput value={l.unit} onChange={(e) => update(l.key, { unit: e.target.value })} placeholder="kg, Pcs…" />
+                  <Field label={t("Unit")}>
+                    <TextInput dir="auto" value={l.unit} onChange={(e) => update(l.key, { unit: e.target.value })} placeholder={t("kg, Pcs…")} />
                   </Field>
-                  <Field label="Unit price">
-                    <TextInput inputMode="decimal" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} />
+                  <Field label={t("Unit price")}>
+                    <TextInput dir="ltr" inputMode="decimal" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} />
                   </Field>
-                  <Field label="Line total">
-                    <TextInput inputMode="decimal" value={l.lineTotal} onChange={(e) => update(l.key, { lineTotal: e.target.value })} />
+                  <Field label={t("Line total")}>
+                    <TextInput dir="ltr" inputMode="decimal" value={l.lineTotal} onChange={(e) => update(l.key, { lineTotal: e.target.value })} />
                   </Field>
-                  <Field label="Type" className="col-span-2 sm:col-span-1">
+                  <Field label={t("Type")} className="col-span-2 sm:col-span-1">
                     <Select value={l.category} onChange={(e) => update(l.key, { category: e.target.value as Category })}>
                       {SPEND_CATEGORIES.map((c) => (
                         <option key={c} value={c}>
-                          {CATEGORY_LABEL[c]}
+                          {t(CATEGORY_LABEL[c])}
                         </option>
                       ))}
                     </Select>
                   </Field>
                 </div>
                 {isStock(l.category) && (
-                  <div className="ml-8 grid gap-3 rounded-[12px] bg-black-iron/[0.025] p-3 sm:grid-cols-[1fr_auto]">
-                    <Field label="Ingredient" hint={known ? "Existing ingredient" : l.ingredientName.trim() ? "New ingredient" : "Leave empty to keep it out of stock"}>
-                      <TextInput list="ops-ingredients" value={l.ingredientName} onChange={(e) => update(l.key, { ingredientName: e.target.value })} placeholder="e.g. Sella rice" />
+                  <div className="ms-8 grid gap-3 rounded-[12px] bg-black-iron/[0.025] p-3 sm:grid-cols-[1fr_auto]">
+                    <Field
+                      label={t("Ingredient")}
+                      hint={
+                        known
+                          ? t("Existing ingredient")
+                          : l.ingredientName.trim()
+                            ? t("New ingredient")
+                            : t("Leave empty to keep it out of stock")
+                      }
+                    >
+                      <TextInput
+                        list="ops-ingredients"
+                        dir="auto"
+                        value={l.ingredientName}
+                        onChange={(e) => update(l.key, { ingredientName: e.target.value })}
+                        placeholder={t("e.g. Sella rice")}
+                      />
                     </Field>
                     <Field
-                      label="Stock added"
+                      label={t("Stock added")}
                       hint={
                         <>
-                          {stockBase != null && stockBase > 0 ? formatAmount(stockBase, unit) : "Total for this line"}
+                          {stockBase != null && stockBase > 0 ? amountText(stockBase, unit, locale) : t("Total for this line")}
                           {l.source && (
-                            <span className="ml-1.5 inline-flex items-center gap-1 text-terracotta-ink">
+                            <span className="ms-1.5 inline-flex items-center gap-1 text-terracotta-ink">
                               <Sparkles className="h-3 w-3" />
-                              {SOURCE_LABEL[l.source]}
+                              {t(SOURCE_LABEL[l.source])}
                             </span>
                           )}
                         </>
                       }
                     >
                       <div className="flex gap-2">
-                        <TextInput inputMode="decimal" value={l.stock} onChange={(e) => update(l.key, { stock: e.target.value })} className="w-28" />
+                        <TextInput dir="ltr" inputMode="decimal" value={l.stock} onChange={(e) => update(l.key, { stock: e.target.value })} className="w-28" />
                         <select
-                          aria-label="Stock unit"
+                          aria-label={t("Stock unit")}
                           value={unit}
                           disabled={!!known}
                           onChange={(e) => update(l.key, { stockUnit: e.target.value as BaseUnit })}
@@ -386,7 +443,7 @@ export function InvoiceReview({
                         >
                           {(["g", "ml", "pcs"] as const).map((u) => (
                             <option key={u} value={u}>
-                              {DISPLAY_UNIT[u]}
+                              {t(DISPLAY_UNIT[u])}
                             </option>
                           ))}
                         </select>
@@ -394,7 +451,7 @@ export function InvoiceReview({
                     </Field>
                   </div>
                 )}
-                {lineFlags(i).length > 0 && <Flags flags={lineFlags(i)} className="ml-8" compact />}
+                {lineFlags(i).length > 0 && <Flags flags={lineFlags(i)} className="ms-8" compact />}
               </li>
             );
           })}
@@ -432,24 +489,24 @@ export function InvoiceReview({
               ])
             }
           >
-            <Plus className="h-4 w-4" /> Add item
+            <Plus className="h-4 w-4" /> {t("Add item")}
           </Button>
         </div>
       </Card>
 
-      <Card title="Totals (AED)">
+      <Card title={t("Totals (AED)")}>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Field label="Subtotal">
-            <TextInput inputMode="decimal" value={subtotal} onChange={(e) => setSubtotal(e.target.value)} />
+          <Field label={t("Subtotal", { context: "invoice" })}>
+            <TextInput dir="ltr" inputMode="decimal" value={subtotal} onChange={(e) => setSubtotal(e.target.value)} />
           </Field>
-          <Field label="Discount">
-            <TextInput inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          <Field label={t("Discount")}>
+            <TextInput dir="ltr" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </Field>
-          <Field label="VAT">
-            <TextInput inputMode="decimal" value={vat} onChange={(e) => setVat(e.target.value)} />
+          <Field label={t("VAT")}>
+            <TextInput dir="ltr" inputMode="decimal" value={vat} onChange={(e) => setVat(e.target.value)} />
           </Field>
-          <Field label="Total" required>
-            <TextInput inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} className="font-semibold" />
+          <Field label={t("Total")} required>
+            <TextInput dir="ltr" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} className="font-semibold" />
           </Field>
         </div>
       </Card>
@@ -457,21 +514,21 @@ export function InvoiceReview({
       <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-black-iron/[0.07] bg-warm-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-[16px] sm:border">
         <Button onClick={save} disabled={!!busy}>
           {busy === "save" && <Loader2 className="h-4 w-4 animate-spin" />}
-          Save to stock
+          {t("Save to stock")}
         </Button>
         {errors > 0 ? (
           <StatusPill tone="bad">
-            {errors} to check
+            {t("{n} to check", { n: errors })}
           </StatusPill>
         ) : (
-          <StatusPill tone="good">Numbers add up</StatusPill>
+          <StatusPill tone="good">{t("Numbers add up")}</StatusPill>
         )}
-        <div className="ml-auto flex gap-1">
+        <div className="ms-auto flex gap-1">
           <Button variant="ghost" size="sm" onClick={readAgain} disabled={!!busy}>
-            {busy === "read" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} Read again
+            {busy === "read" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} {t("Read again")}
           </Button>
           <Button variant="ghost" size="sm" onClick={discard} disabled={!!busy} className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]">
-            Discard
+            {t("Discard")}
           </Button>
         </div>
       </div>
@@ -479,7 +536,33 @@ export function InvoiceReview({
   );
 }
 
+/*
+ * Check messages come from lib/ops/checks in English (with numbers
+ * filled in); these patterns turn the ones with numbers back into
+ * dictionary sentences. Anything else is looked up as is.
+ */
+function flagText(message: string, t: Translate): string {
+  let m: RegExpMatchArray | null;
+  if ((m = message.match(/^The date (.+) is in the future — check it\.$/))) return t("The date {date} is in the future — check it.", { date: m[1] });
+  if ((m = message.match(/^The date (.+) is over a year ago — check it\.$/))) return t("The date {date} is over a year ago — check it.", { date: m[1] });
+  if ((m = message.match(/^TRN "(.*)" is not 15 digits — check it\.$/))) return t('TRN "{trn}" is not 15 digits — check it.', { trn: m[1] });
+  if ((m = message.match(/^(\S+) × (\S+) = (\S+), but the line says (\S+)\.$/)))
+    return t("{qty} × {price} = {expected}, but the line says {total}.", { qty: m[1], price: m[2], expected: m[3], total: m[4] });
+  if ((m = message.match(/^Unsure: ([\s\S]*)$/))) return t("Unsure: {note}", { note: m[1] });
+  if ((m = message.match(/^Lines add up to (\S+), but the subtotal says (\S+)\.$/)))
+    return t("Lines add up to {lines}, but the subtotal says {subtotal}.", { lines: m[1], subtotal: m[2] });
+  if ((m = message.match(/^(Subtotal|Lines) (\S+)(?: − discount (\S+))?(?: \+ VAT (\S+))? doesn't match the total (\S+)\.$/))) {
+    const sum =
+      t(m[1] === "Subtotal" ? "Subtotal {amount}" : "Lines {amount}", { amount: m[2] }) +
+      (m[3] ? ` − ${t("discount {amount}", { amount: m[3] })}` : "") +
+      (m[4] ? ` + ${t("VAT {amount}", { amount: m[4] })}` : "");
+    return t("{sum} doesn't match the total {total}.", { sum, total: m[5] });
+  }
+  return t(message);
+}
+
 export function Flags({ flags, className, compact }: { flags: Flag[]; className?: string; compact?: boolean }) {
+  const { t } = useAdminI18n();
   const icon = { error: XCircle, warn: AlertTriangle, info: Info };
   const tone = { error: "text-pomegranate-red", warn: "text-cinnamon-bark", info: "text-dark-grey" };
   return (
@@ -489,7 +572,7 @@ export function Flags({ flags, className, compact }: { flags: Flag[]; className?
         return (
           <li key={i} className={cn("flex items-start gap-2 text-[13px]", tone[f.level])}>
             <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{f.message}</span>
+            <span>{flagText(f.message, t)}</span>
           </li>
         );
       })}

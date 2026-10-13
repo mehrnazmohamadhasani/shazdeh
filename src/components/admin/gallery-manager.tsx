@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState } from "@/components/admin/ui";
+import { useAdminI18n } from "@/components/admin/i18n";
 import { messageFromApiJson, messageFromUnknown } from "@/lib/error-message";
 import { uploadAdminImage } from "@/lib/upload-admin-image";
 
@@ -24,6 +25,7 @@ async function apiError(res: Response, fallback: string): Promise<string> {
 }
 
 export function GalleryManager({ initial }: { initial: Img[] }) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
   const [deleting, setDeleting] = React.useState<string | null>(null);
@@ -48,9 +50,9 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
         if (!res.ok) throw new Error(await apiError(res, "Couldn't save to the gallery"));
         success += 1;
       }
-      toast.success(`${success} photo${success === 1 ? "" : "s"} added`);
+      toast.success(t(success === 1 ? "{n} photo added" : "{n} photos added", { n: success }));
     } catch (e) {
-      toast.error(messageFromUnknown(e, "Upload failed"));
+      toast.error(t(messageFromUnknown(e, "Upload failed")));
     } finally {
       setPending(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -59,30 +61,30 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
   }
 
   async function remove(img: Img) {
-    if (!confirm("Delete this photo?")) return;
+    if (!confirm(t("Delete this photo?"))) return;
     setDeleting(img.id);
     const res = await fetch(`/api/gallery/${img.id}`, { method: "DELETE" }).catch(() => null);
-    if (res?.ok) toast.success("Photo deleted");
-    else toast.error("Couldn't delete the photo");
+    if (res?.ok) toast.success(t("Photo deleted"));
+    else toast.error(t("Couldn't delete the photo"));
     setDeleting(null);
     router.refresh();
   }
 
   return (
     <Card
-      title={`${initial.length} photo${initial.length === 1 ? "" : "s"}`}
+      title={t(initial.length === 1 ? "{n} photo" : "{n} photos", { n: initial.length })}
       actions={
         <>
           <input ref={inputRef} type="file" multiple accept="image/*" className="sr-only" onChange={(e) => handleUpload(e.target.files)} />
           <Button size="sm" onClick={() => inputRef.current?.click()} disabled={pending}>
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Add photos
+            {t("Add photos")}
           </Button>
         </>
       }
     >
       {initial.length === 0 ? (
-        <EmptyState title="No photos yet" description="Add a few to fill the website gallery." />
+        <EmptyState title={t("No photos yet")} description={t("Add a few to fill the website gallery.")} />
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {initial.map((img) => (
@@ -92,9 +94,9 @@ export function GalleryManager({ initial }: { initial: Img[] }) {
                 type="button"
                 onClick={() => remove(img)}
                 disabled={deleting === img.id}
-                aria-label="Delete photo"
-                title="Delete photo"
-                className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-black-iron shadow-sm transition-colors hover:bg-pomegranate-red hover:text-white"
+                aria-label={t("Delete photo")}
+                title={t("Delete photo")}
+                className="absolute end-2 top-2 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-black-iron shadow-sm transition-colors hover:bg-pomegranate-red hover:text-white"
               >
                 {deleting === img.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </button>

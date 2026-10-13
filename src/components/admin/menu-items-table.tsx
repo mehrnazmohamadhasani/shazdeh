@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { ArrowDown, ArrowUp, ChevronRight, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Card, EmptyState, Select, StatusPill, TextInput, IconButton } from "@/components/admin/ui";
-import { formatPrice, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useAdminI18n } from "@/components/admin/i18n";
 
 type Item = {
   id: string;
@@ -24,6 +25,7 @@ type Cat = { id: string; name: string };
 
 export function MenuItemsTable({ items, categories }: { items: Item[]; categories: Cat[] }) {
   const router = useRouter();
+  const { t, price } = useAdminI18n();
   const [query, setQuery] = React.useState("");
   const [activeCat, setActiveCat] = React.useState<string>("all");
   const [pendingId, setPendingId] = React.useState<string | null>(null);
@@ -44,7 +46,7 @@ export function MenuItemsTable({ items, categories }: { items: Item[]; categorie
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Couldn't update the dish");
+      if (!res.ok) throw new Error(t("Couldn't update the dish"));
       toast.success(message);
       router.refresh();
     } catch (e) {
@@ -71,7 +73,7 @@ export function MenuItemsTable({ items, categories }: { items: Item[]; categorie
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ order }),
           }).then((r) => {
-            if (!r.ok) throw new Error("Couldn't reorder");
+            if (!r.ok) throw new Error(t("Couldn't reorder"));
           }),
         ),
       );
@@ -87,14 +89,14 @@ export function MenuItemsTable({ items, categories }: { items: Item[]; categorie
     <Card bodyClassName="p-0 md:p-0">
       <div className="flex flex-col gap-2 border-b border-black-iron/[0.06] p-4 sm:flex-row md:px-6">
         <label className="relative flex-1">
-          <span className="sr-only">Search dishes</span>
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" strokeWidth={1.6} />
-          <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search dishes" className="pl-10" />
+          <span className="sr-only">{t("Search dishes")}</span>
+          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" strokeWidth={1.6} />
+          <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Search dishes")} className="ps-10" dir="auto" />
         </label>
-        <Select value={activeCat} onChange={(e) => setActiveCat(e.target.value)} aria-label="Category" className="sm:w-56">
-          <option value="all">All categories ({items.length})</option>
+        <Select value={activeCat} onChange={(e) => setActiveCat(e.target.value)} aria-label={t("Category")} className="sm:w-56">
+          <option value="all">{t("All categories ({n})", { n: items.length })}</option>
           {categories.map((c) => (
-            <option key={c.id} value={c.id}>
+            <option key={c.id} value={c.id} dir="auto">
               {c.name} ({items.filter((i) => i.category.id === c.id).length})
             </option>
           ))}
@@ -102,14 +104,14 @@ export function MenuItemsTable({ items, categories }: { items: Item[]; categorie
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState title="No dishes found" description="Try another search or category." />
+        <EmptyState title={t("No dishes found")} description={t("Try another search or category.")} />
       ) : (
         <>
           <div className="hidden grid-cols-[minmax(0,1fr)_96px_88px_88px_76px] items-center gap-3 border-b border-black-iron/[0.06] px-6 py-2.5 text-[12px] font-medium text-dark-grey md:grid">
-            <span>Dish</span>
-            <span className="text-right">Price</span>
-            <span className="text-center">On menu</span>
-            <span className="text-center">In stock</span>
+            <span>{t("Dish")}</span>
+            <span className="text-end">{t("Price")}</span>
+            <span className="text-center">{t("On menu")}</span>
+            <span className="text-center">{t("In stock")}</span>
             <span />
           </div>
           <ul className="divide-y divide-black-iron/[0.06]">
@@ -126,48 +128,48 @@ export function MenuItemsTable({ items, categories }: { items: Item[]; categorie
                     {item.imageUrl && <Image src={item.imageUrl} alt="" fill sizes="48px" className="object-cover" />}
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-medium text-black-iron">{item.name}</span>
+                    <span dir="auto" className="block truncate text-[14px] font-medium text-black-iron">{item.name}</span>
                     <span className="flex items-center gap-2 text-[12.5px] text-dark-grey">
-                      <span className="truncate">{item.category.name}</span>
-                      <span className="tabular-nums md:hidden">· {formatPrice(item.price)}</span>
+                      <span dir="auto" className="truncate">{item.category.name}</span>
+                      <span className="tabular-nums md:hidden">· {price(item.price)}</span>
                     </span>
                     <span className="mt-1 flex gap-1.5 md:hidden">
-                      {!item.isActive && <StatusPill>Hidden</StatusPill>}
-                      {item.isActive && !item.isAvailable && <StatusPill tone="warn">Sold out</StatusPill>}
+                      {!item.isActive && <StatusPill>{t("Hidden")}</StatusPill>}
+                      {item.isActive && !item.isAvailable && <StatusPill tone="warn">{t("Sold out")}</StatusPill>}
                     </span>
                   </span>
                 </Link>
 
-                <span className="hidden text-right text-[14px] tabular-nums md:block">{formatPrice(item.price)}</span>
+                <span className="hidden text-end text-[14px] tabular-nums md:block">{price(item.price)}</span>
                 <span className="hidden justify-center md:flex">
                   <Switch
                     checked={item.isActive}
                     disabled={pendingId === item.id}
-                    aria-label={`Show ${item.name} on the menu`}
-                    onCheckedChange={(v) => patch(item, { isActive: v }, v ? "Shown on the menu" : "Hidden from the menu")}
+                    aria-label={t("Show {name} on the menu", { name: item.name })}
+                    onCheckedChange={(v) => patch(item, { isActive: v }, v ? t("Shown on the menu") : t("Hidden from the menu"))}
                   />
                 </span>
                 <span className="flex justify-center">
                   <Switch
                     checked={item.isAvailable}
                     disabled={pendingId === item.id}
-                    aria-label={`${item.name} in stock`}
-                    onCheckedChange={(v) => patch(item, { isAvailable: v }, v ? "Back in stock" : "Marked sold out")}
+                    aria-label={t("{name} in stock", { name: item.name })}
+                    onCheckedChange={(v) => patch(item, { isAvailable: v }, v ? t("Back in stock") : t("Marked sold out"))}
                   />
                 </span>
                 <span className="hidden items-center justify-end gap-0.5 md:flex">
                   {canReorder ? (
                     <>
-                      <IconButton label="Move up" disabled={idx === 0 || pendingId !== null} onClick={() => move(item, -1)}>
+                      <IconButton label={t("Move up")} disabled={idx === 0 || pendingId !== null} onClick={() => move(item, -1)}>
                         <ArrowUp className="h-4 w-4" />
                       </IconButton>
-                      <IconButton label="Move down" disabled={idx === filtered.length - 1 || pendingId !== null} onClick={() => move(item, 1)}>
+                      <IconButton label={t("Move down")} disabled={idx === filtered.length - 1 || pendingId !== null} onClick={() => move(item, 1)}>
                         <ArrowDown className="h-4 w-4" />
                       </IconButton>
                     </>
                   ) : (
-                    <Link href={`/admin/menu-items/${item.id}`} aria-label={`Edit ${item.name}`} className="grid h-9 w-9 place-items-center rounded-full text-dark-grey hover:bg-black-iron/[0.05]">
-                      <ChevronRight className="h-4 w-4" />
+                    <Link href={`/admin/menu-items/${item.id}`} aria-label={t("Edit {name}", { name: item.name })} className="grid h-9 w-9 place-items-center rounded-full text-dark-grey hover:bg-black-iron/[0.05]">
+                      <ChevronRight className="h-4 w-4 rtl:-scale-x-100" />
                     </Link>
                   )}
                 </span>
@@ -176,7 +178,7 @@ export function MenuItemsTable({ items, categories }: { items: Item[]; categorie
           </ul>
           {!canReorder && (
             <p className="border-t border-black-iron/[0.06] px-6 py-3 text-[12px] text-dark-grey">
-              Choose a category to reorder its dishes.
+              {t("Choose a category to reorder its dishes.")}
             </p>
           )}
         </>

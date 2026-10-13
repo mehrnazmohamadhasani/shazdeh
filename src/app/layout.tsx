@@ -121,7 +121,7 @@ export default function RootLayout({
               color: "#000000",
               border: "1px solid rgba(0,0,0,0.10)",
               borderRadius: "8px",
-              fontFamily: "var(--font-inter)",
+              fontFamily: "var(--font-inter), var(--font-vazirmatn), sans-serif",
               fontWeight: 400,
               fontSize: "13px",
             },

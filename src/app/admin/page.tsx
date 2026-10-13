@@ -4,15 +4,17 @@ import { ArrowRight, Plus } from "lucide-react";
 import { AdminPage, Card, EmptyState, StatusPill } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
-import { formatPrice } from "@/lib/utils";
-import { formatFils } from "@/lib/ordering/money";
 import { localClock } from "@/lib/ordering/hours";
 import { KITCHEN_TIMEZONE } from "@/lib/ordering/config";
 import { STAFF_LABEL } from "@/lib/ordering/status";
 import { ACTIVE_STATUSES } from "@/lib/ordering/admin";
+import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Dashboard" };
+export async function generateMetadata() {
+  const { t } = await getAdminI18n();
+  return { title: t("Dashboard") };
+}
 
 /** Start of "today" in Dubai, as a UTC Date. */
 function startOfDubaiDay(now = new Date()) {
@@ -23,6 +25,7 @@ function startOfDubaiDay(now = new Date()) {
 }
 
 export default async function Dashboard() {
+  const { t, money, price } = await getAdminI18n();
   const [today, waiting, inProgress, soldOut, latestOrders, recentDishes] = await Promise.all([
     prisma.order.aggregate({
       where: {
@@ -57,19 +60,19 @@ export default async function Dashboard() {
   ]);
 
   const stats = [
-    { label: "Orders today", value: String(today._count), href: "/admin/orders" },
-    { label: "Sales today", value: formatFils(today._sum.totalFils ?? 0), href: "/admin/orders" },
-    { label: "Waiting to accept", value: String(waiting), href: "/admin/orders", alert: waiting > 0 },
-    { label: "Sold out dishes", value: String(soldOut), href: "/admin/menu-items", alert: soldOut > 0 },
+    { label: t("Orders today"), value: String(today._count), href: "/admin/orders" },
+    { label: t("Sales today"), value: money(today._sum.totalFils ?? 0), href: "/admin/orders" },
+    { label: t("Waiting to accept"), value: String(waiting), href: "/admin/orders", alert: waiting > 0 },
+    { label: t("Sold out dishes"), value: String(soldOut), href: "/admin/menu-items", alert: soldOut > 0 },
   ];
 
   return (
     <AdminPage
-      title="Dashboard"
+      title={t("Dashboard")}
       actions={
         <Button asChild size="sm">
           <Link href="/admin/menu-items/new">
-            <Plus className="h-4 w-4" /> New dish
+            <Plus className="h-4 w-4" /> {t("New dish")}
           </Link>
         </Button>
       }
@@ -89,19 +92,19 @@ export default async function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card
-          title="Latest orders"
-          description={inProgress > 0 ? `${inProgress} in progress` : undefined}
+          title={t("Latest orders")}
+          description={inProgress > 0 ? t("{n} in progress", { n: inProgress }) : undefined}
           actions={
             <Link href="/admin/orders" className="inline-flex items-center gap-1 text-[13px] font-medium text-terracotta-ink hover:underline">
-              Open board <ArrowRight className="h-3.5 w-3.5" />
+              {t("Open board")} <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100" />
             </Link>
           }
           bodyClassName="p-0 md:p-0"
         >
           {latestOrders.length === 0 ? (
-            <EmptyState title="No orders yet" description="Orders placed on the website appear here." />
+            <EmptyState title={t("No orders yet")} description={t("Orders placed on the website appear here.")} />
           ) : (
             <ul className="divide-y divide-black-iron/[0.06]">
               {latestOrders.map((o) => (
@@ -109,14 +112,14 @@ export default async function Dashboard() {
                   <Link href={`/admin/orders/${o.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-black-iron/[0.02] md:px-6">
                     <span className="min-w-0 flex-1">
                       <span className="block text-[14px] font-semibold tabular-nums">{o.number}</span>
-                      <span className="block truncate text-[12.5px] text-dark-grey">
+                      <span dir="auto" className="block truncate text-[12.5px] text-dark-grey">
                         {o.customerName} · {o.areaName}
                       </span>
                     </span>
                     <StatusPill tone={o.status === "RECEIVED" ? "accent" : o.status === "DELIVERED" ? "good" : "neutral"}>
-                      {STAFF_LABEL[o.status]}
+                      {t(STAFF_LABEL[o.status])}
                     </StatusPill>
-                    <span className="w-20 text-right text-[13.5px] tabular-nums">{formatFils(o.totalFils)}</span>
+                    <span className="w-24 text-end text-[13.5px] tabular-nums">{money(o.totalFils)}</span>
                   </Link>
                 </li>
               ))}
@@ -125,10 +128,10 @@ export default async function Dashboard() {
         </Card>
 
         <Card
-          title="Recently edited dishes"
+          title={t("Recently edited dishes")}
           actions={
             <Link href="/admin/menu-items" className="inline-flex items-center gap-1 text-[13px] font-medium text-terracotta-ink hover:underline">
-              All dishes <ArrowRight className="h-3.5 w-3.5" />
+              {t("All dishes")} <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100" />
             </Link>
           }
           bodyClassName="p-0 md:p-0"
@@ -141,15 +144,15 @@ export default async function Dashboard() {
                     {d.imageUrl && <Image src={d.imageUrl} alt="" fill sizes="44px" className="object-cover" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-medium">{d.name}</span>
-                    <span className="block truncate text-[12.5px] text-dark-grey">{d.category.name}</span>
+                    <span dir="auto" className="block truncate text-[14px] font-medium">{d.name}</span>
+                    <span dir="auto" className="block truncate text-[12.5px] text-dark-grey">{d.category.name}</span>
                   </span>
                   {!d.isActive ? (
-                    <StatusPill>Hidden</StatusPill>
+                    <StatusPill>{t("Hidden")}</StatusPill>
                   ) : !d.isAvailable ? (
-                    <StatusPill tone="warn">Sold out</StatusPill>
+                    <StatusPill tone="warn">{t("Sold out")}</StatusPill>
                   ) : null}
-                  <span className="text-[13.5px] tabular-nums">{formatPrice(d.price)}</span>
+                  <span className="text-[13.5px] tabular-nums">{price(d.price)}</span>
                 </Link>
               </li>
             ))}
