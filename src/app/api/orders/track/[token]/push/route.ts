@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ok, parseJson, serverError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { clientIp, sharedRateLimit } from "@/lib/rate-limit";
 import { pushSubscriptionSchema } from "@/lib/ordering/admin-schemas";
 
 /** "Notify me": push every status change of this order to this browser. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
-  const limit = rateLimit(`push:ip:${clientIp(req)}`, { limit: 20, windowMs: 10 * 60_000 });
+  const limit = await sharedRateLimit(`push:ip:${clientIp(req)}`, { limit: 20, windowMs: 10 * 60_000 });
   if (!limit.ok) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   const { token } = await ctx.params;
   const parsed = await parseJson(req, pushSubscriptionSchema);

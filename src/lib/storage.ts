@@ -1,7 +1,7 @@
 import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
+import sharp, { type OutputInfo } from "sharp";
 import { cloudinaryUploadSignature } from "@/lib/cloudinary-sign";
 import { env } from "@/lib/env";
 
@@ -61,7 +61,7 @@ async function uploadToLocal(
   data: Buffer,
   filename: string,
   folder: string,
-  info: sharp.OutputInfo,
+  info: OutputInfo,
 ): Promise<UploadResult> {
   if (process.env.VERCEL === "1") {
     throw new Error(
@@ -95,7 +95,7 @@ async function uploadToSupabase(
   data: Buffer,
   filename: string,
   folder: string,
-  info: sharp.OutputInfo,
+  info: OutputInfo,
 ): Promise<UploadResult> {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY || !env.SUPABASE_BUCKET) {
     throw new Error("Supabase storage env vars are not configured");
@@ -113,6 +113,7 @@ async function uploadToSupabase(
       "x-upsert": "true",
     },
     body: new Uint8Array(data),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     throw new Error(`Supabase upload failed: ${res.status} ${await res.text()}`);
@@ -136,7 +137,7 @@ async function uploadToCloudinary(
   data: Buffer,
   _filename: string,
   folder: string,
-  info: sharp.OutputInfo,
+  info: OutputInfo,
 ): Promise<UploadResult> {
   if (
     !env.CLOUDINARY_CLOUD_NAME ||
@@ -164,7 +165,7 @@ async function uploadToCloudinary(
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/image/upload`,
-    { method: "POST", body: form },
+    { method: "POST", body: form, signal: AbortSignal.timeout(30_000) },
   );
   if (!res.ok) {
     throw new Error(

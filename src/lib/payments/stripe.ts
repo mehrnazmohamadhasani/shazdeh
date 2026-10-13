@@ -32,6 +32,8 @@ async function stripe(path: string, init?: { method?: string; form?: Record<stri
     },
     body: init?.form ? new URLSearchParams(init.form).toString() : undefined,
     cache: "no-store",
+    // Runs inside the customer's checkout request: never hang it.
+    signal: AbortSignal.timeout(10_000),
   });
   const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok) {

@@ -143,7 +143,7 @@ shazdeh/
     │   ├── auth/                # LoginForm
     │   └── admin/               # Sidebar, page header, all CMS forms
     ├── lib/
-    │   ├── prisma.ts            # Prisma 7 + better-sqlite3 adapter
+    │   ├── prisma.ts            # Prisma 7 + pg (Postgres) adapter
     │   ├── auth.ts              # JWT sign/verify, session cookie helpers
     │   ├── api.ts               # Validated route helpers
     │   ├── validators.ts        # Zod schemas for every entity
@@ -344,9 +344,8 @@ npm run start
 ```
 
 The bundle is fully self-contained except for the Prisma client — make
-sure the host has access to `node_modules/.prisma` and the
-`@prisma/adapter-better-sqlite3` native binding (or swap in
-`@prisma/adapter-pg` for Postgres).
+sure the host has access to the generated client (`src/generated/prisma`)
+and `@prisma/adapter-pg`.
 
 ---
 
