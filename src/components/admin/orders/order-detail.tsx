@@ -17,7 +17,7 @@ import {
   type DispatchProviderOption,
 } from "@/components/admin/orders/order-actions";
 import { useAdminI18n } from "@/components/admin/i18n";
-import { formatUaeMobile } from "@/lib/ordering/phone";
+import { formatPhone } from "@/lib/ordering/phone";
 import {
   PAYMENT_LABEL,
   PAYMENT_METHOD_LABEL,
@@ -252,7 +252,7 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
             </p>
             <div className="mt-3 flex flex-wrap gap-2 print:hidden">
               <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron">
-                <Phone className="h-4 w-4" /> <span dir="ltr">{formatUaeMobile(o.customerPhone)}</span>
+                <Phone className="h-4 w-4" /> <span dir="ltr">{formatPhone(o.customerPhone)}</span>
               </a>
               <a
                 href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Hello ${o.customerName.split(" ")[0]}, this is SHĀZDEH about your order ${o.number}.`)}`}
@@ -263,7 +263,7 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
                 <MessageSquare className="h-4 w-4" /> WhatsApp
               </a>
             </div>
-            <p dir="ltr" className="mt-1 hidden text-[14px] text-black-iron print:block">{formatUaeMobile(o.customerPhone)}</p>
+            <p dir="ltr" className="mt-1 hidden text-[14px] text-black-iron print:block">{formatPhone(o.customerPhone)}</p>
             {o.customerEmail && <p dir="ltr" className="mt-2 text-[13px] text-dark-grey">{o.customerEmail}</p>}
 
             <div className="mt-5 border-t border-black-iron/[0.08] pt-4 text-[14px] leading-relaxed text-black-iron">

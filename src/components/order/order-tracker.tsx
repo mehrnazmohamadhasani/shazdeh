@@ -53,25 +53,41 @@ export function OrderTracker({
 
   React.useEffect(() => {
     if (done) return;
-    let timer: ReturnType<typeof setTimeout>;
+    // Exactly one poll chain at a time: every (re)schedule clears the
+    // pending timer, an in-flight poll is never doubled, and nothing runs
+    // after unmount or once the status changes (this effect re-runs).
+    let cancelled = false;
+    let inFlight = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = (ms: number) => {
+      clearTimeout(timer);
+      if (!cancelled) timer = setTimeout(poll, ms);
+    };
     async function poll() {
+      clearTimeout(timer);
+      if (cancelled || inFlight) return;
       if (document.visibilityState === "visible") {
+        inFlight = true;
         try {
           const res = await fetch(`/api/orders/track/${token}`, { cache: "no-store" });
+          if (cancelled) return;
           if (res.ok) {
             setView(await res.json());
             setStale(false);
           } else setStale(true);
         } catch {
-          setStale(true);
+          if (!cancelled) setStale(true);
+        } finally {
+          inFlight = false;
         }
       }
-      timer = setTimeout(poll, view.status === "PENDING_PAYMENT" ? 3000 : POLL_MS);
+      schedule(view.status === "PENDING_PAYMENT" ? 3000 : POLL_MS);
     }
-    timer = setTimeout(poll, view.status === "PENDING_PAYMENT" ? 2000 : POLL_MS);
+    schedule(view.status === "PENDING_PAYMENT" ? 2000 : POLL_MS);
     const onVisible = () => document.visibilityState === "visible" && poll();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      cancelled = true;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };

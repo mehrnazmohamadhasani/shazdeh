@@ -404,7 +404,7 @@ async function main() {
 
   // Admin user — created once, never reset: an existing account keeps
   // its password and role.
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@shazdeh.ae";
+  const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@shazdeh.ae").trim().toLowerCase();
   if (await prisma.user.findUnique({ where: { email: adminEmail }, select: { id: true } })) {
     console.log(`  ✓ Admin user → ${adminEmail} (exists, unchanged)`);
   } else {

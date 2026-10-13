@@ -221,6 +221,12 @@ export async function addMovement(
  */
 export async function recordCount(counts: { ingredientId: string; counted: number }[], day: string, actor: Actor) {
   return prisma.$transaction(async (tx) => {
+    // Lock the counted ingredients (in a fixed order, so two counts can't
+    // deadlock) until this transaction ends: a second count of the same
+    // item waits, then sees this one's movement instead of posting the
+    // same difference again.
+    const ids = [...new Set(counts.map((c) => c.ingredientId))].sort();
+    await tx.$queryRaw`SELECT "id" FROM "Ingredient" WHERE "id" = ANY(${ids}::text[]) ORDER BY "id" FOR UPDATE`;
     const sums = await tx.stockMovement.groupBy({
       by: ["ingredientId"],
       where: { ingredientId: { in: counts.map((c) => c.ingredientId) } },

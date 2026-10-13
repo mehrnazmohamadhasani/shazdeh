@@ -354,9 +354,15 @@ export async function markInvoicePaid(
   if (invoice.voidedAt) throw new OpsError("This invoice was undone.", 409);
   if (invoice.paidAt) throw new OpsError("Already marked as paid.", 409);
   const paidAt = dubaiDate(input.paidOn);
-  await prisma.$transaction([
-    prisma.purchaseInvoice.update({ where: { id: invoiceId }, data: { paidAt, paidBy: input.paidBy, paymentNote: input.note } }),
-    prisma.auditLog.create({
+  await prisma.$transaction(async (tx) => {
+    // Conditional update: of two clicks at the same moment, only one
+    // marks it paid (and writes the audit entry); the other gets a 409.
+    const { count } = await tx.purchaseInvoice.updateMany({
+      where: { id: invoiceId, paidAt: null, voidedAt: null },
+      data: { paidAt, paidBy: input.paidBy, paymentNote: input.note },
+    });
+    if (count === 0) throw new OpsError("Already marked as paid.", 409);
+    await tx.auditLog.create({
       data: {
         actor: actor.email,
         action: "purchase_invoice.pay",
@@ -365,8 +371,8 @@ export async function markInvoicePaid(
         before: { paidAt: null },
         after: { paidAt: paidAt.toISOString(), paidBy: input.paidBy, note: input.note },
       },
-    }),
-  ]);
+    });
+  });
 }
 
 export async function discardDocument(id: string, actor: { email: string }) {

@@ -1,6 +1,6 @@
 import "server-only";
 import { formatFils } from "@/lib/ordering/money";
-import { formatUaeMobile } from "@/lib/ordering/phone";
+import { formatPhone } from "@/lib/ordering/phone";
 import { PAYMENT_METHOD_LABEL, type PaymentMethodValue, type PaymentStatusValue } from "@/lib/ordering/status";
 
 /*
@@ -62,7 +62,7 @@ function header(label: string, o: TicketOrder) {
 <div class="tag">${label}</div>
 <div class="num">${esc(o.number)}</div>
 <div class="row"><span>Placed ${dubai(o.placedAt, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><span class="b">Deliver by ${dubai(due, { hour: "2-digit", minute: "2-digit" })}</span></div>
-<div class="row"><span class="b">${esc(o.customerName)}</span><span>${esc(formatUaeMobile(o.customerPhone))}</span></div>
+<div class="row"><span class="b">${esc(o.customerName)}</span><span>${esc(formatPhone(o.customerPhone))}</span></div>
 <hr>`;
 }
 

@@ -26,6 +26,9 @@ model User {
   name              String?
   passwordHash      String
   role              UserRole           @default(ADMIN)
+  /// Bumped when the password changes: sessions signed with an older
+  /// version stop working on every device.
+  sessionVersion    Int                @default(0)
   pushSubscriptions PushSubscription[]
   opsDocuments      OpsDocument[]
   createdAt         DateTime           @default(now())
@@ -54,7 +57,8 @@ model MenuItem {
   price          Float
   imageUrl       String?
   categoryId     String
-  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  // Restrict: deleting a category must never take its dishes with it.
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   ingredients    String?
   allergens      String?
   isVegetarian   Boolean         @default(false)

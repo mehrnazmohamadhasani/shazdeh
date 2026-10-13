@@ -15,7 +15,7 @@ import {
 } from "@/components/order/cart-store";
 import { useBasket, useOrderData } from "@/components/order/order-data";
 import { formatFils } from "@/lib/ordering/money";
-import { normalizeUaeMobile } from "@/lib/ordering/phone";
+import { normalizeMobile } from "@/lib/ordering/phone";
 import type { Totals } from "@/lib/ordering/pricing";
 import { cn } from "@/lib/utils";
 
@@ -137,7 +137,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
   }
 
   // Server quote — debounced, re-run whenever the basket, area or code changes.
-  const normalizedPhone = normalizeUaeMobile(phone);
+  const normalizedPhone = normalizeMobile(phone);
   const quoteBody = React.useMemo(
     () =>
       JSON.stringify({
@@ -179,7 +179,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
     building: !building.trim() ? (addressType === "villa" ? "Enter your villa number" : "Enter your building name") : null,
     unit: addressType !== "villa" && !unit.trim() ? "Enter your apartment or office number" : null,
     name: name.trim().length < 2 ? "Enter your name" : null,
-    phone: !normalizedPhone ? "Enter a UAE mobile, e.g. 050 123 4567" : null,
+    phone: !normalizedPhone ? "Enter a mobile number. Include the country code if it isn't a UAE number, e.g. +44 7911 123456" : null,
     email: email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? "Check your email address" : null,
   };
   const hasErrors = Object.values(errors).some(Boolean);
@@ -400,7 +400,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
                 inputMode="tel"
                 type="tel"
                 placeholder="050 123 4567"
-                hint="The rider calls this number on arrival."
+                hint="The rider calls this number on arrival. Not a UAE number? Start with your country code, e.g. +44."
               />
               <Field
                 label="Email"

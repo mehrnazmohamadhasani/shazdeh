@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { categoryUpdateSchema } from "@/lib/validators";
 import {
@@ -56,6 +57,15 @@ export async function DELETE(
   if (auth.response) return auth.response;
   const { id } = await ctx.params;
   try {
+    // The admin screen checks this too, but a stale tab or a direct call
+    // must not delete a category that still has dishes.
+    const dishes = await prisma.menuItem.count({ where: { categoryId: id } });
+    if (dishes > 0) {
+      return NextResponse.json(
+        { error: `This category still has ${dishes} dish${dishes === 1 ? "" : "es"}. Move or delete them first.` },
+        { status: 409 },
+      );
+    }
     await prisma.category.delete({ where: { id } });
     revalidateSite();
     return ok({ ok: true });

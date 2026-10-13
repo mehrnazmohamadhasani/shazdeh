@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ok, parseJson, requireAuth, serverError } from "@/lib/api";
+import { setSessionCookie, signSession } from "@/lib/auth";
 import { teamUpdateSchema } from "@/lib/ordering/admin-schemas";
 
 async function adminCount() {
@@ -21,11 +22,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (target.role === "ADMIN" && rest.role && rest.role !== "ADMIN" && (await adminCount()) <= 1) {
       return NextResponse.json({ error: "Keep at least one admin." }, { status: 409 });
     }
-    const user = await prisma.user.update({
+    // A new password signs this person out on every device.
+    const { sessionVersion, ...user } = await prisma.user.update({
       where: { id },
-      data: { ...rest, ...(password ? { passwordHash: await bcrypt.hash(password, 12) } : {}) },
-      select: { id: true, email: true, name: true, role: true },
+      data: {
+        ...rest,
+        ...(password ? { passwordHash: await bcrypt.hash(password, 12), sessionVersion: { increment: 1 } } : {}),
+      },
+      select: { id: true, email: true, name: true, role: true, sessionVersion: true },
     });
+    // …except the admin changing their own password on this device.
+    if (password && id === auth.user.id) await setSessionCookie(await signSession({ ...user, sessionVersion }));
     return ok(user);
   } catch (e) {
     return serverError(e);

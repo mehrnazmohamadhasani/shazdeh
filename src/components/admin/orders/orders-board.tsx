@@ -14,7 +14,7 @@ import {
 import { claimPrint, printTickets, useAutoPrint } from "@/components/admin/orders/print-tickets";
 import type { BoardOrder } from "@/lib/ordering/admin";
 import { useAdminI18n } from "@/components/admin/i18n";
-import { formatUaeMobile } from "@/lib/ordering/phone";
+import { formatPhone } from "@/lib/ordering/phone";
 import { STAFF_ACTION, STAFF_LABEL, nextStatus, type OrderStatusValue } from "@/lib/ordering/status";
 import { cn } from "@/lib/utils";
 
@@ -347,7 +347,7 @@ function OrderCard({
           </Link>
           <p dir="auto" className="mt-0.5 text-[14px] font-semibold text-black-iron">{o.customerName}</p>
           <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-8 items-center gap-1.5 text-[13px] tabular-nums text-terracotta-ink">
-            <Phone className="h-3.5 w-3.5" /> <span dir="ltr">{formatUaeMobile(o.customerPhone)}</span>
+            <Phone className="h-3.5 w-3.5" /> <span dir="ltr">{formatPhone(o.customerPhone)}</span>
           </a>
           <p dir="auto" className="text-[12.5px] text-dark-grey">{o.areaName}</p>
         </div>
@@ -469,7 +469,7 @@ function HistoryTable({ orders }: { orders: BoardOrder[] }) {
               </td>
               <td className="whitespace-nowrap px-4 py-3 tabular-nums max-lg:hidden">
                 <a href={`tel:${o.customerPhone}`} dir="ltr" className="text-black-iron/80 hover:text-terracotta-ink">
-                  {formatUaeMobile(o.customerPhone)}
+                  {formatPhone(o.customerPhone)}
                 </a>
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-black-iron/80">{t(STAFF_LABEL[o.status])}</td>
