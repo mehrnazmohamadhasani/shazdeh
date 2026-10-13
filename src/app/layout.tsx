@@ -5,6 +5,7 @@ import "./globals.css";
 import { getSettings } from "@/lib/settings";
 import { env } from "@/lib/env";
 import { ServiceWorker } from "@/components/pwa/service-worker";
+import { SiteAnalytics } from "@/components/shared/site-analytics";
 
 // Inter is the brand typeface — loaded as a single variable file so
 // Light (body) and Bold (headlines) cost one request, not six.
@@ -108,6 +109,7 @@ export default function RootLayout({
       <body className="min-h-full">
         {children}
         <ServiceWorker />
+        <SiteAnalytics />
         <Toaster
           position="bottom-center"
           mobileOffset={{
