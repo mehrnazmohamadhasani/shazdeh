@@ -623,6 +623,7 @@ export async function getTrackingView(token: string) {
     placedAt: order.placedAt.toISOString(),
     etaMin: order.etaMin,
     etaMax: order.etaMax,
+    dispatchedAt: order.dispatchedAt?.toISOString() ?? null,
     deliveredAt: order.deliveredAt?.toISOString() ?? null,
     reason: order.rejectionReason,
     trackingUrl: order.trackingUrl,

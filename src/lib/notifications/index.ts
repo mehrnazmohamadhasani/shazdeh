@@ -54,6 +54,11 @@ const CUSTOMER_COPY: Partial<Record<OrderEventName, { subject: string; line: str
   "payment.failed": { subject: "Payment didn't go through", line: "Your payment failed, so the order was not placed." },
 };
 
+// "On its way" gets the delivery scooter (scripts/generate-push-icons.ts)
+// in the push notification and the email.
+const ON_THE_WAY_ICON = "/icons/on-the-way.png";
+const ON_THE_WAY_BADGE = "/icons/badge-on-the-way.png";
+
 const RESTAURANT_EVENTS: OrderEventName[] = ["order.received", "payment.received", "order.cancelled"];
 
 async function log(
@@ -127,6 +132,7 @@ export async function notifyOrder(orderId: string, event: OrderEventName, { deta
         const lines = [copy.line, detail, eta].filter(Boolean) as string[];
         const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;color:#1d1d1b">
 <p style="color:#ce4927;font-weight:700;letter-spacing:.08em">SHĀZDEH</p>
+${event === "order.dispatched" ? `<img src="${esc(absoluteUrl(ON_THE_WAY_ICON))}" width="96" height="96" alt="" style="display:block;border-radius:20px;margin:0 0 12px">` : ""}
 <h1 style="font-size:22px;margin:0 0 8px">${esc(copy.subject)}</h1>
 ${lines.map((l) => `<p style="margin:4px 0">${esc(l)}</p>`).join("")}
 <p style="margin:16px 0 4px;font-weight:600">Order ${esc(order.number)}</p>
@@ -156,11 +162,14 @@ ${lines.map((l) => `<p style="margin:4px 0">${esc(l)}</p>`).join("")}
 
     // Customer push — every stage
     if (copy && order.pushSubscriptions.length) {
+      const onTheWay = event === "order.dispatched";
       const result = await sendPush(order.pushSubscriptions, {
-        title: `${copy.subject} · ${order.number}`,
+        // iPhone only ever shows the app icon, so the scooter rides in the title too.
+        title: `${onTheWay ? "🛵 " : ""}${copy.subject} · ${order.number}`,
         body: [detail ?? copy.line, eta].filter(Boolean).join(" "),
         url: `/order/track/${order.trackingToken}`,
         tag: `order-${order.id}`,
+        ...(onTheWay ? { icon: ON_THE_WAY_ICON, badge: ON_THE_WAY_BADGE } : {}),
       });
       await log(order.id, event, "push", `${order.pushSubscriptions.length} device(s)`, result === "skipped" ? "skipped" : result > 0 ? "sent" : "failed");
     }

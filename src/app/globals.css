@@ -424,6 +424,31 @@
   }
 }
 
+/* Tracking page: the delivery scooter's gentle ride and speed lines. */
+@keyframes scooter-ride {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(-1.5deg);
+  }
+}
+
+@keyframes speed-line {
+  from {
+    opacity: 0;
+    transform: translateX(6px) scaleX(0.4);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px) scaleX(1);
+  }
+}
+
 /* Radix overlay / content transitions (no plugin required) */
 .overlay-anim[data-state="open"] {
   animation: fade 400ms var(--ease-editorial) both;

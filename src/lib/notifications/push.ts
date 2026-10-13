@@ -12,7 +12,17 @@ import { prisma } from "@/lib/prisma";
  * only once the site is added to the Home Screen (iOS 16.4+).
  */
 
-export type PushPayload = { title: string; body: string; url: string; tag?: string; requireInteraction?: boolean };
+export type PushPayload = {
+  title: string;
+  body: string;
+  url: string;
+  tag?: string;
+  requireInteraction?: boolean;
+  /** Large colour icon (Android/desktop); defaults to the app icon. iPhone always shows the app icon. */
+  icon?: string;
+  /** Monochrome status-bar badge (Android); defaults to the app icon. */
+  badge?: string;
+};
 
 export function vapidPublicKey(): string | null {
   return process.env.VAPID_PUBLIC_KEY?.trim() || null;

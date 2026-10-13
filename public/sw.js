@@ -267,8 +267,8 @@ self.addEventListener("push", (event) => {
       tag: data.tag,
       renotify: Boolean(data.tag),
       requireInteraction: Boolean(data.requireInteraction),
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      icon: data.icon || "/icons/icon-192.png",
+      badge: data.badge || "/icons/icon-192.png",
       data: { url: data.url || "/" },
     }),
   );

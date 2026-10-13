@@ -5,6 +5,7 @@ import { Bell, BellRing, Check, ExternalLink, Loader2, Phone, XCircle } from "lu
 import { WhatsappIcon } from "@/components/icons/social";
 import { ArchLines } from "@/components/brand/arch";
 import { cart } from "@/components/order/cart-store";
+import { OnTheWayCard } from "@/components/order/on-the-way-card";
 import { pushSupported, requestNotifications, subscribePush } from "@/components/admin/orders/kitchen-alerts";
 import type { TrackingView } from "@/lib/ordering/orders";
 import { formatFils } from "@/lib/ordering/money";
@@ -130,20 +131,33 @@ export function OrderTracker({
                 )}
               </h1>
               <p lang="fa" dir="rtl" className="mt-2 text-left text-[15px] text-warm-white/60">
-                {view.status === "DELIVERED" ? "نوش جان" : "سفارش شما ثبت شد"}
+                {view.status === "DELIVERED"
+                  ? "نوش جان"
+                  : view.status === "OUT_FOR_DELIVERY"
+                    ? "سفارش شما در راه است"
+                    : "سفارش شما ثبت شد"}
               </p>
-              <p className="mt-5 text-[15px] tabular-nums text-warm-white/85">
-                {view.status === "DELIVERED" && view.deliveredAt ? (
-                  <>Delivered at {clock(view.deliveredAt)}</>
-                ) : (
-                  <>
-                    Estimated arrival{" "}
-                    <strong className="font-semibold text-warm-white">
-                      {clock(view.placedAt, view.etaMin)}–{clock(view.placedAt, view.etaMax)}
-                    </strong>
-                  </>
-                )}
-              </p>
+              {view.status === "OUT_FOR_DELIVERY" ? (
+                <OnTheWayCard
+                  dispatchedAt={view.dispatchedAt ?? when("OUT_FOR_DELIVERY") ?? view.placedAt}
+                  placedAt={view.placedAt}
+                  etaMax={view.etaMax}
+                  driverName={view.driverName}
+                />
+              ) : (
+                <p className="mt-5 text-[15px] tabular-nums text-warm-white/85">
+                  {view.status === "DELIVERED" && view.deliveredAt ? (
+                    <>Delivered at {clock(view.deliveredAt)}</>
+                  ) : (
+                    <>
+                      Estimated arrival{" "}
+                      <strong className="font-semibold text-warm-white">
+                        {clock(view.placedAt, view.etaMin)}–{clock(view.placedAt, view.etaMax)}
+                      </strong>
+                    </>
+                  )}
+                </p>
+              )}
             </>
           )}
         </div>
