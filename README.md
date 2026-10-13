@@ -58,8 +58,9 @@ npm install
 cp .env.example .env
 
 # 3. Migrate + seed (creates the Shazdeh menu, admin user, gallery…)
-#    ⚠ Point DATABASE_URL at a local/dev database first — seeding deletes
-#    and recreates gallery images and social links.
+#    Seeding only adds what is missing (it never changes existing dishes,
+#    gallery, links or the admin password) and refuses to run unless
+#    DATABASE_URL is a local database (override: SEED_ALLOW_REMOTE=1).
 npm run db:migrate
 npm run db:seed
 
@@ -70,9 +71,9 @@ npm run dev
 Open `http://localhost:3000` — the public site.
 Open `http://localhost:3000/login` — the admin.
 
-Default admin credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
-`.env` (seed only). **Change the password before deploying** — the example
-value is public.
+The first admin is created by the seed from `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+in `.env` (12+ characters; required, there is no default). Re-seeding never
+resets an existing admin's password.
 
 ---
 
@@ -328,7 +329,8 @@ then DevTools → Application.
    ADMIN_PASSWORD=<secure>
    ```
 4. **First deploy**: after deploy, run the seed once via
-   `vercel exec npm run db:seed` (or temporarily expose a one-off route).
+   `SEED_ALLOW_REMOTE=1 vercel exec npm run db:seed` (or temporarily expose a
+   one-off route). It is safe to repeat: it only adds what is missing.
 5. **CDN images**: `next.config.ts` already whitelists Supabase &
    Cloudinary domains for `<Image />` optimization.
 

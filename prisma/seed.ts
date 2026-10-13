@@ -3,15 +3,14 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { pgConnectionString } from "../src/lib/pg-connection";
+import { assertLocalDatabase } from "./local-db-guard";
 import "dotenv/config";
 
 const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
-}
+assertLocalDatabase(connectionString, "seed the database");
 
 const pool = new Pool({
-  connectionString: pgConnectionString(connectionString),
+  connectionString: pgConnectionString(connectionString!),
 });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -403,22 +402,26 @@ const CATEGORIES: SeedCategory[] = [
 async function main() {
   console.log("→ Seeding Shazdeh database…");
 
-  // Admin user
+  // Admin user — created once, never reset: an existing account keeps
+  // its password and role.
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@shazdeh.ae";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "shazdeh-admin";
-  const passwordHash = await bcrypt.hash(adminPassword, 12);
-
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { passwordHash, role: "ADMIN" },
-    create: {
-      email: adminEmail,
-      passwordHash,
-      name: "SHĀZDEH Admin",
-      role: "ADMIN",
-    },
-  });
-  console.log(`  ✓ Admin user → ${adminEmail}`);
+  if (await prisma.user.findUnique({ where: { email: adminEmail }, select: { id: true } })) {
+    console.log(`  ✓ Admin user → ${adminEmail} (exists, unchanged)`);
+  } else {
+    const adminPassword = process.env.ADMIN_PASSWORD?.trim();
+    if (!adminPassword || adminPassword.length < 12 || adminPassword === "shazdeh-admin") {
+      throw new Error("Set ADMIN_PASSWORD (12+ characters, not the example value) to create the admin user.");
+    }
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash: await bcrypt.hash(adminPassword, 12),
+        name: "SHĀZDEH Admin",
+        role: "ADMIN",
+      },
+    });
+    console.log(`  ✓ Admin user → ${adminEmail} (created)`);
+  }
 
   // Restaurant settings
   await prisma.restaurantSettings.upsert({
@@ -453,11 +456,7 @@ async function main() {
   for (const cat of CATEGORIES) {
     const category = await prisma.category.upsert({
       where: { slug: cat.slug },
-      update: {
-        name: cat.name,
-        order: cat.order,
-        isActive: true,
-      },
+      update: {},
       create: {
         slug: cat.slug,
         name: cat.name,
@@ -471,16 +470,8 @@ async function main() {
       order += 1;
       await prisma.menuItem.upsert({
         where: { slug: item.slug },
-        update: {
-          name: item.name,
-          nameFa: item.nameFa ?? null,
-          description: item.description ?? null,
-          price: item.price,
-          imageUrl: item.imageUrl ?? null,
-          isVegetarian: item.isVegetarian ?? false,
-          order,
-          categoryId: category.id,
-        },
+        // Existing dishes are the owner's: never overwrite prices or names.
+        update: {},
         create: {
           slug: item.slug,
           name: item.name,
@@ -497,8 +488,8 @@ async function main() {
     console.log(`  ✓ ${cat.name} (${cat.items.length} items)`);
   }
 
-  // Gallery
-  await prisma.galleryImage.deleteMany();
+  // Gallery and social links: only filled into empty tables, so curated
+  // content is never replaced.
   const galleryFiles = [
     "ghormeh-sabzi.jpg",
     "fesenjoon.jpg",
@@ -513,57 +504,62 @@ async function main() {
     "homemade-torshi.jpg",
     "mast-bademjoon.jpg",
   ];
-  await prisma.galleryImage.createMany({
-    data: galleryFiles.map((f, i) => ({
-      imageUrl: IMG(f),
-      order: i + 1,
-    })),
-  });
-  console.log(`  ✓ Gallery (${galleryFiles.length} images)`);
+  if ((await prisma.galleryImage.count()) === 0) {
+    await prisma.galleryImage.createMany({
+      data: galleryFiles.map((f, i) => ({
+        imageUrl: IMG(f),
+        order: i + 1,
+      })),
+    });
+    console.log(`  ✓ Gallery (${galleryFiles.length} images)`);
+  } else {
+    console.log("  ✓ Gallery (exists, unchanged)");
+  }
 
-  // Social links
-  await prisma.socialLink.deleteMany();
-  await prisma.socialLink.createMany({
-    data: [
-      {
-        platform: "instagram",
-        label: "Instagram",
-        url: "https://instagram.com/shazdeh",
-        order: 1,
-      },
-      {
-        platform: "whatsapp",
-        label: "WhatsApp",
-        url: "https://wa.me/971500000000",
-        order: 2,
-      },
-      {
-        platform: "talabat",
-        label: "Talabat",
-        url: "https://talabat.com",
-        order: 3,
-      },
-      {
-        platform: "deliveroo",
-        label: "Deliveroo",
-        url: "https://deliveroo.ae",
-        order: 4,
-      },
-      {
-        platform: "careem",
-        label: "Careem",
-        url: "https://careem.com",
-        order: 5,
-      },
-    ],
-  });
-  console.log("  ✓ Social links");
+  if ((await prisma.socialLink.count()) === 0) {
+    await prisma.socialLink.createMany({
+      data: [
+        {
+          platform: "instagram",
+          label: "Instagram",
+          url: "https://instagram.com/shazdeh",
+          order: 1,
+        },
+        {
+          platform: "whatsapp",
+          label: "WhatsApp",
+          url: "https://wa.me/971500000000",
+          order: 2,
+        },
+        {
+          platform: "talabat",
+          label: "Talabat",
+          url: "https://talabat.com",
+          order: 3,
+        },
+        {
+          platform: "deliveroo",
+          label: "Deliveroo",
+          url: "https://deliveroo.ae",
+          order: 4,
+        },
+        {
+          platform: "careem",
+          label: "Careem",
+          url: "https://careem.com",
+          order: 5,
+        },
+      ],
+    });
+    console.log("  ✓ Social links");
+  } else {
+    console.log("  ✓ Social links (exist, unchanged)");
+  }
 
   await seedOrdering();
 
   console.log("✓ Seed complete.\n");
-  console.log(`  Login → ${adminEmail}`);
-  console.log(`  Pass  → ${adminPassword}`);
+  console.log(`  Login → ${adminEmail} (password: ADMIN_PASSWORD from .env)`);
 }
 
 /*

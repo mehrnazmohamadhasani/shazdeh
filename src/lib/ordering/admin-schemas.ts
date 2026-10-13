@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ORDER_STATUSES } from "@/lib/ordering/status";
+import { isPushServiceUrl } from "@/lib/notifications/push-hosts";
 
 /* Admin-side schemas for ordering: settings, zones, coupons, modifiers, orders. */
 
@@ -168,7 +169,7 @@ export const orderActionSchema = z.discriminatedUnion("action", [
 
 /** A browser PushSubscription.toJSON(). */
 export const pushSubscriptionSchema = z.object({
-  endpoint: z.url().max(1000).refine((v) => v.startsWith("https://"), "Push endpoint must be https"),
+  endpoint: z.url().max(1000).refine(isPushServiceUrl, "Not a browser push service endpoint"),
   keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
 });
 
