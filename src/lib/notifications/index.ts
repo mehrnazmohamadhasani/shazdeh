@@ -13,7 +13,8 @@ import { sendPush } from "@/lib/notifications/push";
  * what was sent. Channels are switched on by environment variables:
  *
  *   email    RESEND_API_KEY + EMAIL_FROM   (customer receipts/updates,
- *            and the kitchen inbox set in Ordering settings)
+ *            and the kitchen inbox set in Ordering settings);
+ *            EMAIL_REPLY_TO (optional) is where customer replies land
  *   push     VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY (see ./push.ts) —
  *            customers who tapped "Notify me" on the tracking page get
  *            every status change; staff get new orders.
@@ -71,11 +72,12 @@ async function log(
 async function sendEmail(to: string, subject: string, text: string, html?: string) {
   const key = process.env.RESEND_API_KEY?.trim();
   const from = process.env.EMAIL_FROM?.trim();
+  const replyTo = process.env.EMAIL_REPLY_TO?.trim();
   if (!key || !from) return "skipped" as const;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to, subject, text, ...(html ? { html } : {}) }),
+    body: JSON.stringify({ from, to, subject, text, ...(html ? { html } : {}), ...(replyTo ? { reply_to: replyTo } : {}) }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
   return "sent" as const;
