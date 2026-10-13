@@ -1,6 +1,7 @@
 import "server-only";
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
+import { isPushServiceUrl } from "./push-hosts";
 
 /*
  * Web Push (VAPID). Switched on by three env vars:
@@ -47,7 +48,9 @@ export async function sendPush(subs: Sub[], payload: PushPayload): Promise<numbe
   const body = JSON.stringify(payload);
   let sent = 0;
   await Promise.all(
-    subs.map(async (s) => {
+    // Never contact a non-push host, even if one was saved before the
+    // endpoint check existed.
+    subs.filter((s) => isPushServiceUrl(s.endpoint)).map(async (s) => {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body, {
           TTL: 60 * 60,
