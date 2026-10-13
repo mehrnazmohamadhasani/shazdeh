@@ -45,5 +45,5 @@ next-env.d.ts
 # The example file is sanitised and safe to commit
 !.env.example
 
-# Internal ordering docs — kept on this laptop only
-/docs/ordering/
+# Internal docs (ordering, ops, admin guide) — kept on this laptop only
+/docs/
