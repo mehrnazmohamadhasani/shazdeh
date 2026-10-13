@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { reportError } from "@/lib/report-error";
 import { currentUser, getSessionUser, type SessionUser, type UserRoleValue } from "@/lib/auth";
 
 /** Who may edit content. Kitchen staff (STAFF) only manage orders. */
@@ -128,7 +129,8 @@ export function serverError(
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
   }
-  console.error(err);
+  // Reported after the response is sent, so the user isn't kept waiting.
+  after(() => reportError(err, { where: "api" }));
   if (opts?.expose && err instanceof Error && err.message) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

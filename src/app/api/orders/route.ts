@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { parseJson, serverError } from "@/lib/api";
-import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { clientIp, sharedRateLimit } from "@/lib/rate-limit";
 import { env } from "@/lib/env";
 import { placeOrderSchema } from "@/lib/ordering/schemas";
 import { placeOrder } from "@/lib/ordering/orders";
@@ -8,7 +8,7 @@ import { placeOrder } from "@/lib/ordering/orders";
 /** Places an order. Prices, fees and discounts are recomputed server-side. */
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);
-  const byIp = rateLimit(`order:ip:${ip}`, { limit: 10, windowMs: 10 * 60_000 });
+  const byIp = await sharedRateLimit(`order:ip:${ip}`, { limit: 10, windowMs: 10 * 60_000 });
   if (!byIp.ok) {
     return NextResponse.json(
       { error: "Too many orders from this connection — please try again shortly." },
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const parsed = await parseJson(req, placeOrderSchema);
   if (!parsed.ok) return parsed.response;
 
-  const byPhone = rateLimit(`order:phone:${parsed.data.customer.phone}`, { limit: 6, windowMs: 10 * 60_000 });
+  const byPhone = await sharedRateLimit(`order:phone:${parsed.data.customer.phone}`, { limit: 6, windowMs: 10 * 60_000 });
   if (!byPhone.ok) {
     return NextResponse.json(
       { error: "Several orders were just placed for this number — please call us if you need help." },

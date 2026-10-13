@@ -5,6 +5,7 @@ import { absoluteUrl } from "@/lib/seo";
 import { formatFils } from "@/lib/ordering/money";
 import { getOrderingSettings } from "@/lib/ordering/config";
 import { sendPush } from "@/lib/notifications/push";
+import { reportError } from "@/lib/report-error";
 
 /*
  * Order notifications.
@@ -84,6 +85,7 @@ async function sendEmail(to: string, subject: string, text: string, html?: strin
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to, subject, text, ...(html ? { html } : {}), ...(replyTo ? { reply_to: replyTo } : {}) }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
   return "sent" as const;
@@ -250,7 +252,7 @@ ${lines.map((l) => `<p style="margin:4px 0">${esc(l)}</p>`).join("")}
       }
     }
   } catch (e) {
-    console.error("[notify]", event, e);
+    await reportError(e, { where: `notify ${event}` });
   }
 }
 

@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getProviderById } from "@/lib/payments";
 import { applyPaymentResult } from "@/lib/ordering/orders";
+import { reportError } from "@/lib/report-error";
 
 /**
  * Gateway webhooks. The signature is verified by the provider adapter
@@ -37,7 +38,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ provider: stri
   } catch (e) {
     // Let the gateway retry: forget the event id so the retry is processed.
     await prisma.webhookEvent.deleteMany({ where: { provider: id, eventId: result.eventId } });
-    console.error(`[payments:${id}] webhook processing failed`, e);
+    await reportError(e, { where: `payments:${id} webhook` });
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
   return NextResponse.json({ received: true });

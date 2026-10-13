@@ -18,6 +18,36 @@ function appVersion(): string {
   }
 }
 
+const isDev = process.env.NODE_ENV === "development";
+
+/*
+ * Content-Security-Policy without nonces, so pages stay static and
+ * cached (nonces would force every page to render per request). Inline
+ * scripts stay allowed — Next's bootstrap needs them — but everything
+ * else is locked to this site plus the image/video hosts we use:
+ * Cloudinary and Supabase storage. Admin uploads go straight to
+ * Cloudinary from the browser.
+ */
+const MEDIA_HOSTS = "https://res.cloudinary.com https://*.supabase.co";
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${MEDIA_HOSTS}`,
+  `media-src 'self' blob: ${MEDIA_HOSTS}`,
+  "font-src 'self' data:",
+  `connect-src 'self' https://api.cloudinary.com${isDev ? " ws:" : ""}`,
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "frame-src 'self'",
+  // The invoice page shows the uploaded PDF (served by this site) in an <object>.
+  "object-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
+].join("; ");
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -56,6 +86,9 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: contentSecurityPolicy },
+          // HTTPS only, for two years (not in local development over http).
+          ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]),
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self)",

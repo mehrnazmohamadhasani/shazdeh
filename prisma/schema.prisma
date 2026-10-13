@@ -655,6 +655,16 @@ model StockMovement {
   @@index([ingredientId, at])
 }
 
+/// Shared rate-limit counters (sign-in, orders), so the limits hold
+/// across every server instance. Expired rows are deleted lazily.
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
 /// Who changed what, before/after, and how (photo, voice, chat, manual).
 model AuditLog {
   id        String   @id @default(cuid())

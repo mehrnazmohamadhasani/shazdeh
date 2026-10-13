@@ -1,0 +1,15 @@
+# Local Postgres for development: `docker compose up -d`, then point
+# DATABASE_URL at postgresql://shazdeh:shazdeh@localhost:5432/shazdeh
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: shazdeh
+      POSTGRES_PASSWORD: shazdeh
+      POSTGRES_DB: shazdeh
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

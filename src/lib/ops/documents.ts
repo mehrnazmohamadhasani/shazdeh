@@ -9,6 +9,7 @@ import { extractionSchema, isStockCategory, type Extraction } from "./extraction
 import { suggestMatches, type Suggestions } from "./match";
 import type { SaveInvoiceInput } from "./save-schema";
 import { normalizeName } from "./units";
+import { reportError } from "@/lib/report-error";
 
 /*
  * Purchase documents: upload → AI reading → review → saved invoice and
@@ -79,7 +80,7 @@ export async function processDocument(id: string) {
       },
     });
   } catch (e) {
-    console.error("[ops] read failed", id, e);
+    await reportError(e, { where: `ops document read ${id}` });
     await prisma.opsDocument.update({
       where: { id },
       data: { status: "FAILED", error: (e instanceof Error ? e.message : String(e)).slice(0, 1000) },
