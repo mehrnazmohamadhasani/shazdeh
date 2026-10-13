@@ -13,6 +13,25 @@ import { EASE } from "@/lib/motion";
  */
 
 const HERO_IMAGE = "/menu/shazdeh-mix.jpg";
+const HERO_VIDEO_MOBILE = "/brand/hero-mobile.mp4";
+const HERO_VIDEO_MOBILE_POSTER = "/brand/hero-mobile-poster.jpg";
+
+/* Phone widths only (below Tailwind `sm`), and never for reduced motion —
+ * so desktop never downloads the clip. */
+const MOBILE_VIDEO_QUERY =
+  "(max-width: 639px) and (prefers-reduced-motion: no-preference)";
+
+function useMobileVideo() {
+  const [enabled, setEnabled] = React.useState(false);
+  React.useEffect(() => {
+    const mq = window.matchMedia(MOBILE_VIDEO_QUERY);
+    const update = () => setEnabled(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return enabled;
+}
 
 export function HomeHero({
   title,
@@ -22,6 +41,7 @@ export function HomeHero({
   subtitle?: string | null;
 }) {
   const sectionRef = React.useRef<HTMLElement>(null);
+  const showVideo = useMobileVideo();
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -46,6 +66,20 @@ export function HomeHero({
           sizes="100vw"
           className="object-cover object-[50%_58%] brightness-[1.05] saturate-[1.05]"
         />
+        {/* Mobile: looping video over the photo, which stays as the fallback */}
+        {showVideo && (
+          <video
+            aria-hidden
+            src={HERO_VIDEO_MOBILE}
+            poster={HERO_VIDEO_MOBILE_POSTER}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
         {/* Warm luminous wash at the top */}
         <div
           aria-hidden
@@ -68,16 +102,17 @@ export function HomeHero({
         className="relative z-10 flex h-full flex-col justify-end pb-24 sm:pb-28 md:pb-32"
       >
         <div className="container-shazdeh">
+          {/* Mobile: video and buttons only; the h1 stays for screen readers */}
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.15, ease: EASE }}
-            className="text-center text-[11px] font-medium uppercase tracking-[0.3em] text-warm-white/85 sm:text-left"
+            className="text-left text-[11px] font-medium uppercase tracking-[0.3em] text-warm-white/85 max-sm:hidden"
           >
             Persian Cuisine · Dubai
           </motion.p>
 
-          <h1 className="t-display mx-auto mt-5 max-w-[13ch] animate-rise text-center [animation-delay:120ms] max-sm:text-[13vw] sm:mx-0 sm:max-w-[14ch] sm:text-left">
+          <h1 className="t-display mt-5 max-w-[14ch] animate-rise text-left [animation-delay:120ms] max-sm:sr-only">
             {title ? (
               title
             ) : (
@@ -91,7 +126,7 @@ export function HomeHero({
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, delay: 0.45, ease: EASE }}
-            className="t-lead mx-auto mt-6 max-w-md text-center text-warm-white/85 sm:mx-0 sm:text-left"
+            className="t-lead mt-6 max-w-md text-left text-warm-white/85 max-sm:hidden"
           >
             {subtitle ??
               "Contemporary Persian cuisine — slow-cooked, saffron-bright, and delivered across Dubai."}
