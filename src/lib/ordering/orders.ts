@@ -647,3 +647,17 @@ export async function getTrackingView(token: string) {
 }
 
 export type TrackingView = NonNullable<Awaited<ReturnType<typeof getTrackingView>>>;
+
+/**
+ * Number, status and time of several orders at once, by tracking token —
+ * enough for the "your orders" list. Unknown tokens are simply left out.
+ */
+export async function getTrackingSummaries(tokens: string[]) {
+  const orders = await prisma.order.findMany({
+    where: { trackingToken: { in: tokens } },
+    select: { trackingToken: true, number: true, status: true, placedAt: true },
+  });
+  return orders.map((o) => ({ token: o.trackingToken, number: o.number, status: o.status, placedAt: o.placedAt.toISOString() }));
+}
+
+export type TrackingSummary = Awaited<ReturnType<typeof getTrackingSummaries>>[number];

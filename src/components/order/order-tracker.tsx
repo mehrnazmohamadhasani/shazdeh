@@ -6,6 +6,7 @@ import { WhatsappIcon } from "@/components/icons/social";
 import { ArchLines } from "@/components/brand/arch";
 import { cart } from "@/components/order/cart-store";
 import { OnTheWayCard } from "@/components/order/on-the-way-card";
+import { OrderSwitcher } from "@/components/order/order-switcher";
 import { pushSupported, requestNotifications, subscribePush } from "@/components/admin/orders/kitchen-alerts";
 import type { TrackingView } from "@/lib/ordering/orders";
 import { formatFils } from "@/lib/ordering/money";
@@ -162,6 +163,8 @@ export function OrderTracker({
           )}
         </div>
       </section>
+
+      <OrderSwitcher current={{ number: view.number, token, placedAt: view.placedAt }} />
 
       <div className="container-shazdeh mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-4">

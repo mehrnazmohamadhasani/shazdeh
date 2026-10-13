@@ -69,5 +69,10 @@ export const placeOrderSchema = z.object({
   expectedTotalFils: z.number().int().nonnegative(),
 });
 
+/** Tracking tokens this device remembers, for the "your orders" list. */
+export const trackStatusesSchema = z.object({
+  tokens: z.array(z.string().regex(/^[A-Za-z0-9_-]{16,64}$/)).min(1).max(10),
+});
+
 export type QuoteInput = z.infer<typeof quoteSchema>;
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;

@@ -1,14 +1,14 @@
 "use client";
 import * as React from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { ChevronDown, Clock, MapPin, Minus, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AreaPicker } from "@/components/order/area-picker";
 import { BasketPanel } from "@/components/order/basket-panel";
 import { ProductSheet, type SheetTarget } from "@/components/order/product-sheet";
-import { cart, recentOrders, useCart, type RecentOrder } from "@/components/order/cart-store";
+import { cart, useCart } from "@/components/order/cart-store";
+import { RecentOrders } from "@/components/order/recent-orders";
 import { useBasket, useOrderData } from "@/components/order/order-data";
 import { formatFils } from "@/lib/ordering/money";
 import type { OrderProduct } from "@/lib/ordering/types";
@@ -25,12 +25,6 @@ import { cn } from "@/lib/utils";
 type Partner = { label: string; url: string };
 
 const noopSubscribe = () => () => {};
-
-/** The last order placed on this device in the past 6 hours, as a stable string snapshot. */
-function recentOrderSnapshot() {
-  const last = recentOrders.list()[0];
-  return JSON.stringify(last && Date.now() - new Date(last.placedAt).getTime() < 6 * 3600_000 ? last : null);
-}
 
 export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsapp?: string }) {
   const { categories, config } = useOrderData();
@@ -56,9 +50,6 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
   );
   const activeSheet: SheetTarget = sheet ?? (!deepLinkDone && deepProduct ? { product: deepProduct } : null);
 
-  // A recent order from this device, offered as "Track your order".
-  const recentRaw = React.useSyncExternalStore(noopSubscribe, recentOrderSnapshot, () => "null");
-  const recent = React.useMemo(() => JSON.parse(recentRaw) as RecentOrder | null, [recentRaw]);
 
   // Ask for the area up-front, once, if none is chosen yet.
   React.useEffect(() => {
@@ -188,17 +179,8 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
 
         {!config.canOrder && <ClosedNotice partners={partners} whatsapp={whatsapp} />}
 
-        {recent && (
-          <Link
-            href={`/order/track/${recent.token}`}
-            className="mt-3 flex min-h-12 items-center justify-between rounded-[14px] bg-black-iron px-4 text-[13.5px] text-warm-white md:max-w-3xl"
-          >
-            <span>
-              Track your order <strong className="tabular-nums">{recent.number}</strong>
-            </span>
-            <span aria-hidden>→</span>
-          </Link>
-        )}
+        {/* Every order this device placed in the last few hours, with its status. */}
+        <RecentOrders />
       </section>
 
       {/* Sticky rail */}

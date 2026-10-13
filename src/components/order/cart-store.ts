@@ -187,10 +187,23 @@ export const savedContact = {
     c ? writeJson("shazdeh.contact.v1", c) : window.localStorage.removeItem("shazdeh.contact.v1"),
 };
 
+/*
+ * Orders placed (or opened) on this device, newest first, so a customer
+ * with several orders can get back to each one. Kept for a day.
+ */
 export type RecentOrder = { number: string; token: string; placedAt: string };
+const RECENT_KEEP_MS = 24 * 3600_000;
+/** How long an order is offered on the order page and the tracker's switcher. */
+export const RECENT_SHOW_MS = 6 * 3600_000;
+const placedWithin = (o: RecentOrder, ms: number) => Date.now() - new Date(o.placedAt).getTime() < ms;
 export const recentOrders = {
-  list: () => readJson<RecentOrder[]>("shazdeh.orders.v1", []),
+  list: () =>
+    readJson<RecentOrder[]>("shazdeh.orders.v1", [])
+      .filter((o) => o && typeof o.token === "string" && placedWithin(o, RECENT_KEEP_MS))
+      .sort((a, b) => b.placedAt.localeCompare(a.placedAt)),
+  /** Orders from the last few hours — the ones still worth tracking. */
+  shown: () => recentOrders.list().filter((o) => placedWithin(o, RECENT_SHOW_MS)),
   add(o: RecentOrder) {
-    writeJson("shazdeh.orders.v1", [o, ...recentOrders.list().filter((x) => x.token !== o.token)].slice(0, 5));
+    writeJson("shazdeh.orders.v1", [o, ...recentOrders.list().filter((x) => x.token !== o.token)].slice(0, 10));
   },
 };
