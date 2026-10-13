@@ -5,18 +5,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ExternalLink,
+  FileText,
   FolderTree,
   Image as ImageIcon,
   LayoutDashboard,
   Link2,
   LogOut,
+  Package,
   ReceiptText,
   Settings as SettingsIcon,
   SlidersHorizontal,
+  Store,
   TicketPercent,
   Truck,
   Users,
   UtensilsCrossed,
+  Wallet,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { cn } from "@/lib/utils";
@@ -33,6 +37,10 @@ const NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: CMS, group: "Daily" },
   { href: "/admin/orders", label: "Orders", icon: ReceiptText, roles: ALL, group: "Daily" },
   { href: "/admin/menu-items", label: "Menu", icon: UtensilsCrossed, roles: CMS, group: "Daily" },
+  { href: "/admin/ops/invoices", label: "Invoices", icon: FileText, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/stock", label: "Stock", icon: Package, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/suppliers", label: "Suppliers", icon: Store, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/payables", label: "Payables", icon: Wallet, roles: CMS, group: "Kitchen" },
   { href: "/admin/categories", label: "Categories", icon: FolderTree, roles: CMS, group: "Setup" },
   { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Setup" },
   { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Setup" },

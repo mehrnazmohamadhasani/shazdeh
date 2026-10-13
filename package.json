@@ -11,11 +11,12 @@
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "SEED_DEMO_ORDERING=1 tsx prisma/seed.ts",
-    "test": "tsx --test src/lib/ordering/__tests__/*.test.ts",
+    "test": "tsx --test src/lib/ordering/__tests__/*.test.ts src/lib/ops/__tests__/*.test.ts",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
     "images:optimize": "tsx scripts/optimize-images.ts",
-    "icons:pwa": "tsx scripts/generate-pwa-icons.ts"
+    "icons:pwa": "tsx scripts/generate-pwa-icons.ts",
+    "icons:push": "tsx scripts/generate-push-icons.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -39,6 +40,7 @@
     "lucide-react": "^1.14.0",
     "motion": "^12.38.0",
     "next": "16.2.6",
+    "pdf-lib": "1.17.1",
     "pg": "^8.16.3",
     "react": "19.2.6",
     "react-dom": "19.2.6",

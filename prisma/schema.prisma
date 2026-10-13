@@ -21,51 +21,52 @@ enum UserRole {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  passwordHash  String
-  role          UserRole @default(ADMIN)
+  id                String             @id @default(cuid())
+  email             String             @unique
+  name              String?
+  passwordHash      String
+  role              UserRole           @default(ADMIN)
   pushSubscriptions PushSubscription[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  opsDocuments      OpsDocument[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 // ─── Menu ────────────────────────────────────────────────────────────────────
 
 model Category {
-  id          String     @id @default(cuid())
-  slug        String     @unique
-  name        String
-  order       Int        @default(0)
-  isActive    Boolean    @default(true)
-  items       MenuItem[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  name      String
+  order     Int        @default(0)
+  isActive  Boolean    @default(true)
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 model MenuItem {
-  id            String        @id @default(cuid())
-  slug          String        @unique
-  name          String
-  nameFa        String?
-  description   String?
-  price         Float
-  imageUrl      String?
-  categoryId    String
-  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  ingredients   String?
-  allergens     String?
-  isVegetarian  Boolean       @default(false)
-  isAvailable   Boolean       @default(true)
+  id             String          @id @default(cuid())
+  slug           String          @unique
+  name           String
+  nameFa         String?
+  description    String?
+  price          Float
+  imageUrl       String?
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  ingredients    String?
+  allergens      String?
+  isVegetarian   Boolean         @default(false)
+  isAvailable    Boolean         @default(true)
   // false = hidden from the menu and ordering entirely ("disabled").
   // isAvailable=false keeps it visible but marked sold out.
-  isActive      Boolean       @default(true)
-  order         Int           @default(0)
+  isActive       Boolean         @default(true)
+  order          Int             @default(0)
   modifierGroups ModifierGroup[]
-  orderItems    OrderItem[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  orderItems     OrderItem[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([categoryId])
 }
@@ -113,7 +114,7 @@ model GalleryImage {
 
 model SocialLink {
   id        String   @id @default(cuid())
-  platform  String   // instagram | tiktok | whatsapp | talabat | deliveroo | careem | noon
+  platform  String // instagram | tiktok | whatsapp | talabat | deliveroo | careem | noon
   label     String
   url       String
   order     Int      @default(0)
@@ -123,19 +124,19 @@ model SocialLink {
 }
 
 model RestaurantSettings {
-  id            String   @id @default("default")
-  brandName     String   @default("Shazdeh")
-  description   String?
-  email         String?
-  phone         String?
-  whatsapp      String?
-  address       String?
-  openingHours  String?  // JSON string of weekly hours
-  logoUrl       String?
-  metaTitle     String?
-  metaDesc      String?
-  ogImageUrl    String?
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default("default")
+  brandName    String   @default("Shazdeh")
+  description  String?
+  email        String?
+  phone        String?
+  whatsapp     String?
+  address      String?
+  openingHours String? // JSON string of weekly hours
+  logoUrl      String?
+  metaTitle    String?
+  metaDesc     String?
+  ogImageUrl   String?
+  updatedAt    DateTime @updatedAt
 }
 
 // ─── Online ordering ────────────────────────────────────────────────────────
@@ -168,8 +169,8 @@ enum OrderStatus {
 }
 
 enum PaymentStatus {
-  PENDING          // waiting for the gateway
-  PAY_ON_DELIVERY  // cash / card machine at the door
+  PENDING // waiting for the gateway
+  PAY_ON_DELIVERY // cash / card machine at the door
   PAID
   FAILED
   REFUNDED
@@ -231,12 +232,12 @@ model DeliveryZone {
 /// A named community ("Dubai Marina", "JLT") — how people in Dubai
 /// describe where they live. Each belongs to exactly one zone.
 model DeliveryArea {
-  id       String       @id @default(cuid())
-  zoneId   String
-  zone     DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  name     String       @unique
-  lat      Float?
-  lng      Float?
+  id     String       @id @default(cuid())
+  zoneId String
+  zone   DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  name   String       @unique
+  lat    Float?
+  lng    Float?
 
   @@index([zoneId])
 }
@@ -273,76 +274,76 @@ model Customer {
 }
 
 model Order {
-  id               String        @id @default(cuid())
-  number           String        @unique // shown to humans, e.g. SZ-482913
-  trackingToken    String        @unique // unguessable, for the tracking link
-  idempotencyKey   String        @unique
-  status           OrderStatus
-  paymentMethod    PaymentMethod
-  paymentStatus    PaymentStatus
+  id             String        @id @default(cuid())
+  number         String        @unique // shown to humans, e.g. SZ-482913
+  trackingToken  String        @unique // unguessable, for the tracking link
+  idempotencyKey String        @unique
+  status         OrderStatus
+  paymentMethod  PaymentMethod
+  paymentStatus  PaymentStatus
 
-  customerId       String?
-  customer         Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  customerName     String
-  customerPhone    String
-  customerEmail    String?
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName  String
+  customerPhone String
+  customerEmail String?
 
   // Address snapshot — never re-read from anywhere after placement.
-  zoneId           String?
-  zoneName         String
-  areaName         String
-  addressType      String        // apartment | villa | office
-  building         String
-  street           String?
-  unit             String?
-  floor            String?
-  instructions     String?
-  lat              Float?
-  lng              Float?
+  zoneId       String?
+  zoneName     String
+  areaName     String
+  addressType  String // apartment | villa | office
+  building     String
+  street       String?
+  unit         String?
+  floor        String?
+  instructions String?
+  lat          Float?
+  lng          Float?
 
-  notes            String?
-  cutlery          Boolean       @default(false)
+  notes   String?
+  cutlery Boolean @default(false)
 
-  currency         String        @default("AED")
-  subtotalFils     Int
-  deliveryFeeFils  Int
-  serviceFeeFils   Int           @default(0)
-  discountFils     Int           @default(0)
-  vatFils          Int           @default(0) // VAT contained in (or added to) the total
-  totalFils        Int
-  couponId         String?
-  couponCode       String?
+  currency        String  @default("AED")
+  subtotalFils    Int
+  deliveryFeeFils Int
+  serviceFeeFils  Int     @default(0)
+  discountFils    Int     @default(0)
+  vatFils         Int     @default(0) // VAT contained in (or added to) the total
+  totalFils       Int
+  couponId        String?
+  couponCode      String?
 
-  etaMin           Int
-  etaMax           Int
-  rejectionReason  String?
+  etaMin          Int
+  etaMax          Int
+  rejectionReason String?
 
-  deliveryProvider String        @default("own_fleet")
+  deliveryProvider String  @default("own_fleet")
   deliveryRef      String?
   trackingUrl      String?
   driverName       String?
   driverPhone      String?
 
-  placedAt         DateTime      @default(now())
-  confirmedAt      DateTime?
-  preparingAt      DateTime?
-  readyAt          DateTime?
-  dispatchedAt     DateTime?
-  deliveredAt      DateTime?
-  cancelledAt      DateTime?
+  placedAt     DateTime  @default(now())
+  confirmedAt  DateTime?
+  preparingAt  DateTime?
+  readyAt      DateTime?
+  dispatchedAt DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
   // Staff acknowledged the order — the admin alarm rings until this is
   // set (accepting does it; auto-accepted orders need a "Got it").
-  seenAt           DateTime?
+  seenAt       DateTime?
   // Kitchen + delivery tickets printed. Claimed atomically so only one
   // auto-printing device prints each order.
-  printedAt        DateTime?
+  printedAt    DateTime?
 
-  items            OrderItem[]
-  events           OrderEvent[]
-  payments         Payment[]
+  items             OrderItem[]
+  events            OrderEvent[]
+  payments          Payment[]
   pushSubscriptions PushSubscription[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([status, placedAt])
   @@index([customerPhone])
@@ -357,7 +358,7 @@ model OrderItem {
   menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   name          String
   portion       String?
-  unitPriceFils Int       // dish + selected options
+  unitPriceFils Int // dish + selected options
   quantity      Int
   lineTotalFils Int
   notes         String?
@@ -373,10 +374,10 @@ model OrderEvent {
   id        String       @id @default(cuid())
   orderId   String
   order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  type      String       // status | payment | note | dispatch
+  type      String // status | payment | note | dispatch
   status    OrderStatus?
   message   String?
-  actor     String       // staff email, "customer", "system" or a provider id
+  actor     String // staff email, "customer", "system" or a provider id
   createdAt DateTime     @default(now())
 
   @@index([orderId])
@@ -386,7 +387,7 @@ model Payment {
   id            String        @id @default(cuid())
   orderId       String
   order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  provider      String        // cash | stripe | mock | …
+  provider      String // cash | stripe | mock | …
   providerRef   String?
   method        PaymentMethod
   amountFils    Int
@@ -415,9 +416,9 @@ model Notification {
   id        String   @id @default(cuid())
   orderId   String?
   event     String
-  channel   String   // email | push | webhook | log
+  channel   String // email | push | webhook | log
   recipient String?
-  status    String   // sent | failed | skipped
+  status    String // sent | failed | skipped
   error     String?
   createdAt DateTime @default(now())
 
@@ -439,4 +440,225 @@ model PushSubscription {
 
   @@index([orderId])
   @@index([userId])
+}
+
+// ─── Ops: purchasing and stock ──────────────────────────────────────────────
+// A supplier invoice is photographed, read by AI into a canonical shape
+// (OpsDocument.extraction), reviewed by a person, then saved as a
+// PurchaseInvoice whose food/packaging lines add StockMovements. Stock on
+// hand is always the sum of movements — never a stored number. Money is
+// integer fils like orders.
+
+enum OpsDocumentStatus {
+  PROCESSING // AI is reading it
+  NEEDS_REVIEW // read; waiting for a person to confirm
+  SAVED // turned into a purchase invoice
+  FAILED // AI could not read it (see error)
+  DISCARDED
+}
+
+/// What a purchase line is. Only FOOD and PACKAGING feed food cost.
+enum SpendCategory {
+  FOOD
+  PACKAGING
+  SMALLWARES
+  DELIVERY
+  OTHER
+}
+
+/// Stock is counted in grams, millilitres or pieces.
+enum StockUnit {
+  G
+  ML
+  PCS
+}
+
+enum StockMovementType {
+  PURCHASE
+  CONSUMPTION
+  WASTE
+  STAFF_MEAL
+  ADJUSTMENT
+  COUNT
+}
+
+/// An uploaded file, kept immutably (private — served only to admins).
+model OpsDocument {
+  id             String            @id @default(cuid())
+  kind           String            @default("supplier_invoice")
+  status         OpsDocumentStatus @default(PROCESSING)
+  sha256         String            @unique // duplicate uploads are caught here
+  mimeType       String
+  sizeBytes      Int
+  data           Bytes
+  originalName   String?
+  /// Canonical AI output (src/lib/ops/extraction.ts) plus matches to
+  /// existing suppliers/ingredients.
+  extraction     Json?
+  aiModel        String?
+  aiInputTokens  Int?
+  aiOutputTokens Int?
+  error          String?
+  uploadedById   String?
+  uploadedBy     User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  invoice        PurchaseInvoice?  @relation("InvoiceDocument")
+  voidedInvoices PurchaseInvoice[] @relation("VoidedInvoiceDocument")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model Supplier {
+  id               String            @id @default(cuid())
+  name             String
+  trn              String?
+  phone            String?
+  notes            String?
+  /// Days the supplier delivers: 0 = Sunday … 6 = Saturday.
+  deliveryDays     Int[]             @default([])
+  /// Days from order to delivery.
+  leadTimeDays     Int?
+  /// Credit terms: days after the invoice date that payment is due.
+  paymentTermsDays Int?
+  invoices         PurchaseInvoice[]
+  items            SupplierItem[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([name])
+  @@index([trn])
+}
+
+model Ingredient {
+  id            String          @id @default(cuid())
+  name          String          @unique
+  nameFa        String?
+  unit          StockUnit
+  category      SpendCategory   @default(FOOD)
+  supplierItems SupplierItem[]
+  purchaseLines PurchaseLine[]
+  movements     StockMovement[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+/// Learned from confirmations: how a supplier prints an item, and how
+/// much stock one of its units is ("Fanoos Sella 4x10kg" → rice, 40000 g).
+model SupplierItem {
+  id             String     @id @default(cuid())
+  supplierId     String
+  supplier       Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  rawName        String // normalised: lower-case, single spaces
+  ingredientId   String
+  ingredient     Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  baseQtyPerUnit Float
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([supplierId, rawName])
+}
+
+model PurchaseInvoice {
+  id               String         @id @default(cuid())
+  documentId       String?        @unique
+  document         OpsDocument?   @relation("InvoiceDocument", fields: [documentId], references: [id], onDelete: SetNull)
+  supplierId       String
+  supplier         Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  invoiceNo        String?
+  invoiceDate      DateTime
+  paymentMode      String? // cash | card | credit | transfer
+  pricesIncludeVat Boolean        @default(false)
+  subtotalFils     Int?
+  discountFils     Int            @default(0)
+  vatFils          Int?
+  totalFils        Int
+  /// Handwritten hints and other notes read from the paper.
+  notes            String?
+  /// Credit invoices: when payment is due; null for cash/card.
+  dueDate          DateTime?
+  paidAt           DateTime?
+  /// Who paid: "Owner", a staff name, "Company card"…
+  paidBy           String?
+  paymentNote      String?
+  /// Undone: stock was reversed and the document went back to review.
+  voidedAt         DateTime?
+  voidReason       String?
+  voidedDocumentId String?
+  voidedDocument   OpsDocument?   @relation("VoidedInvoiceDocument", fields: [voidedDocumentId], references: [id], onDelete: SetNull)
+  createdById      String?
+  lines            PurchaseLine[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  // Not unique in the database: an undone invoice keeps its number and
+  // may be saved again. Duplicates among live invoices are checked in code.
+  @@index([supplierId, invoiceNo])
+  @@index([invoiceDate])
+  @@index([paymentMode, paidAt])
+}
+
+model PurchaseLine {
+  id            String          @id @default(cuid())
+  invoiceId     String
+  invoice       PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  rawName       String
+  itemCode      String?
+  quantity      Float
+  unit          String? // as printed: Pcs, kg, CTN…
+  unitPriceFils Int?
+  discountFils  Int             @default(0)
+  vatFils       Int?
+  lineTotalFils Int
+  /// Cost of this line without VAT, after its share of any invoice
+  /// discount — what food cost uses (SHĀZDEH reclaims input VAT).
+  netFils       Int?
+  category      SpendCategory
+  ingredientId  String?
+  ingredient    Ingredient?     @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  /// Stock added, in the ingredient's unit (quantity × pack size).
+  baseQty       Float?
+  movement      StockMovement?
+
+  @@index([invoiceId])
+  @@index([ingredientId])
+}
+
+/// Append-only stock ledger. quantity is signed, in the ingredient's unit.
+model StockMovement {
+  id             String            @id @default(cuid())
+  ingredientId   String
+  ingredient     Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  type           StockMovementType
+  quantity       Float
+  /// What this quantity cost, when known (purchases).
+  costFils       Int?
+  at             DateTime
+  purchaseLineId String?           @unique
+  purchaseLine   PurchaseLine?     @relation(fields: [purchaseLineId], references: [id], onDelete: Cascade)
+  /// Set on the movement that cancels another (undoing an invoice).
+  reversesId     String?           @unique
+  reverses       StockMovement?    @relation("Reversal", fields: [reversesId], references: [id], onDelete: Restrict)
+  reversedBy     StockMovement?    @relation("Reversal")
+  note           String?
+  createdById    String?
+  createdAt      DateTime          @default(now())
+
+  @@index([ingredientId, at])
+}
+
+/// Who changed what, before/after, and how (photo, voice, chat, manual).
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String // user email or "system"
+  action    String // e.g. purchase_invoice.create
+  entity    String
+  entityId  String
+  via       String   @default("manual")
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
 }
