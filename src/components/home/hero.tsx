@@ -1,37 +1,34 @@
 "use client";
 import * as React from "react";
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "motion/react";
 import { EASE } from "@/lib/motion";
 
 /*
  * Home hero — full-bleed photograph of the SHĀZDEH Mix with the brand
- * line set large. The image is the LCP element, so it is preloaded and
- * served responsively; a dark base keeps the headline legible while it
- * loads.
+ * line set large. The image is the LCP element, so it is fetched with
+ * high priority and served responsively; a dark base keeps the headline
+ * legible while it loads. Phones get a portrait photo instead (art
+ * direction).
  */
 
 const HERO_IMAGE = "/menu/shazdeh-mix.jpg";
-const HERO_VIDEO_MOBILE = "/brand/hero-mobile.mp4";
-const HERO_VIDEO_MOBILE_POSTER = "/brand/hero-mobile-poster.jpg";
+const HERO_IMAGE_MOBILE = "/brand/hero-mobile.jpg";
 
-/* Phone widths only (below Tailwind `sm`), and never for reduced motion —
- * so desktop never downloads the clip. */
-const MOBILE_VIDEO_QUERY =
-  "(max-width: 639px) and (prefers-reduced-motion: no-preference)";
-
-function useMobileVideo() {
-  const [enabled, setEnabled] = React.useState(false);
-  React.useEffect(() => {
-    const mq = window.matchMedia(MOBILE_VIDEO_QUERY);
-    const update = () => setEnabled(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return enabled;
-}
+const HERO_IMAGE_COMMON = {
+  alt: "Saffron rice from the SHĀZDEH kitchen, crowned with khoresh, barberries and pistachio",
+  fill: true,
+  sizes: "100vw",
+  fetchPriority: "high",
+  loading: "eager",
+} as const;
+const {
+  props: { srcSet: heroDesktopSrcSet },
+} = getImageProps({ ...HERO_IMAGE_COMMON, src: HERO_IMAGE });
+const {
+  props: { srcSet: heroMobileSrcSet, ...heroImgProps },
+} = getImageProps({ ...HERO_IMAGE_COMMON, src: HERO_IMAGE_MOBILE });
 
 export function HomeHero({
   title,
@@ -41,7 +38,6 @@ export function HomeHero({
   subtitle?: string | null;
 }) {
   const sectionRef = React.useRef<HTMLElement>(null);
-  const showVideo = useMobileVideo();
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -58,28 +54,15 @@ export function HomeHero({
       className="relative h-[100svh] min-h-[620px] w-full overflow-hidden bg-[#2a1d16] text-warm-white"
     >
       <motion.div style={{ y, scale }} className="absolute inset-0 will-change-transform">
-        <Image
-          src={HERO_IMAGE}
-          alt="SHĀZDEH Mix — three saffron rice crowns filled with khoresh"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-[50%_58%] brightness-[1.05] saturate-[1.05]"
-        />
-        {/* Mobile: looping video over the photo, which stays as the fallback */}
-        {showVideo && (
-          <video
-            aria-hidden
-            src={HERO_VIDEO_MOBILE}
-            poster={HERO_VIDEO_MOBILE_POSTER}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            className="absolute inset-0 h-full w-full object-cover"
+        <picture>
+          <source media="(min-width: 640px)" srcSet={heroDesktopSrcSet} />
+          <source srcSet={heroMobileSrcSet} />
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- alt comes from getImageProps */}
+          <img
+            {...heroImgProps}
+            className="object-cover sm:object-[50%_58%] sm:brightness-[1.05] sm:saturate-[1.05]"
           />
-        )}
+        </picture>
         {/* Warm luminous wash at the top */}
         <div
           aria-hidden
@@ -102,7 +85,7 @@ export function HomeHero({
         className="relative z-10 flex h-full flex-col justify-end pb-24 sm:pb-28 md:pb-32"
       >
         <div className="container-shazdeh">
-          {/* Mobile: video and buttons only; the h1 stays for screen readers */}
+          {/* Mobile: photo and buttons only; the h1 stays for screen readers */}
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
