@@ -13,17 +13,19 @@ import { SCOOTER_VIEWBOX, scooterMarkup } from "@/components/order/scooter-art";
 
 const MIN_RIDE_MS = 10 * 60_000;
 
-const SCOOTER = scooterMarkup({
-  body: "#ce4927",
+const COLORS = {
+  body: "#fdf6ec",
   wheel: "#000000",
   rim: "#fdf6ec",
-  box: "#fdf6ec",
-  mark: "#ce4927",
+  box: "#ce4927",
+  mark: "#fdf6ec",
   light: "#d68a64",
-});
+};
 
 export function Scooter({ className }: { className?: string }) {
-  return <svg aria-hidden viewBox={SCOOTER_VIEWBOX} className={className} dangerouslySetInnerHTML={{ __html: SCOOTER }} />;
+  const id = React.useId();
+  const markup = React.useMemo(() => scooterMarkup(COLORS, { id }), [id]);
+  return <svg aria-hidden viewBox={SCOOTER_VIEWBOX} className={className} dangerouslySetInnerHTML={{ __html: markup }} />;
 }
 
 function clock(ms: number) {
@@ -60,8 +62,11 @@ export function OnTheWayCard({
 
   const start = Date.parse(dispatchedAt);
   const eta = Math.max(Date.parse(placedAt) + etaMax * 60_000, start + MIN_RIDE_MS);
-  const progress = now === null ? 8 : Math.min(92, Math.max(8, ((now - start) / (eta - start)) * 100));
+  const progress = now === null ? 8 : Math.min(86, Math.max(8, ((now - start) / (eta - start)) * 100));
   const minutes = now === null ? null : Math.ceil((eta - now) / 60_000);
+  // The scooter's front sits at the progress point; the first 40px keep
+  // its body (and speed lines) inside the card at the start of the ride.
+  const at = `calc(40px + (100% - 40px) * ${progress / 100})`;
 
   return (
     <div className="mt-7 max-w-xl rounded-[22px] border border-white/10 bg-gradient-to-br from-white/[0.10] to-white/[0.03] p-5 sm:p-6">
@@ -88,12 +93,12 @@ export function OnTheWayCard({
           <span
             aria-hidden
             className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-gradient-to-r from-terracotta to-apricot-clay transition-[width] duration-1000 ease-out"
-            style={{ width: `${progress}%` }}
+            style={{ width: at }}
           />
           <span
             aria-hidden
             className="absolute top-1/2 transition-[left] duration-1000 ease-out"
-            style={{ left: `${progress}%`, translate: "-60% -90%" }}
+            style={{ left: at, translate: "-60% -90%" }}
           >
             <span className="absolute -left-4 top-[40%] flex flex-col gap-1">
               {[0, 1, 2].map((i) => (
