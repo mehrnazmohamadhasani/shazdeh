@@ -19,11 +19,10 @@ shazdeh ── public site (cinematic, mobile-first, SEO-ready)
 
 Direct ordering (menu → basket → checkout → tracking), the staff order
 board, delivery zones, promo codes, provider-agnostic online payments and
-notification hooks. Ordering ships **switched off**; see:
-
-- [`docs/ordering/README.md`](docs/ordering/README.md) — architecture, routes, security, go-live runbook, roadmap
-- [`docs/ordering/owner-checklist.md`](docs/ordering/owner-checklist.md) — what to collect from the restaurant
-- [`docs/ordering/legal-dubai.md`](docs/ordering/legal-dubai.md) — Dubai/UAE regulatory research
+notification hooks. Ordering ships **switched off**. Its internal docs
+(architecture and go-live runbook, owner checklist, Dubai/UAE legal
+research) live in `docs/ordering/`, which is kept locally and not
+published to this repository.
 
 ```bash
 npm run db:seed:demo   # local only: demo zones, add-ons, promo NOOSH10, ordering on
