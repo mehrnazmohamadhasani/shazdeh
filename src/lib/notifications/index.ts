@@ -55,9 +55,10 @@ const CUSTOMER_COPY: Partial<Record<OrderEventName, { subject: string; line: str
 };
 
 // "On its way" gets the delivery scooter (scripts/generate-push-icons.ts)
-// in the push notification and the email.
-const ON_THE_WAY_ICON = "/icons/on-the-way.png";
-const ON_THE_WAY_BADGE = "/icons/badge-on-the-way.png";
+// in the push notification and the email. Bump ?v= whenever the icons
+// are regenerated: mail clients and the service worker cache by URL.
+const ON_THE_WAY_ICON = "/icons/on-the-way.png?v=2";
+const ON_THE_WAY_BADGE = "/icons/badge-on-the-way.png?v=2";
 
 const RESTAURANT_EVENTS: OrderEventName[] = ["order.received", "payment.received", "order.cancelled"];
 
