@@ -159,6 +159,7 @@ export const ops: Record<string, string> = {
   Type: "نوع",
   Food: "مواد غذایی",
   Packaging: "بسته‌بندی",
+  "Supplies (gas, cleaning, disposables)": "مصرفی (گاز، شوینده، یک‌بارمصرف)",
   "Kitchen equipment": "لوازم آشپزخانه",
   "Delivery charge": "هزینه‌ی حمل",
   Other: "سایر",

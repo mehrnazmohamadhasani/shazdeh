@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, PackageOpen } from "lucide-react";
 import { AdminPage, Card, EmptyState } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { UploadButton } from "@/components/admin/ops/upload-button";
@@ -23,6 +23,11 @@ export default async function StockPage() {
       actions={
         <>
           <Button asChild variant="outline" size="md">
+            <Link href="/admin/ops/stock/opening">
+              <PackageOpen className="h-4 w-4" /> {t("Opening stock")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="md">
             <Link href="/admin/ops/stock/count">
               <ClipboardList className="h-4 w-4" /> {t("Count stock")}
             </Link>
@@ -33,7 +38,17 @@ export default async function StockPage() {
     >
       <Card bodyClassName="p-0">
         {rows.length === 0 ? (
-          <EmptyState title={t("No stock yet")} description={t("Save your first supplier invoice and its ingredients appear here.")} />
+          <EmptyState
+            title={t("No stock yet")}
+            description={t("Starting out? Enter what is in the kitchen today as the opening stock, then add this month's invoices.")}
+            action={
+              <Button asChild size="md">
+                <Link href="/admin/ops/stock/opening">
+                  <PackageOpen className="h-4 w-4" /> {t("Enter opening stock")}
+                </Link>
+              </Button>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-[14px]">
@@ -55,6 +70,7 @@ export default async function StockPage() {
                           {r.name}
                         </Link>
                         {r.category === "PACKAGING" && <span className="ms-2 text-[12px] font-normal text-dark-grey">{t("packaging")}</span>}
+                        {r.category === "SUPPLIES" && <span className="ms-2 text-[12px] font-normal text-dark-grey">{t("supplies")}</span>}
                       </td>
                       <td className={`px-3 py-3 text-end tabular-nums ${r.onHand < 0 ? "text-pomegranate-red" : ""}`}>{amountText(r.onHand, unit, locale)}</td>
                       <td className="px-3 py-3 text-end tabular-nums text-dark-grey">

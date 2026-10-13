@@ -8,7 +8,7 @@ import { Card, Field, IconButton, Select, StatusPill, TextArea, TextInput, contr
 import { messageFromUnknown } from "@/lib/error-message";
 import { cn } from "@/lib/utils";
 import { checkExtraction, type Flag } from "@/lib/ops/checks";
-import { SPEND_CATEGORIES, type Extraction } from "@/lib/ops/extraction";
+import { SPEND_CATEGORIES, isStockCategory, type Extraction } from "@/lib/ops/extraction";
 import type { Suggestions } from "@/lib/ops/match";
 import type { SaveInvoiceInput } from "@/lib/ops/save-schema";
 import type { BaseUnit } from "@/lib/ops/units";
@@ -52,6 +52,7 @@ type LineState = {
 const CATEGORY_LABEL: Record<Category, string> = {
   food: "Food",
   packaging: "Packaging",
+  supplies: "Supplies (gas, cleaning, disposables)",
   smallwares: "Kitchen equipment",
   delivery: "Delivery charge",
   other: "Other",
@@ -67,7 +68,7 @@ function num(v: string): number | null {
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 }
-const isStock = (c: Category) => c === "food" || c === "packaging";
+const isStock = (c: Category) => isStockCategory(c);
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export function InvoiceReview({

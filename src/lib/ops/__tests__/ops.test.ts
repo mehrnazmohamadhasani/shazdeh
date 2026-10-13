@@ -191,3 +191,31 @@ test("Shop receipt with VAT-inclusive prices", () => {
   assert.equal(out[0].netFils, 2000);
   assert.equal(out[0].vatFils, 100);
 });
+
+// ─── Opening stock: pasted lists ─────────────────────────────────────────────
+import { parseStockLines } from "../paste";
+
+test("opening stock lines from Excel (tabs) and typed text", () => {
+  assert.deepEqual(parseStockLines("Sella rice\t200\tkg\t5.25\nRose water\t12\tL\t8.5\nSoup cup\t500\tpcs"), [
+    { name: "Sella rice", unit: "g", quantity: 200, price: 5.25 },
+    { name: "Rose water", unit: "ml", quantity: 12, price: 8.5 },
+    { name: "Soup cup", unit: "pcs", quantity: 500, price: null },
+  ]);
+  // typed with commas; grams become kg and the price follows
+  assert.deepEqual(parseStockLines("Saffron, 250, g, 0.9"), [{ name: "Saffron", unit: "g", quantity: 0.25, price: 900 }]);
+  // no separators
+  assert.deepEqual(parseStockLines("Lamb leg 15 kg 40"), [{ name: "Lamb leg", unit: "g", quantity: 15, price: 40 }]);
+  // Persian, with Persian digits and the Persian comma
+  assert.deepEqual(parseStockLines("برنج سلا، ۲۰۰، کیلو، ۵.۲۵"), [{ name: "برنج سلا", unit: "g", quantity: 200, price: 5.25 }]);
+  // thousands separator
+  assert.deepEqual(parseStockLines("Bags\t1,200\tpcs\t0.5"), [{ name: "Bags", unit: "pcs", quantity: 1200, price: 0.5 }]);
+});
+
+test("supplies are stock but not food cost; equipment is neither", async () => {
+  const { isStockCategory } = await import("../extraction");
+  assert.equal(isStockCategory("supplies"), true);
+  assert.equal(isStockCategory("food"), true);
+  assert.equal(isStockCategory("packaging"), true);
+  assert.equal(isStockCategory("smallwares"), false);
+  assert.equal(isStockCategory("delivery"), false);
+});

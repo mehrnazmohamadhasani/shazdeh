@@ -457,10 +457,12 @@ enum OpsDocumentStatus {
   DISCARDED
 }
 
-/// What a purchase line is. Only FOOD and PACKAGING feed food cost.
+/// What a purchase line is. Only FOOD and PACKAGING feed food cost;
+/// SUPPLIES (gas, cleaning, disposables) are kept in stock but are not food cost.
 enum SpendCategory {
   FOOD
   PACKAGING
+  SUPPLIES
   SMALLWARES
   DELIVERY
   OTHER
@@ -474,6 +476,8 @@ enum StockUnit {
 }
 
 enum StockMovementType {
+  /// What was already in the kitchen when SHĀZDEH started using the system.
+  OPENING
   PURCHASE
   CONSUMPTION
   WASTE

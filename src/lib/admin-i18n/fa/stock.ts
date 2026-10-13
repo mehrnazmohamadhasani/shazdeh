@@ -20,6 +20,8 @@ export const stock: Record<string, string> = {
   "Last price (ex VAT)": "آخرین قیمت (بدون VAT)",
   "Last bought": "آخرین خرید",
   packaging: "بسته‌بندی",
+  supplies: "مصرفی",
+  Supplies: "مصرفی",
 
   // Stock count
   "Stock count": "شمارش انبار",
@@ -149,4 +151,30 @@ export const stock: Record<string, string> = {
   "Use YYYY-MM-DD": "تاریخ را به شکل YYYY-MM-DD وارد کنید",
   "That record already exists.": "این مورد از قبل وجود دارد.",
   "A related record is missing or still in use.": "یک مورد مرتبط پیدا نشد یا هنوز در حال استفاده است.",
+
+  // Opening stock
+  "Opening stock": "موجودی اولیه",
+  "Enter opening stock": "ثبت موجودی اولیه",
+  "Everything that was already in the kitchen on the first day, once. After this, add that month's invoices — the stock then stays right on its own.":
+    "یک بار، هر چیزی که روز اول در آشپزخانه بود. بعد فاکتورهای همان ماه را اضافه کنید؛ از آن به بعد انبار خودش درست می‌ماند.",
+  "Starting out? Enter what is in the kitchen today as the opening stock, then add this month's invoices.":
+    "تازه شروع می‌کنید؟ موجودی امروز آشپزخانه را به‌عنوان موجودی اولیه وارد کنید، بعد فاکتورهای این ماه را اضافه کنید.",
+  "Stock on the morning of": "موجودی صبحِ روز",
+  "Paste from Excel": "چسباندن از Excel",
+  "One item per line: name, quantity, unit, price per unit": "هر قلم در یک خط: اسم، مقدار، واحد، قیمت هر واحد",
+  "Copy the columns from Excel, or type e.g. “Sella rice, 200, kg, 5.25”. Units: kg, g, L, ml, pcs.":
+    "ستون‌ها را از Excel کپی کنید یا بنویسید مثلاً «برنج سلا، 200، کیلو، 5.25». واحدها: کیلو، گرم، لیتر، ml، عدد.",
+  "Add these lines": "افزودن این خط‌ها",
+  "Nothing to add — check the lines": "چیزی برای افزودن نیست؛ خط‌ها را بررسی کنید",
+  "{n} lines added — check them below": "{n} خط اضافه شد؛ پایین بررسی‌شان کنید",
+  "Item {n}": "قلم {n}",
+  "Sella rice": "برنج سلا",
+  Amount: "مقدار",
+  "Price per {unit} (ex VAT)": "قیمت هر {unit} (بدون VAT)",
+  "Already has an opening stock — use a stock count instead": "موجودی اولیه‌اش قبلاً ثبت شده؛ به‌جایش از شمارش انبار استفاده کنید",
+  "{name} already has an opening stock": "موجودی اولیه‌ی {name} قبلاً ثبت شده",
+  "Add at least one item with an amount": "دست‌کم یک قلم با مقدار وارد کنید",
+  "Save opening stock ({n})": "ذخیره‌ی موجودی اولیه ({n})",
+  "Opening stock saved — {n} items": "موجودی اولیه ذخیره شد — {n} قلم",
+  "Value {amount}": "ارزش {amount}",
 };

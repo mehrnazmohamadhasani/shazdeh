@@ -20,7 +20,7 @@ export const mergeSchema = z.object({ intoId: z.string().min(1) });
 export const ingredientUpdateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   nameFa: text(120),
-  category: z.enum(["FOOD", "PACKAGING"]),
+  category: z.enum(["FOOD", "PACKAGING", "SUPPLIES"]),
 });
 
 export const movementSchema = z.object({
@@ -34,4 +34,24 @@ export const movementSchema = z.object({
 export const countSchema = z.object({
   day,
   counts: z.array(z.object({ ingredientId: z.string().min(1), counted: z.number().finite().min(0) })).min(1).max(500),
+});
+
+export const openingSchema = z.object({
+  day,
+  rows: z
+    .array(
+      z.object({
+        /** Existing ingredient, or null to find/create one by name. */
+        ingredientId: z.string().nullable(),
+        name: z.string().trim().min(1).max(120),
+        unit: z.enum(["g", "ml", "pcs"]),
+        category: z.enum(["FOOD", "PACKAGING", "SUPPLIES"]),
+        /** In the ingredient's unit (g / ml / pcs). */
+        quantity: z.number().finite().positive(),
+        /** Value of the whole row in AED, ex VAT; null when unknown. */
+        value: z.number().finite().min(0).nullable(),
+      }),
+    )
+    .min(1)
+    .max(1000),
 });

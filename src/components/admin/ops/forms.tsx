@@ -2,18 +2,20 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { ClipboardPaste, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, Select, TextArea, TextInput } from "@/components/admin/ui";
+import { Field, IconButton, Select, TextArea, TextInput } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { amountText, weekday } from "@/components/admin/ops/format";
 import { messageFromUnknown } from "@/lib/error-message";
 import type { BaseUnit } from "@/lib/ops/units";
+import { parseStockLines } from "@/lib/ops/paste";
 import { cn } from "@/lib/utils";
 
 /*
  * Small forms for the purchasing screens: supplier details, merging,
- * ingredient details, manual stock movements and the stock count.
+ * ingredient details, manual stock movements, the stock count and the
+ * opening stock.
  * Amounts are typed in kg / L / pieces and sent in g / ml / pieces.
  */
 
@@ -211,7 +213,7 @@ export function MergeForm({
 export function IngredientForm({
   ingredient,
 }: {
-  ingredient: { id: string; name: string; nameFa: string | null; category: "FOOD" | "PACKAGING" };
+  ingredient: { id: string; name: string; nameFa: string | null; category: "FOOD" | "PACKAGING" | "SUPPLIES" };
 }) {
   const { t } = useAdminI18n();
   const { busy, submit } = useSubmit();
@@ -236,6 +238,7 @@ export function IngredientForm({
         <Select value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
           <option value="FOOD">{t("Food")}</option>
           <option value="PACKAGING">{t("Packaging")}</option>
+                    <option value="SUPPLIES">{t("Supplies")}</option>
         </Select>
       </Field>
       <div className="sm:col-span-3">
@@ -374,6 +377,210 @@ export function CountForm({ rows }: { rows: { id: string; name: string; unit: Ba
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           {t("Save count ({n})", { n: entered.length })}
         </Button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Opening stock ──────────────────────────────────────────────────────────
+
+type OpeningRow = {
+  key: string;
+  name: string;
+  unit: BaseUnit;
+  category: "FOOD" | "PACKAGING" | "SUPPLIES";
+  /** In kg / L / pcs. */
+  qty: string;
+  /** AED per kg / L / pc, ex VAT. */
+  price: string;
+};
+
+let rowSeq = 0;
+const blankRow = (): OpeningRow => ({ key: `r${++rowSeq}`, name: "", unit: "g", category: "FOOD", qty: "", price: "" });
+
+/** First day of the current month in Dubai, YYYY-MM-DD. */
+function firstOfMonth() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+  return `${today.slice(0, 7)}-01`;
+}
+
+/** Pasted Excel rows → form rows (amounts in kg / L / pcs). */
+function parsePasted(text: string): OpeningRow[] {
+  return parseStockLines(text).map((l) => ({
+    ...blankRow(),
+    name: l.name,
+    unit: l.unit,
+    qty: l.quantity == null ? "" : String(l.quantity),
+    price: l.price == null ? "" : String(l.price),
+  }));
+}
+
+export function OpeningStockForm({
+  ingredients,
+}: {
+  ingredients: { id: string; name: string; unit: BaseUnit; category: "FOOD" | "PACKAGING" | "SUPPLIES"; hasOpening: boolean }[];
+}) {
+  const { t, money } = useAdminI18n();
+  const { busy, submit, router } = useSubmit();
+  const [day, setDay] = React.useState(firstOfMonth);
+  const [rows, setRows] = React.useState<OpeningRow[]>(() => [blankRow(), blankRow(), blankRow()]);
+  const [pasting, setPasting] = React.useState(false);
+  const [pasted, setPasted] = React.useState("");
+
+  const known = (name: string) => ingredients.find((i) => i.name.trim().toLowerCase() === name.trim().toLowerCase()) ?? null;
+  const update = (key: string, patch: Partial<OpeningRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const filled = rows.filter((r) => r.name.trim() && (num(r.qty) ?? 0) > 0);
+  const valueOf = (r: OpeningRow) => {
+    const q = num(r.qty);
+    const p = num(r.price);
+    return q != null && p != null ? q * p : null;
+  };
+  const total = filled.reduce((s, r) => s + (valueOf(r) ?? 0), 0);
+  const blocked = filled.filter((r) => known(r.name)?.hasOpening);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!filled.length) return toast.error(t("Add at least one item with an amount"));
+        if (blocked.length) return toast.error(t("{name} already has an opening stock", { name: blocked[0].name }));
+        void submit(
+          "/api/admin/ops/stock/opening",
+          "POST",
+          {
+            day,
+            rows: filled.map((r) => {
+              const k = known(r.name);
+              const unit = k?.unit ?? r.unit;
+              const value = valueOf(r);
+              return {
+                ingredientId: k?.id ?? null,
+                name: k?.name ?? r.name.trim(),
+                unit,
+                category: k?.category ?? r.category,
+                quantity: num(r.qty)! * PER[unit],
+                value: value == null ? null : Math.round(value * 100) / 100,
+              };
+            }),
+          },
+          t("Opening stock saved — {n} items", { n: filled.length }),
+          () => {
+            router.push("/admin/ops/stock");
+            router.refresh();
+          },
+        );
+      }}
+    >
+      <div className="flex flex-wrap items-end gap-3 px-5 py-4 md:px-6">
+        <Field label={t("Stock on the morning of")}>
+          <TextInput type="date" value={day} onChange={(e) => setDay(e.target.value)} className="w-44" />
+        </Field>
+        <Button type="button" variant="outline" size="sm" onClick={() => setPasting((v) => !v)}>
+          <ClipboardPaste className="h-4 w-4" /> {t("Paste from Excel")}
+        </Button>
+      </div>
+
+      {pasting && (
+        <div className="space-y-2 border-t border-black-iron/[0.06] px-5 py-4 md:px-6">
+          <Field
+            label={t("One item per line: name, quantity, unit, price per unit")}
+            hint={t("Copy the columns from Excel, or type e.g. “Sella rice, 200, kg, 5.25”. Units: kg, g, L, ml, pcs.")}
+          >
+            <TextArea rows={5} value={pasted} onChange={(e) => setPasted(e.target.value)} dir="auto" />
+          </Field>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              const add = parsePasted(pasted);
+              if (!add.length) return toast.error(t("Nothing to add — check the lines"));
+              setRows((rs) => [...rs.filter((r) => r.name.trim()), ...add]);
+              setPasted("");
+              setPasting(false);
+              toast.success(t("{n} lines added — check them below", { n: add.length }));
+            }}
+          >
+            {t("Add these lines")}
+          </Button>
+        </div>
+      )}
+
+      <ul className="divide-y divide-black-iron/[0.06] border-t border-black-iron/[0.06]">
+        {rows.map((r, i) => {
+          const k = r.name.trim() ? known(r.name) : null;
+          const unit = k?.unit ?? r.unit;
+          const value = valueOf(r);
+          return (
+            <li key={r.key} className="space-y-2 px-5 py-3 md:px-6">
+              <div className="flex items-start gap-2">
+                <TextInput
+                  aria-label={t("Item {n}", { n: i + 1 })}
+                  list="opening-ingredients"
+                  value={r.name}
+                  onChange={(e) => update(r.key, { name: e.target.value })}
+                  placeholder={t("e.g. {example}", { example: t("Sella rice") })}
+                  className="font-medium"
+                  dir="auto"
+                />
+                <IconButton label={t("Remove item {n}", { n: i + 1 })} danger onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>
+                  <Trash2 className="h-4 w-4" />
+                </IconButton>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_auto_1fr_auto]">
+                <Field label={t("Amount")}>
+                  <TextInput inputMode="decimal" value={r.qty} onChange={(e) => update(r.key, { qty: e.target.value })} />
+                </Field>
+                <Field label={t("Unit")}>
+                  <Select value={unit} disabled={!!k} onChange={(e) => update(r.key, { unit: e.target.value as BaseUnit })} className="w-24">
+                    {(["g", "ml", "pcs"] as const).map((u) => (
+                      <option key={u} value={u}>
+                        {t(DISPLAY[u])}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label={t("Price per {unit} (ex VAT)", { unit: t(DISPLAY[unit]) })}>
+                  <TextInput inputMode="decimal" value={r.price} onChange={(e) => update(r.key, { price: e.target.value })} placeholder={t("Optional")} />
+                </Field>
+                <Field label={t("Type")}>
+                  <Select
+                    value={k?.category ?? r.category}
+                    disabled={!!k}
+                    onChange={(e) => update(r.key, { category: e.target.value as OpeningRow["category"] })}
+                    className="w-36"
+                  >
+                    <option value="FOOD">{t("Food")}</option>
+                    <option value="PACKAGING">{t("Packaging")}</option>
+                    <option value="SUPPLIES">{t("Supplies")}</option>
+                  </Select>
+                </Field>
+              </div>
+              <p className="text-[12.5px] text-dark-grey">
+                {k ? (k.hasOpening ? <span className="text-pomegranate-red">{t("Already has an opening stock — use a stock count instead")}</span> : t("Existing ingredient")) : r.name.trim() ? t("New ingredient") : null}
+                {value != null && <span className="tabular-nums"> · {money(Math.round(value * 100))}</span>}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      <datalist id="opening-ingredients">
+        {ingredients.map((i) => (
+          <option key={i.id} value={i.name} />
+        ))}
+      </datalist>
+
+      <div className="border-t border-black-iron/[0.06] px-5 py-3 md:px-6">
+        <Button type="button" variant="ghost" size="sm" onClick={() => setRows((rs) => [...rs, blankRow()])}>
+          <Plus className="h-4 w-4" /> {t("Add item")}
+        </Button>
+      </div>
+
+      <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-black-iron/[0.07] bg-white/95 px-5 py-3 backdrop-blur md:px-6">
+        <Button type="submit" disabled={busy || !filled.length}>
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t("Save opening stock ({n})", { n: filled.length })}
+        </Button>
+        {total > 0 && <span className="text-[13.5px] tabular-nums text-dark-grey">{t("Value {amount}", { amount: money(Math.round(total * 100)) })}</span>}
       </div>
     </form>
   );

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { toFils } from "@/lib/ordering/money";
 import { readDocument } from "./ai";
 import { costLines } from "./costing";
-import { extractionSchema, type Extraction } from "./extraction";
+import { extractionSchema, isStockCategory, type Extraction } from "./extraction";
 import { suggestMatches, type Suggestions } from "./match";
 import type { SaveInvoiceInput } from "./save-schema";
 import { normalizeName } from "./units";
@@ -128,7 +128,7 @@ export async function getDocument(id: string) {
 }
 
 const DB_UNIT = { g: "G", ml: "ML", pcs: "PCS" } as const;
-const DB_CATEGORY = { food: "FOOD", packaging: "PACKAGING", smallwares: "SMALLWARES", delivery: "DELIVERY", other: "OTHER" } as const;
+const DB_CATEGORY = { food: "FOOD", packaging: "PACKAGING", supplies: "SUPPLIES", smallwares: "SMALLWARES", delivery: "DELIVERY", other: "OTHER" } as const;
 
 /** Noon in Dubai on the given day — a date without a time zone surprise. */
 export function dubaiDate(day: string) {
@@ -182,7 +182,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
           : await tx.ingredient.findFirst({ where: { name: { equals: line.ingredient.name, mode: "insensitive" } } });
         if (!ingredient) {
           ingredient = await tx.ingredient.create({
-            data: { name: line.ingredient.name, unit, category: line.category === "packaging" ? "PACKAGING" : "FOOD" },
+            data: { name: line.ingredient.name, unit, category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
           });
         }
         if (ingredient.unit !== unit) {
@@ -215,7 +215,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
       let movements = 0;
       for (const [i, line] of input.lines.entries()) {
         const ingredientId = ingredientIds[i];
-        const stocked = ingredientId && line.stockQuantity && (line.category === "food" || line.category === "packaging");
+        const stocked = ingredientId && line.stockQuantity && isStockCategory(line.category);
         const created = await tx.purchaseLine.create({
           data: {
             invoiceId: invoice.id,
@@ -385,7 +385,8 @@ export async function stockSummary() {
     prisma.ingredient.findMany({ orderBy: { name: "asc" } }),
     prisma.stockMovement.groupBy({ by: ["ingredientId"], _sum: { quantity: true } }),
     prisma.stockMovement.findMany({
-      where: { type: "PURCHASE", reversedBy: null },
+      // The opening stock's value counts as a price until the first purchase.
+      where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null },
       orderBy: { at: "desc" },
       distinct: ["ingredientId"],
       select: {

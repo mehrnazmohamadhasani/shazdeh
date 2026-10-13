@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { Extraction } from "./extraction";
+import { isStockCategory, type Extraction } from "./extraction";
 import { lineStockAmount, normalizeName, type BaseUnit } from "./units";
 
 /*
@@ -46,7 +46,7 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
   const ingredients = await prisma.ingredient.findMany({ select: { id: true, name: true, unit: true } });
 
   const lines = x.lines.map((l): LineSuggestion => {
-    if (l.category !== "food" && l.category !== "packaging") {
+    if (!isStockCategory(l.category)) {
       return { ingredientId: null, ingredientName: null, unit: null, quantity: null, source: null };
     }
     const memory = learned.find((m) => m.rawName === normalizeName(l.description));

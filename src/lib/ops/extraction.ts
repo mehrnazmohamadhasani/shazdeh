@@ -8,7 +8,10 @@ import { z } from "zod";
  * are AED exactly as printed; they become fils only when saved.
  */
 
-export const SPEND_CATEGORIES = ["food", "packaging", "smallwares", "delivery", "other"] as const;
+export const SPEND_CATEGORIES = ["food", "packaging", "supplies", "smallwares", "delivery", "other"] as const;
+/** Categories kept in stock. Only food and packaging count as food cost. */
+export const STOCK_CATEGORIES = ["food", "packaging", "supplies"] as const;
+export const isStockCategory = (c: string) => (STOCK_CATEGORIES as readonly string[]).includes(c);
 export const STOCK_UNITS = ["g", "ml", "pcs"] as const;
 export const PAYMENT_MODES = ["cash", "card", "credit", "transfer"] as const;
 
@@ -120,7 +123,7 @@ Rules:
 - One entry in "lines" per printed item line, in order. Delivery charges are their own line with category "delivery".
 - quantity, unitPrice, discount, vat and lineTotal are the numbers on that line, in AED. vat is the VAT AMOUNT in AED (e.g. 4.25), never the rate (5%). Discounts are positive amounts (a printed "-16.00" discount is 16).
 - packSize: the pack size if printed in a column or in the product name ("4 x 10 kg", "800G", "1000 ml"), else null.
-- category: food = ingredients and drinks for cooking or resale; packaging = takeaway boxes, bags, foil, labels; smallwares = kitchen tools, equipment, cleaning; delivery = delivery/transport charges; other = anything else.
+- category: food = ingredients and drinks for cooking or resale; packaging = takeaway boxes, containers, cups, lids, bags, foil, labels; supplies = things used up in the kitchen that are not food or packaging: cooking gas cylinders, cleaning products, gloves, tissues, bin bags, cling film; smallwares = durable kitchen tools and equipment (pans, trays, knives, GN pans, utensils); delivery = delivery/transport charges; other = anything else.
 - stockUnit / stockQuantity: how the kitchen would count this line in stock — "g" for solids, "ml" for liquids, "pcs" for countable items — and the TOTAL amount the whole line adds (e.g. 5 cartons of 4 x 10 kg rice = 200000 g; 2 pcs of tomato paste 800 g = 1600 g; 15 kg lamb = 15000 g). If the pack size is truly unclear, set stockQuantity to null and say why in note. Use null for delivery and non-stock lines.
 - confidence (0–1) per line and overall: how sure you are you read it correctly. Lower it for handwriting, blur, glare or ambiguous quantities (e.g. a "3B" that could be 38).
 - invoiceDate as YYYY-MM-DD. Dates may be written 09/07/2026, 16-Jul-2026, 24-08-26 or 27/8/2026 (day first in the UAE).

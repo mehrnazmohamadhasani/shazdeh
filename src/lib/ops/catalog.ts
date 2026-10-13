@@ -9,6 +9,7 @@ import { OpsError, dubaiDate } from "./documents";
  */
 
 type Actor = { id: string; email: string };
+type IngredientCategory = "FOOD" | "PACKAGING" | "SUPPLIES";
 
 // ─── Suppliers ──────────────────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ export async function getIngredient(id: string) {
 
 export async function updateIngredient(
   id: string,
-  data: { name: string; nameFa: string | null; category: "FOOD" | "PACKAGING" },
+  data: { name: string; nameFa: string | null; category: IngredientCategory },
   actor: Actor,
 ) {
   const before = await prisma.ingredient.findUnique({ where: { id } });
@@ -301,4 +302,66 @@ export async function reconcileStatement(
     return { ...l, amountFils, match: match ?? null, how };
   });
   return { supplier, rows };
+}
+
+// ─── Opening stock ──────────────────────────────────────────────────────────
+
+const DB_UNIT = { g: "G", ml: "ML", pcs: "PCS" } as const;
+
+/**
+ * What was already in the kitchen on the first day: one OPENING movement
+ * per ingredient (with its value when known), dated at the very start of
+ * that day so the month's invoices come after it. An ingredient gets one
+ * opening only; later differences are counts or corrections.
+ */
+export async function recordOpeningStock(
+  day: string,
+  rows: { ingredientId: string | null; name: string; unit: "g" | "ml" | "pcs"; category: IngredientCategory; quantity: number; value: number | null }[],
+  actor: Actor,
+) {
+  return prisma.$transaction(async (tx) => {
+    const at = new Date(`${day}T00:00:00+04:00`);
+    const done: { id: string; name: string }[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      const unit = DB_UNIT[row.unit];
+      let ingredient = row.ingredientId
+        ? await tx.ingredient.findUnique({ where: { id: row.ingredientId } })
+        : await tx.ingredient.findFirst({ where: { name: { equals: row.name, mode: "insensitive" } } });
+      if (!ingredient) {
+        ingredient = await tx.ingredient.create({ data: { name: row.name, unit, category: row.category } });
+      }
+      if (ingredient.unit !== unit) {
+        throw new OpsError(`"${ingredient.name}" is counted in ${ingredient.unit.toLowerCase()}, not ${row.unit}.`);
+      }
+      if (seen.has(ingredient.id)) throw new OpsError(`"${ingredient.name}" is in the list twice.`);
+      seen.add(ingredient.id);
+      const existing = await tx.stockMovement.findFirst({ where: { ingredientId: ingredient.id, type: "OPENING" }, select: { id: true } });
+      if (existing) {
+        throw new OpsError(`"${ingredient.name}" already has an opening stock — use a stock count or a correction instead.`, 409);
+      }
+      await tx.stockMovement.create({
+        data: {
+          ingredientId: ingredient.id,
+          type: "OPENING",
+          quantity: row.quantity,
+          costFils: row.value == null ? null : Math.round(row.value * 100),
+          at,
+          note: "Opening stock",
+          createdById: actor.id,
+        },
+      });
+      done.push({ id: ingredient.id, name: ingredient.name });
+    }
+    await tx.auditLog.create({
+      data: {
+        actor: actor.email,
+        action: "stock.opening",
+        entity: "StockOpening",
+        entityId: day,
+        after: { day, items: rows.length, value: rows.reduce((s, r) => s + (r.value ?? 0), 0) },
+      },
+    });
+    return { saved: done.length };
+  });
 }
