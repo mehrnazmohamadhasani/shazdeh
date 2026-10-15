@@ -2,8 +2,7 @@
 export const today: Record<string, string> = {
   Today: "امروز",
   "Choose a day": "انتخاب روز",
-  "Day before": "روز قبل",
-  "Next day": "روز بعد",
+  "Pick a day to see its sales and profit.": "روزی را انتخاب کنید تا فروش و سودش را ببینید.",
   Website: "سایت",
   "{n} orders": "{n} سفارش",
   "1 order": "1 سفارش",
