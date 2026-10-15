@@ -161,7 +161,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
       </Card>
 
       <Card title={t("Details")}>
-        <IngredientForm ingredient={{ id: ingredient.id, name: ingredient.name, nameFa: ingredient.nameFa, category: ingredient.category === "PACKAGING" || ingredient.category === "SUPPLIES" ? ingredient.category : "FOOD" }} />
+        <IngredientForm ingredient={{ id: ingredient.id, name: ingredient.name, nameFa: ingredient.nameFa, category: ingredient.category === "PACKAGING" || ingredient.category === "SUPPLIES" ? ingredient.category : "FOOD", unit, lowStockAt: ingredient.lowStockAt }} />
       </Card>
 
       <Card

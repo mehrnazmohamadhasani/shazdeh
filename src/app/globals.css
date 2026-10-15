@@ -103,6 +103,14 @@
   }
 }
 
+/* Today's Add button sits at the bottom of phones and tablets: toasts
+ * and the install prompt go above it. */
+@media (width < 64rem) {
+  :root:has([data-add-bar]) {
+    --tabbar-h: 4.5rem;
+  }
+}
+
 [data-theme="dark"] {
   --color-background: var(--color-black-iron);
   --color-foreground: var(--color-warm-white);

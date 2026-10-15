@@ -161,7 +161,7 @@ export async function createIngredient(data: { name: string; nameFa: string | nu
 
 export async function updateIngredient(
   id: string,
-  data: { name: string; nameFa: string | null; category: IngredientCategory },
+  data: { name: string; nameFa: string | null; category: IngredientCategory; lowStockAt?: number | null },
   actor: Actor,
 ) {
   const before = await prisma.ingredient.findUnique({ where: { id } });
@@ -175,7 +175,7 @@ export async function updateIngredient(
       action: "ingredient.update",
       entity: "Ingredient",
       entityId: id,
-      before: { name: before.name, nameFa: before.nameFa, category: before.category },
+      before: { name: before.name, nameFa: before.nameFa, category: before.category, lowStockAt: before.lowStockAt },
       after: data,
     },
   });

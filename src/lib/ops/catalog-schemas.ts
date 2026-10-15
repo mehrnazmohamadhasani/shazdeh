@@ -21,6 +21,8 @@ export const ingredientUpdateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   nameFa: text(120),
   category: z.enum(["FOOD", "PACKAGING", "SUPPLIES"]),
+  /** Low-stock warning level in the ingredient's unit (g / ml / pcs); null: none. */
+  lowStockAt: z.number().finite().min(0).max(100_000_000).nullable().optional(),
 });
 
 export const movementSchema = z.object({

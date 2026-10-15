@@ -558,6 +558,9 @@ model Ingredient {
   nameFa        String?
   unit          StockUnit
   category      SpendCategory     @default(FOOD)
+  /// Warn on Today when stock on hand is at or below this (g / ml / pcs).
+  /// Null: no warning set.
+  lowStockAt    Float?
   supplierItems SupplierItem[]
   purchaseLines PurchaseLine[]
   movements     StockMovement[]
