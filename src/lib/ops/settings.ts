@@ -19,7 +19,15 @@ export function chosenCost(netFils: number | null, grossFils: number | null | un
   return withVat && grossFils != null ? grossFils : netFils;
 }
 
-export async function updateOpsSettings(data: { foodCostIncludesVat?: boolean; aiMonthlyCapUsd?: number }, actor: { email: string }) {
+type SettingsUpdate = { foodCostIncludesVat?: boolean; aiMonthlyCapUsd?: number; autoSavePlatform?: boolean; autoSaveInvoices?: boolean };
+const pick = (s: SettingsUpdate) => ({
+  foodCostIncludesVat: s.foodCostIncludesVat,
+  aiMonthlyCapUsd: s.aiMonthlyCapUsd,
+  autoSavePlatform: s.autoSavePlatform,
+  autoSaveInvoices: s.autoSaveInvoices,
+});
+
+export async function updateOpsSettings(data: SettingsUpdate, actor: { email: string }) {
   const before = await getOpsSettings();
   return prisma.$transaction(async (tx) => {
     const after = await tx.opsSettings.update({ where: { id: "default" }, data });
@@ -29,10 +37,10 @@ export async function updateOpsSettings(data: { foodCostIncludesVat?: boolean; a
         action: "ops_settings.update",
         entity: "OpsSettings",
         entityId: "default",
-        before: { foodCostIncludesVat: before.foodCostIncludesVat, aiMonthlyCapUsd: before.aiMonthlyCapUsd },
-        after: { foodCostIncludesVat: after.foodCostIncludesVat, aiMonthlyCapUsd: after.aiMonthlyCapUsd },
+        before: pick(before),
+        after: pick(after),
       },
     });
-    return { foodCostIncludesVat: after.foodCostIncludesVat, aiMonthlyCapUsd: after.aiMonthlyCapUsd };
+    return pick(after);
   });
 }

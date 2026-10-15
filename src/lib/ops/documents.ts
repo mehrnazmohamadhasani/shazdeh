@@ -14,6 +14,7 @@ import { processRecipeDocument } from "./recipe-import";
 import { processPlatformDocument } from "./platform-import";
 import { chosenCost, getOpsSettings } from "./settings";
 import { AiBudgetError } from "./ai-usage";
+import { decideInvoiceAutoSave } from "./autosave";
 
 /*
  * Purchase documents: upload → AI reading → review → saved invoice and
@@ -92,12 +93,40 @@ export async function processDocument(id: string) {
         aiOutputTokens: result.outputTokens,
       },
     });
+    await autoSaveInvoice(id, result.extraction, suggestions);
   } catch (e) {
     if (!(e instanceof AiBudgetError)) await reportError(e, { where: `ops document read ${id}` });
     await prisma.opsDocument.update({
       where: { id },
       data: { status: "FAILED", error: (e instanceof Error ? e.message : String(e)).slice(0, 1000) },
     });
+  }
+}
+
+/** The person who uploaded a document, acting through auto-save (for createdBy and the audit log). */
+export async function autoActor(documentId: string) {
+  const doc = await prisma.opsDocument.findUnique({ where: { id: documentId }, select: { uploadedBy: { select: { id: true, email: true } } } });
+  const user = doc?.uploadedBy;
+  return user ? { id: user.id, email: `auto-save (${user.email})` } : null;
+}
+
+/**
+ * Saves a clear invoice without review (see ./autosave.ts). Anything
+ * uncertain — or a save that fails, e.g. a duplicate — stays in review.
+ */
+async function autoSaveInvoice(id: string, reading: Extraction, suggestions: Suggestions) {
+  try {
+    const settings = await getOpsSettings();
+    if (!settings.autoSaveInvoices) return;
+    const decision = decideInvoiceAutoSave(reading, suggestions, settings.autoSaveMinConfidence);
+    if (!decision.ok) return;
+    const actor = await autoActor(id);
+    if (!actor) return;
+    await saveDocument(id, decision.input, actor);
+    await prisma.opsDocument.update({ where: { id }, data: { autoSaved: true } });
+  } catch (e) {
+    // Expected for duplicates and the like: a person sees it in review.
+    if (!(e instanceof OpsError)) await reportError(e, { where: `auto-save invoice ${id}` });
   }
 }
 
@@ -110,6 +139,7 @@ export async function listDocuments() {
     select: {
       id: true,
       status: true,
+      autoSaved: true,
       createdAt: true,
       originalName: true,
       extraction: true,
@@ -126,6 +156,7 @@ export async function getDocument(id: string) {
       id: true,
       kind: true,
       status: true,
+      autoSaved: true,
       createdAt: true,
       mimeType: true,
       originalName: true,
@@ -359,7 +390,7 @@ export async function voidInvoice(invoiceId: string, reason: string, actor: { id
       data: { voidedAt: now, voidReason: reason, documentId: null, voidedDocumentId: invoice.documentId },
     });
     if (invoice.documentId) {
-      await tx.opsDocument.update({ where: { id: invoice.documentId }, data: { status: "NEEDS_REVIEW" } });
+      await tx.opsDocument.update({ where: { id: invoice.documentId }, data: { status: "NEEDS_REVIEW", autoSaved: false } });
     }
     await tx.auditLog.create({
       data: {

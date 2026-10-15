@@ -45,7 +45,7 @@ export async function salesOverview(month?: string | null) {
     prisma.platformOrder.findMany({
       where: { placedAt: { gte: start, lt: end } },
       orderBy: { placedAt: "desc" },
-      include: { channel: { select: { code: true, name: true } }, items: { select: { quantity: true } } },
+      include: { channel: { select: { code: true, name: true } }, items: { select: { quantity: true } }, document: { select: { autoSaved: true } } },
     }),
     prisma.order.aggregate({
       where: { placedAt: { gte: start, lt: end }, status: { in: [...COUNTED] } },

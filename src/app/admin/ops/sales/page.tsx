@@ -142,6 +142,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                     <span className="block text-[12.5px] text-dark-grey">
                       {day(o.placedAt, false, intl)} · {t(o.dishes === 1 ? "{n} dish" : "{n} dishes", { n: o.dishes })}
                       {o.salesSource === "menu" ? ` · ${t("prices from menu")}` : ""}
+                      {o.document?.autoSaved ? ` · ${t("saved automatically")}` : ""}
                     </span>
                   </span>
                   <span className="text-end tabular-nums">

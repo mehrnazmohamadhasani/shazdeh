@@ -79,7 +79,9 @@ export default async function InvoicesPage() {
                   ? { label: "Statement", tone: "neutral" as const }
                   : d.status === "NEEDS_REVIEW" && kind === "platform_order"
                     ? { label: "Sale — not a purchase", tone: "neutral" as const }
-                    : DOC_STATUS[d.status];
+                    : d.status === "SAVED" && d.autoSaved
+                      ? { label: "Saved automatically", tone: "good" as const }
+                      : DOC_STATUS[d.status];
               return (
                 <li key={d.id}>
                   <Link

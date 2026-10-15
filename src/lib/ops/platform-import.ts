@@ -4,10 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { reportError } from "@/lib/report-error";
 import { readWithSchema, AiNotConfiguredError } from "./ai";
 import { AiBudgetError } from "./ai-usage";
-import { OpsError } from "./documents";
+import { OpsError, autoActor } from "./documents";
+import { decidePlatformAutoSave } from "./autosave";
+import { getOpsSettings } from "./settings";
 import { aliasKey, draftFromReading, foodSales, type LearnedAlias, type MenuEntry } from "./platform";
 import { PLATFORM_PROMPT, platformReadingJsonSchema, platformReadingSchema, samplePlatformReading, type PlatformReading } from "./platform-reading";
 import type { SavePlatformOrderInput } from "./platform-save-schema";
+import { recordSaleUse, reverseSaleUse } from "./stock-use";
 
 /*
  * Platform receipts: photo → AI reading → a person confirms the sale →
@@ -54,9 +57,33 @@ export async function processPlatformDocument(id: string) {
       where: { id },
       data: { status: "NEEDS_REVIEW", extraction: stored as unknown as Prisma.InputJsonValue, aiModel: meta.model, aiInputTokens: meta.inputTokens, aiOutputTokens: meta.outputTokens },
     });
+    await autoSavePlatform(id, reading);
   } catch (e) {
     if (!(e instanceof AiBudgetError)) await reportError(e, { where: `platform receipt read ${id}` });
     await prisma.opsDocument.update({ where: { id }, data: { status: "FAILED", error: (e instanceof Error ? e.message : String(e)).slice(0, 1000) } });
+  }
+}
+
+/**
+ * Saves a clear receipt without review (see ./autosave.ts). If the save
+ * is refused (most often: the same order was saved already) the reason
+ * stays on the receipt for the person who checks it.
+ */
+async function autoSavePlatform(id: string, reading: PlatformReading) {
+  try {
+    const settings = await getOpsSettings();
+    if (!settings.autoSavePlatform) return;
+    const [menu, aliasesFor] = await Promise.all([menuEntries(), learnedAliases()]);
+    const draft = draftFromReading(reading, menu, aliasesFor);
+    const decision = decidePlatformAutoSave(reading, draft, menu, settings.autoSaveMinConfidence);
+    if (!decision.ok) return;
+    const actor = await autoActor(id);
+    if (!actor) return;
+    await savePlatformOrder(id, decision.input, actor);
+    await prisma.opsDocument.update({ where: { id }, data: { autoSaved: true } });
+  } catch (e) {
+    if (e instanceof OpsError) await prisma.opsDocument.update({ where: { id }, data: { error: e.message.slice(0, 1000) } });
+    else await reportError(e, { where: `auto-save platform receipt ${id}` });
   }
 }
 
@@ -90,6 +117,7 @@ export async function getPlatformDocument(id: string) {
       id: true,
       kind: true,
       status: true,
+      autoSaved: true,
       createdAt: true,
       mimeType: true,
       extraction: true,
@@ -199,6 +227,13 @@ export async function savePlatformOrder(documentId: string | null, input: SavePl
         },
       });
 
+      // The dishes leave stock now (approved recipes only).
+      const stock = await recordSaleUse(
+        tx,
+        { platformOrderId: order.id },
+        { at: placedAt, label: `${channel.name} #${input.orderNo}`, items: input.items.map((i) => ({ menuItemId: i.menuItemId, name: i.rawName, quantity: i.quantity })), actorId: actor.id },
+      );
+
       // Remember how this platform names each dish.
       for (const i of input.items) {
         if (!i.menuItemId) continue;
@@ -218,7 +253,17 @@ export async function savePlatformOrder(documentId: string | null, input: SavePl
           entity: "PlatformOrder",
           entityId: order.id,
           via: documentId ? "photo" : "manual",
-          after: { channel: channel.code, orderNo: input.orderNo, placedAt: input.placedAt, foodSalesFils: sales.fils, totalFils, items: input.items.length, documentId },
+          after: {
+            channel: channel.code,
+            orderNo: input.orderNo,
+            placedAt: input.placedAt,
+            foodSalesFils: sales.fils,
+            totalFils,
+            items: input.items.length,
+            documentId,
+            stockUsedFor: stock.used,
+            stockNotUsed: stock.skipped.map((s) => `${s.name}: ${s.reason}`),
+          },
         },
       });
       return order;
@@ -235,8 +280,9 @@ export async function undoPlatformOrder(orderId: string, actor: Actor) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.platformOrder.findUnique({ where: { id: orderId }, include: { channel: true, items: true } });
     if (!order) throw new OpsError("Order not found.", 404);
+    const returned = await reverseSaleUse(tx, orderId, `Undo ${order.channel.name} #${order.orderNo}`, actor.id);
     await tx.platformOrder.delete({ where: { id: orderId } });
-    if (order.documentId) await tx.opsDocument.update({ where: { id: order.documentId }, data: { status: "NEEDS_REVIEW" } });
+    if (order.documentId) await tx.opsDocument.update({ where: { id: order.documentId }, data: { status: "NEEDS_REVIEW", autoSaved: false } });
     await tx.auditLog.create({
       data: {
         actor: actor.email,
@@ -251,6 +297,7 @@ export async function undoPlatformOrder(orderId: string, actor: Actor) {
           totalFils: order.totalFils,
           items: order.items.map((i) => ({ rawName: i.rawName, menuItemId: i.menuItemId, quantity: i.quantity, lineTotalFils: i.lineTotalFils })),
           documentId: order.documentId,
+          stockMovementsReturned: returned,
         },
       },
     });

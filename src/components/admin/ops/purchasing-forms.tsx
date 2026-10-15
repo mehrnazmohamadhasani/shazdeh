@@ -104,11 +104,17 @@ export function VoidWithdrawalButton({ id }: { id: string }) {
 }
 
 /** Food cost with or without VAT, and the monthly AI limit. */
-export function OpsSettingsForm({ initial }: { initial: { foodCostIncludesVat: boolean; aiMonthlyCapUsd: number } }) {
+export function OpsSettingsForm({
+  initial,
+}: {
+  initial: { foodCostIncludesVat: boolean; aiMonthlyCapUsd: number; autoSavePlatform: boolean; autoSaveInvoices: boolean };
+}) {
   const { t } = useAdminI18n();
   const router = useRouter();
   const [withVat, setWithVat] = React.useState(initial.foodCostIncludesVat);
   const [cap, setCap] = React.useState(String(initial.aiMonthlyCapUsd));
+  const [autoPlatform, setAutoPlatform] = React.useState(initial.autoSavePlatform);
+  const [autoInvoices, setAutoInvoices] = React.useState(initial.autoSaveInvoices);
   const [busy, setBusy] = React.useState(false);
   return (
     <form
@@ -119,7 +125,12 @@ export function OpsSettingsForm({ initial }: { initial: { foodCostIncludesVat: b
         if (!(capValue >= 0)) return toast.error(t("Enter a monthly limit (0 or more)."));
         setBusy(true);
         try {
-          await send("/api/admin/ops/settings", "PATCH", { foodCostIncludesVat: withVat, aiMonthlyCapUsd: capValue });
+          await send("/api/admin/ops/settings", "PATCH", {
+            foodCostIncludesVat: withVat,
+            aiMonthlyCapUsd: capValue,
+            autoSavePlatform: autoPlatform,
+            autoSaveInvoices: autoInvoices,
+          });
           toast.success(t("Saved"));
           router.refresh();
         } catch (err) {
@@ -136,6 +147,18 @@ export function OpsSettingsForm({ initial }: { initial: { foodCostIncludesVat: b
         )}
         checked={withVat}
         onCheckedChange={setWithVat}
+      />
+      <SwitchRow
+        label={t("Save clear platform receipts automatically")}
+        description={t("Only when every dish is clearly matched to the menu and everything adds up. Anything else waits for a check.")}
+        checked={autoPlatform}
+        onCheckedChange={setAutoPlatform}
+      />
+      <SwitchRow
+        label={t("Save clear supplier invoices automatically")}
+        description={t("Only for a known supplier whose items were all confirmed before, printed (not handwritten), with every sum adding up.")}
+        checked={autoInvoices}
+        onCheckedChange={setAutoInvoices}
       />
       <Field label={t("Monthly AI limit (US$)")} hint={t("Reading stops for the rest of the month at this amount; admins get a warning at 80 %.")}>
         <TextInput inputMode="decimal" dir="ltr" value={cap} onChange={(e) => setCap(e.target.value)} className="max-w-40" />

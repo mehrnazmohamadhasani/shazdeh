@@ -82,6 +82,24 @@ export const sales: Record<string, string> = {
   "Remove this sale? The receipt opens again so you can correct and save it.": "این فروش حذف شود؟ رسید دوباره باز می‌شود تا اصلاح و ذخیره کنید.",
   "Sale removed": "فروش حذف شد",
 
+  // Auto-save and stock use
+  "Saved automatically": "ذخیره‌ی خودکار",
+  "saved automatically": "ذخیره‌ی خودکار",
+  "Not saved automatically: {reason}": "خودکار ذخیره نشد: {reason}",
+  "Save clear platform receipts automatically": "ذخیره‌ی خودکار رسیدهای پلتفرمِ روشن",
+  "Only when every dish is clearly matched to the menu and everything adds up. Anything else waits for a check.":
+    "فقط وقتی همه‌ی غذاها به‌روشنی با منو تطبیق داده شده‌اند و همه‌ی جمع‌ها درست است. بقیه منتظر بررسی می‌مانند.",
+  "Save clear supplier invoices automatically": "ذخیره‌ی خودکار فاکتورهای روشنِ تأمین‌کننده",
+  "Only for a known supplier whose items were all confirmed before, printed (not handwritten), with every sum adding up.":
+    "فقط برای تأمین‌کننده‌ی شناخته‌شده‌ای که همه‌ی اقلامش قبلاً تأیید شده، چاپی (نه دست‌نویس)، و با جمع‌های درست.",
+  "Ingredients taken from stock.": "مواد از انبار کم شد.",
+  "Not matched to a menu dish — stock not reduced.": "با غذای منو تطبیق داده نشده — از انبار کم نشد.",
+  "No recipe yet — stock not reduced.": "هنوز دستور پخت ندارد — از انبار کم نشد.",
+  "Recipe not approved yet — stock not reduced.": "دستور پخت هنوز تأیید نشده — از انبار کم نشد.",
+  "A prep in the recipe isn't approved yet — stock not reduced.": "یکی از آماده‌سازی‌های این دستور پخت هنوز تأیید نشده — از انبار کم نشد.",
+  "The recipe contains itself — stock not reduced.": "دستور پخت خودش را شامل می‌شود — از انبار کم نشد.",
+  "Saved before its recipe was approved — stock not reduced.": "پیش از تأیید دستور پخت ذخیره شده — از انبار کم نشد.",
+
   // Checks (src/lib/ops/platform.ts)
   "This doesn't look like a delivery-platform receipt.": "این شبیه رسید پلتفرم تحویل نیست.",
   "Choose the platform.": "پلتفرم را انتخاب کنید.",

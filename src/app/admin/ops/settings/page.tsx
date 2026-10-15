@@ -38,7 +38,14 @@ export default async function OpsSettingsPage() {
 
       <Card title={t("Settings")}>
         {user.role === "ADMIN" ? (
-          <OpsSettingsForm initial={{ foodCostIncludesVat: settings.foodCostIncludesVat, aiMonthlyCapUsd: cap }} />
+          <OpsSettingsForm
+            initial={{
+              foodCostIncludesVat: settings.foodCostIncludesVat,
+              aiMonthlyCapUsd: cap,
+              autoSavePlatform: settings.autoSavePlatform,
+              autoSaveInvoices: settings.autoSaveInvoices,
+            }}
+          />
         ) : (
           <ul className="space-y-1 text-[14px]">
             <li>{t(settings.foodCostIncludesVat ? "Food cost includes VAT" : "Food cost without VAT")}</li>

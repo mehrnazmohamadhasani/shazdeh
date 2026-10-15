@@ -28,6 +28,7 @@ import type { ProviderPaymentState } from "@/lib/payments/types";
 import type { DispatchResult } from "@/lib/delivery";
 import { notifyOrder, STATUS_EVENT, type NotifyOptions, type OrderEventName } from "@/lib/notifications";
 import { formatFils, toFils } from "@/lib/ordering/money";
+import { takeStockForWebsiteOrder } from "@/lib/ops/stock-use";
 
 /*
  * The order service. Everything that decides money or status lives
@@ -495,6 +496,8 @@ export async function transitionOrder(
 
   const event = STATUS_EVENT[to];
   if (event) queueNotification(orderId, event);
+  // Cooked: its ingredients leave stock (never blocks the order board).
+  await takeStockForWebsiteOrder(orderId, to);
   return { ok: true };
 }
 
