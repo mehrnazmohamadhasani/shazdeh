@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Card, Field, IconButton, Select, TextInput } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 
-type Role = "ADMIN" | "EDITOR" | "STAFF";
+type Role = "ADMIN" | "EDITOR" | "STAFF" | "PURCHASER";
 export type TeamRow = { id: string; email: string; name: string | null; role: Role };
 
 const ROLES: { value: Role; label: string; hint: string }[] = [
   { value: "STAFF", label: "Kitchen staff", hint: "Orders board only — for kitchen tablets." },
+  { value: "PURCHASER", label: "Purchasing", hint: "Invoice photos, stock counts and suppliers — no menu, orders or money pages." },
   { value: "EDITOR", label: "Editor", hint: "Menu, zones, promo codes and website content." },
   { value: "ADMIN", label: "Admin", hint: "Everything, including settings and the team." },
 ];

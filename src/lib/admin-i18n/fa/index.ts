@@ -6,6 +6,8 @@ import { stock } from "./stock";
 import { recipes } from "./recipes";
 import { setup } from "./setup";
 import { settings } from "./settings";
+import { purchasing } from "./purchasing";
+import { sales } from "./sales";
 
 /*
  * English → Persian for the admin panel, split by area so each file
@@ -21,4 +23,6 @@ export const FA: Record<string, string> = {
   ...recipes,
   ...setup,
   ...settings,
+  ...purchasing,
+  ...sales,
 };

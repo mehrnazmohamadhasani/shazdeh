@@ -176,12 +176,12 @@ export const pushSubscriptionSchema = z.object({
 export const teamMemberSchema = z.object({
   email: z.email().max(160),
   name: nullableText(80),
-  role: z.enum(["ADMIN", "EDITOR", "STAFF"]),
+  role: z.enum(["ADMIN", "EDITOR", "STAFF", "PURCHASER"]),
   password: z.string().min(10, "Use at least 10 characters").max(200),
 });
 
 export const teamUpdateSchema = z.object({
   name: nullableText(80),
-  role: z.enum(["ADMIN", "EDITOR", "STAFF"]).optional(),
+  role: z.enum(["ADMIN", "EDITOR", "STAFF", "PURCHASER"]).optional(),
   password: z.string().min(10, "Use at least 10 characters").max(200).optional(),
 });

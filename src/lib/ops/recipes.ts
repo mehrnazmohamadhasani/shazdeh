@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { OpsError } from "./documents";
+import { chosenCost, getOpsSettings } from "./settings";
 import { costVersion, dishMargin, wouldCycle, type CostContext, type CostRecipe, type CostVersion } from "./recipe-cost";
 
 /*
@@ -27,17 +28,26 @@ export type DraftLineInput = {
 
 /**
  * Fils per g / ml / pc of every ingredient: the latest purchase (or valued
- * opening stock) on or before `asOf`, ex VAT, skipping undone invoices —
- * the same source as the Stock screen's "Last price".
+ * opening stock) on or before `asOf`, skipping undone invoices — the same
+ * source as the Stock screen's "Last price". Without VAT, or with the VAT
+ * paid when the owner chose that in Ops settings.
  */
 async function latestPrices(asOf: Date) {
-  const rows = await prisma.stockMovement.findMany({
-    where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null, costFils: { not: null }, quantity: { gt: 0 }, at: { lte: asOf } },
-    orderBy: { at: "desc" },
-    distinct: ["ingredientId"],
-    select: { ingredientId: true, costFils: true, quantity: true, at: true },
-  });
-  return new Map(rows.map((r) => [r.ingredientId, { filsPerUnit: r.costFils! / r.quantity, at: r.at }]));
+  const [rows, settings] = await Promise.all([
+    prisma.stockMovement.findMany({
+      where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null, costFils: { not: null }, quantity: { gt: 0 }, at: { lte: asOf } },
+      orderBy: { at: "desc" },
+      distinct: ["ingredientId"],
+      select: { ingredientId: true, costFils: true, quantity: true, at: true, purchaseLine: { select: { grossFils: true } } },
+    }),
+    getOpsSettings(),
+  ]);
+  return new Map(
+    rows.map((r) => [
+      r.ingredientId,
+      { filsPerUnit: chosenCost(r.costFils, r.purchaseLine?.grossFils, settings.foodCostIncludesVat)! / r.quantity, at: r.at },
+    ]),
+  );
 }
 
 const versionInclude = {

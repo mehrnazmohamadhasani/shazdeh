@@ -1,11 +1,11 @@
-import { CMS_ROLES, notFound, requireAuth } from "@/lib/api";
+import { PURCHASING_ROLES, notFound, requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 /** The original file — private, admins only. */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(CMS_ROLES);
+  const auth = await requireAuth(PURCHASING_ROLES);
   if (auth.response) return auth.response;
   const { id } = await ctx.params;
   const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { data: true, mimeType: true } });

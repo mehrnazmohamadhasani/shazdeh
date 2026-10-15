@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readWithSchema, AiNotConfiguredError } from "./ai";
+import { AiBudgetError } from "./ai-usage";
 import { OpsError } from "./documents";
 import { recipeReadingJsonSchema, recipeReadingPrompt, recipeReadingSchema, sampleRecipeReading, type RecipeReading } from "./recipe-reading";
 import { writeDraft } from "./recipes";
@@ -52,6 +53,7 @@ export async function processRecipeDocument(id: string) {
           prompt: "Read this recipe sheet.",
           schemaName: "recipe_sheet",
           jsonSchema: recipeReadingJsonSchema,
+          usage: { kind: "recipe", documentId: id },
         },
       );
       const parsed = recipeReadingSchema.safeParse(result.json);
@@ -65,7 +67,7 @@ export async function processRecipeDocument(id: string) {
       data: { status: "NEEDS_REVIEW", extraction: stored as unknown as Prisma.InputJsonValue, aiModel: meta.model, aiInputTokens: meta.inputTokens, aiOutputTokens: meta.outputTokens },
     });
   } catch (e) {
-    await reportError(e, { where: `recipe photo read ${id}` });
+    if (!(e instanceof AiBudgetError)) await reportError(e, { where: `recipe photo read ${id}` });
     await prisma.opsDocument.update({
       where: { id },
       data: { status: "FAILED", error: (e instanceof Error ? e.message : String(e)).slice(0, 1000) },

@@ -8,6 +8,8 @@ import { currentUser, getSessionUser, type SessionUser, type UserRoleValue } fro
 /** Who may edit content. Kitchen staff (STAFF) only manage orders. */
 export const CMS_ROLES: UserRoleValue[] = ["ADMIN", "EDITOR"];
 export const ORDER_ROLES: UserRoleValue[] = ["ADMIN", "EDITOR", "STAFF"];
+/** Invoices, stock and suppliers: also the purchaser who buys and counts. */
+export const PURCHASING_ROLES: UserRoleValue[] = ["ADMIN", "EDITOR", "PURCHASER"];
 
 /**
  * Verifies the session JWT *and* re-reads the user, so a removed

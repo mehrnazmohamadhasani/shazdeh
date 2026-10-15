@@ -1,5 +1,6 @@
 import "server-only";
 import { EXTRACTION_PROMPT, extractionJsonSchema, extractionSchema, type Extraction } from "./extraction";
+import { assertAiBudget, recordAiUsage } from "./ai-usage";
 
 /*
  * Reads a document image (or PDF) into the canonical Extraction shape.
@@ -27,7 +28,7 @@ export class AiNotConfiguredError extends Error {
   }
 }
 
-export async function readDocument(file: { data: Buffer; mimeType: string; name?: string | null }): Promise<ReadResult> {
+export async function readDocument(file: { data: Buffer; mimeType: string; name?: string | null }, documentId?: string): Promise<ReadResult> {
   if (!process.env.OPENAI_API_KEY?.trim()) {
     if (process.env.NODE_ENV === "production") throw new AiNotConfiguredError();
     return sampleReading();
@@ -37,6 +38,7 @@ export async function readDocument(file: { data: Buffer; mimeType: string; name?
     prompt: "Read this document.",
     schemaName: "purchase_document",
     jsonSchema: extractionJsonSchema,
+    usage: { kind: "invoice", documentId },
   });
   const parsed = extractionSchema.safeParse(result.json);
   if (!parsed.success) throw new Error(`The reading didn't match the expected shape: ${parsed.error.message.slice(0, 300)}`);
@@ -46,13 +48,15 @@ export async function readDocument(file: { data: Buffer; mimeType: string; name?
 /**
  * One image or PDF in, JSON matching `jsonSchema` out (strict structured
  * output). Shared by every kind of document the kitchen photographs.
+ * Refuses once the month's AI limit is spent, and logs what each call cost.
  */
 export async function readWithSchema(
   file: { data: Buffer; mimeType: string; name?: string | null },
-  opts: { instructions: string; prompt: string; schemaName: string; jsonSchema: object },
+  opts: { instructions: string; prompt: string; schemaName: string; jsonSchema: object; usage: { kind: "invoice" | "recipe" | "platform"; documentId?: string } },
 ): Promise<{ json: unknown; model: string; inputTokens: number | null; outputTokens: number | null }> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new AiNotConfiguredError();
+  await assertAiBudget();
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
   const dataUrl = `data:${file.mimeType};base64,${file.data.toString("base64")}`;
   const attachment =
@@ -79,6 +83,14 @@ export async function readWithSchema(
     output?: { type: string; content?: { type: string; text?: string; refusal?: string }[] }[];
     usage?: { input_tokens?: number; output_tokens?: number };
   };
+  // Billed even if the answer turns out unusable below.
+  await recordAiUsage({
+    kind: opts.usage.kind,
+    model,
+    inputTokens: body.usage?.input_tokens ?? null,
+    outputTokens: body.usage?.output_tokens ?? null,
+    documentId: opts.usage.documentId,
+  });
   const parts = (body.output ?? []).filter((o) => o.type === "message").flatMap((o) => o.content ?? []);
   const refusal = parts.find((p) => p.type === "refusal");
   if (refusal) throw new Error(`The model declined to read this document: ${refusal.refusal ?? ""}`);

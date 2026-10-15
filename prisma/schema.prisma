@@ -18,6 +18,8 @@ enum UserRole {
   EDITOR
   // Kitchen / front-of-house: manages orders only, never the CMS.
   STAFF
+  // The person who buys and counts: invoices, stock and suppliers only.
+  PURCHASER
 }
 
 model User {
@@ -69,6 +71,8 @@ model MenuItem {
   order          Int             @default(0)
   modifierGroups ModifierGroup[]
   orderItems     OrderItem[]
+  platformItems  PlatformOrderItem[]
+  aliases        MenuItemAlias[]
   recipe         Recipe?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -514,6 +518,7 @@ model OpsDocument {
   invoice        PurchaseInvoice?  @relation("InvoiceDocument")
   voidedInvoices PurchaseInvoice[] @relation("VoidedInvoiceDocument")
   recipeVersions RecipeVersion[]
+  platformOrder  PlatformOrder?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -627,6 +632,9 @@ model PurchaseLine {
   /// Cost of this line without VAT, after its share of any invoice
   /// discount — what food cost uses (SHĀZDEH reclaims input VAT).
   netFils       Int?
+  /// The same cost with its share of the invoice's VAT — what food cost
+  /// uses when OpsSettings.foodCostIncludesVat is on.
+  grossFils     Int?
   category      SpendCategory
   ingredientId  String?
   ingredient    Ingredient?     @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
@@ -757,6 +765,186 @@ model RecipeNameAlias {
   recipe       Recipe?     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+}
+
+// ─── Ops: settings, owner cash, AI usage ────────────────────────────────────
+
+/// Single-row store (id = "default") for how the kitchen's numbers are worked out.
+model OpsSettings {
+  id                  String   @id @default("default")
+  /// false: food cost without VAT (VAT reclaimed). true: with the VAT paid.
+  foodCostIncludesVat Boolean  @default(false)
+  /// AI reading stops for the month once this is spent (US dollars).
+  aiMonthlyCapUsd     Float    @default(30)
+  /// "2026-10" once the 80 % warning has been sent for that month.
+  aiWarnedMonth       String?
+  updatedAt           DateTime @updatedAt
+}
+
+/// Cash someone took from the business account to pay for purchases. Set
+/// against the cash/card invoices they present (PurchaseInvoice.paidBy).
+model CashWithdrawal {
+  id          String    @id @default(cuid())
+  /// Who took it: "Owner", a staff name — matched to paidBy on invoices.
+  person      String
+  amountFils  Int
+  at          DateTime
+  note        String?
+  createdById String?
+  /// Removed by mistake-correction; kept for the audit trail.
+  voidedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([person, at])
+}
+
+/// One AI call: what it cost, so a monthly cap can stop runaway spending.
+model AiUsage {
+  id           String   @id @default(cuid())
+  /// invoice | recipe
+  kind         String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  /// Estimated cost in millionths of a US dollar.
+  costMicroUsd Int
+  documentId   String?
+  at           DateTime @default(now())
+
+  @@index([at])
+}
+
+// ─── Sales channels and platform orders ─────────────────────────────────────
+// Website orders stay in Order. Delivery-platform orders are read from the
+// receipt photo into PlatformOrder. Channels are data, not code: a new
+// platform is a Channel row plus (when known) a fee rule. Receipts carry
+// no commission, so fees come only from dated fee rules or statements,
+// never from a guess.
+
+enum ChannelKind {
+  DIRECT
+  PLATFORM
+}
+
+/// Who pays for a discount printed on a receipt. UNKNOWN until the owner says.
+enum FundedBy {
+  UNKNOWN
+  RESTAURANT
+  PLATFORM
+  SHARED
+}
+
+model Channel {
+  id        String           @id @default(cuid())
+  /// direct, talabat, careem, deliveroo, noon, keeta
+  code      String           @unique
+  name      String
+  kind      ChannelKind
+  isActive  Boolean          @default(true)
+  order     Int              @default(0)
+  feeRules  ChannelFeeRule[]
+  orders    PlatformOrder[]
+  aliases   MenuItemAlias[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+/// A platform's fees from a date (contract or statement). Never assumed.
+model ChannelFeeRule {
+  id            String    @id @default(cuid())
+  channelId     String
+  channel       Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  validFrom     DateTime  @db.Date
+  /// Null: still valid.
+  validTo       DateTime? @db.Date
+  /// Percent of food sales.
+  commissionPct Float?
+  /// Percent of food sales charged for card payments.
+  paymentFeePct Float?
+  /// Per order, in fils.
+  fixedFeeFils  Int?
+  /// The platform adds 5 % VAT on its fees.
+  vatOnFees     Boolean   @default(true)
+  note          String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+
+  @@index([channelId, validFrom])
+}
+
+model PlatformOrder {
+  id                String            @id @default(cuid())
+  channelId         String
+  channel           Channel           @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  /// The number printed with "#" or "Order No" (talabat #2309, Careem #17387).
+  orderNo           String
+  /// Any other ID on the receipt (talabat's long number, Careem's large code).
+  altOrderId        String?
+  /// Dubai calendar day the order was placed.
+  businessDate      DateTime          @db.Date
+  placedAt          DateTime
+  /// delivery | pickup
+  fulfilment        String?
+  /// As printed: "PREPAID CREDIT_CARD", "POSTPAID"…
+  payment           String?
+  /// What SHĀZDEH sold: the food subtotal. Customer delivery/service fees
+  /// go to the platform and are not SHĀZDEH's sales.
+  foodSalesFils     Int
+  /// printed | menu (Deliveroo prints no line prices)
+  salesSource       String            @default("printed")
+  subtotalFils      Int?
+  deliveryFeeFils   Int?
+  serviceFeeFils    Int?
+  discountFils      Int               @default(0)
+  discountFundedBy  FundedBy          @default(UNKNOWN)
+  totalFils         Int
+  /// First name only; never a phone number (brief §13.10).
+  customerFirstName String?
+  note              String?
+  documentId        String?           @unique
+  document          OpsDocument?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  items             PlatformOrderItem[]
+  createdById       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([channelId, orderNo, businessDate])
+  @@index([businessDate])
+  @@index([channelId, altOrderId])
+}
+
+model PlatformOrderItem {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         PlatformOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// As printed: "MAKARONI Large Portion"
+  rawName       String
+  /// The heading above it on the receipt: "VEGETARIAN", "SIDES"
+  category      String?
+  menuItemId    String?
+  menuItem      MenuItem?     @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  quantity      Int
+  lineTotalFils Int?
+  /// The line total was taken from the menu price (not printed).
+  priceFromMenu Boolean       @default(false)
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+/// How a platform names a menu item, learned when someone confirms it.
+model MenuItemAlias {
+  id         String   @id @default(cuid())
+  channelId  String
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /// Normalised: lower-case, single spaces, with the receipt heading if any.
+  rawName    String
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([channelId, rawName])
 }
 
 model RateLimitBucket {

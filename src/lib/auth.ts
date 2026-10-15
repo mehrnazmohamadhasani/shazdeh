@@ -26,7 +26,7 @@ export type SessionUser = {
   role: UserRoleValue;
 };
 
-export type UserRoleValue = "ADMIN" | "EDITOR" | "STAFF";
+export type UserRoleValue = "ADMIN" | "EDITOR" | "STAFF" | "PURCHASER";
 
 /** What the session cookie carries: the user plus the session version it was signed with. */
 export type SessionClaims = SessionUser & { sessionVersion: number };

@@ -1,4 +1,4 @@
-import { CMS_ROLES, notFound, ok, requireAuth } from "@/lib/api";
+import { PURCHASING_ROLES, notFound, ok, requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { processDocument } from "@/lib/ops/documents";
 import { opsError } from "@/lib/ops/http";
@@ -8,7 +8,7 @@ export const maxDuration = 120;
 
 /** Read the document with AI again (e.g. after a failure). */
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(CMS_ROLES);
+  const auth = await requireAuth(PURCHASING_ROLES);
   if (auth.response) return auth.response;
   const { id } = await ctx.params;
   try {
