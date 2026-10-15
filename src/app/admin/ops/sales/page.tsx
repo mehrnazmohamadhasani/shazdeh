@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { AdminPage, Card, EmptyState, StatusPill } from "@/components/admin/ui";
 import { UploadButton } from "@/components/admin/ops/upload-button";
+import { MonthPicker } from "@/components/admin/month-picker";
 import { DOC_STATUS } from "@/components/admin/ops/status";
 import { day } from "@/components/admin/ops/format";
 import { parseStoredPlatform } from "@/lib/ops/platform-import";
-import { salesOverview } from "@/lib/ops/sales";
+import { monthRange, salesOverview } from "@/lib/ops/sales";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -14,17 +15,10 @@ export async function generateMetadata() {
   return { title: t("Sales") };
 }
 
-function shiftMonth(month: string, by: number) {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return d.toISOString().slice(0, 7);
-}
-
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { t, money, intl } = await getAdminI18n();
   const { month: asked } = await searchParams;
   const { month, byChannel, orders, pending } = await salesOverview(asked);
-  const monthLabel = new Intl.DateTimeFormat(intl, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T00:00:00Z`));
   const totalSales = byChannel.reduce((s, c) => s + c.foodSalesFils, 0);
   const active = byChannel.filter((c) => c.orders > 0);
 
@@ -64,17 +58,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       )}
 
       <Card
-        title={
-          <span className="flex items-center gap-2">
-            <Link href={`/admin/ops/sales?month=${shiftMonth(month, -1)}`} aria-label={t("Previous month")} className="grid h-8 w-8 place-items-center rounded-full hover:bg-black-iron/[0.05]">
-              <ChevronLeft className="h-4 w-4 rtl:-scale-x-100" />
-            </Link>
-            {monthLabel}
-            <Link href={`/admin/ops/sales?month=${shiftMonth(month, 1)}`} aria-label={t("Next month")} className="grid h-8 w-8 place-items-center rounded-full hover:bg-black-iron/[0.05]">
-              <ChevronRight className="h-4 w-4 rtl:-scale-x-100" />
-            </Link>
-          </span>
-        }
+        title={<MonthPicker month={month} current={monthRange().key} path="/admin/ops/sales" />}
         description={t("Food sales are what SHĀZDEH sold, without the customer's delivery and service fees. Platform fees are estimates from each platform's fee terms.")}
         bodyClassName="p-0"
       >
