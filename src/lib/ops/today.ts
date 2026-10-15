@@ -32,11 +32,6 @@ export function pickDay(asked: string | null | undefined, now = new Date()) {
   return asked > today ? today : asked;
 }
 
-/** The day before / after "YYYY-MM-DD". */
-export function shiftDay(day: string, by: number) {
-  return new Date(Date.parse(`${day}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
-}
-
 export async function todaySummary(day: string, now = new Date()) {
   const start = new Date(`${day}T00:00:00+04:00`);
   const end = new Date(start.getTime() + DAY_MS);

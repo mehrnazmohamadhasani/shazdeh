@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { AddSheet } from "@/components/admin/today/add-sheet";
+import { DayPicker } from "@/components/admin/today/day-picker";
 import { UNIT, amountText } from "@/components/admin/ops/format";
 import { requireAdmin } from "@/lib/auth";
 import { CMS_ROLES } from "@/lib/api";
-import { pickDay, shiftDay, todaySummary, type TodaySummary } from "@/lib/ops/today";
+import { dubaiToday, pickDay, todaySummary, type TodaySummary } from "@/lib/ops/today";
 import type { ProfitGap } from "@/lib/ops/profit";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import type { AdminI18n } from "@/lib/admin-i18n";
@@ -36,7 +37,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       actions={<AddSheet canAddRecipes={CMS_ROLES.includes(user.role)} />}
       className="pb-32 lg:pb-10"
     >
-      <DaySwitch day={summary.day} isToday={summary.isToday} t={t} />
+      <div className="-mt-2">
+        <DayPicker day={summary.day} today={dubaiToday()} />
+      </div>
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         <div className="space-y-4 lg:space-y-6">
           <SalesCard summary={summary} i18n={i18n} />
@@ -45,29 +48,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <AlertsCard alerts={summary.alerts} i18n={i18n} />
       </div>
     </AdminPage>
-  );
-}
-
-function DaySwitch({ day, isToday, t }: { day: string; isToday: boolean; t: AdminI18n["t"] }) {
-  const pill = "inline-flex h-11 items-center gap-1.5 rounded-full bg-black-iron/[0.05] px-4 text-[14px] font-medium";
-  return (
-    <nav aria-label={t("Choose a day")} className="-mt-2 flex items-center gap-2">
-      <Link href={`/admin?day=${shiftDay(day, -1)}`} className={pill}>
-        <ChevronLeft className="h-4 w-4 rtl:-scale-x-100" />
-        {t("Day before")}
-      </Link>
-      {!isToday && (
-        <>
-          <Link href={`/admin?day=${shiftDay(day, 1)}`} className={pill}>
-            {t("Next day")}
-            <ChevronRight className="h-4 w-4 rtl:-scale-x-100" />
-          </Link>
-          <Link href="/admin" className={cn(pill, "bg-terracotta/[0.1] text-terracotta-ink")}>
-            {t("Today")}
-          </Link>
-        </>
-      )}
-    </nav>
   );
 }
 
