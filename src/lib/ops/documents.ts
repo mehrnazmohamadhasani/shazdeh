@@ -155,12 +155,22 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
       if (!doc) throw new OpsError("Document not found.", 404);
       if (doc.status === "SAVED") throw new OpsError("This document is already saved.", 409);
 
-      const supplier = input.supplier.id
-        ? await tx.supplier.update({
-            where: { id: input.supplier.id },
-            data: input.supplier.trn ? { trn: input.supplier.trn } : {},
-          })
-        : await tx.supplier.create({ data: { name: input.supplier.name, trn: input.supplier.trn } });
+      let supplier;
+      if (input.supplier.id) {
+        const known = await tx.supplier.findUnique({ where: { id: input.supplier.id }, select: { phone: true } });
+        supplier = await tx.supplier.update({
+          where: { id: input.supplier.id },
+          data: {
+            ...(input.supplier.trn ? { trn: input.supplier.trn } : {}),
+            // Fill a missing phone; never overwrite one someone already entered.
+            ...(input.supplier.phone && !known?.phone ? { phone: input.supplier.phone } : {}),
+          },
+        });
+      } else {
+        supplier = await tx.supplier.create({
+          data: { name: input.supplier.name, trn: input.supplier.trn, phone: input.supplier.phone },
+        });
+      }
 
       if (input.invoiceNo) {
         const existing = await tx.purchaseInvoice.findFirst({

@@ -129,5 +129,6 @@ Rules:
 - invoiceDate as YYYY-MM-DD. Dates may be written 09/07/2026, 16-Jul-2026, 24-08-26 or 27/8/2026 (day first in the UAE).
 - pricesIncludeVat: true if line prices already include VAT, false if VAT is added on top, null if you can't tell.
 - supplier.trn is the 15-digit UAE Tax Registration Number if printed.
+- supplier.phone is the SUPPLIER's own phone or mobile number (in the header, footer or stamp), exactly as printed with any country code. Prefer the main phone over a fax number. Never use SHĀZDEH's, the bill-to customer's or a salesman's personal number when the supplier's own number is printed; null if there is none.
 - If only a card slip is visible (no item lines), return an empty lines array with the total.
 - notes: short hints such as handwritten words on the paper (translate Persian/Arabic words, e.g. «باقلی» = fava beans, «نون» = bread).`;

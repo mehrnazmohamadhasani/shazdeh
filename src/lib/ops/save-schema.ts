@@ -36,6 +36,7 @@ export const saveInvoiceSchema = z.object({
     id: z.string().nullable(),
     name: z.string().trim().min(1).max(200),
     trn: z.string().trim().max(30).nullable(),
+    phone: z.string().trim().max(40).nullable().default(null),
   }),
   invoiceNo: z.string().trim().max(60).nullable(),
   invoiceDate: day,

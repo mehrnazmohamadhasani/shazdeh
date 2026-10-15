@@ -229,7 +229,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   } else if (doc.status === "NEEDS_REVIEW" && stored) {
     const undone = doc.voidedInvoices[0];
     const [suppliers, ingredients] = await Promise.all([
-      prisma.supplier.findMany({ select: { id: true, name: true, trn: true, paymentTermsDays: true }, orderBy: { name: "asc" } }),
+      prisma.supplier.findMany({ select: { id: true, name: true, trn: true, phone: true, paymentTermsDays: true }, orderBy: { name: "asc" } }),
       prisma.ingredient.findMany({ select: { id: true, name: true, unit: true }, orderBy: { name: "asc" } }),
     ]);
     body = (

@@ -25,7 +25,7 @@ import { amountText } from "@/components/admin/ops/format";
 
 type Category = (typeof SPEND_CATEGORIES)[number];
 type Known = { id: string; name: string };
-type KnownSupplier = Known & { trn: string | null; paymentTermsDays: number | null };
+type KnownSupplier = Known & { trn: string | null; phone: string | null; paymentTermsDays: number | null };
 type KnownIngredient = Known & { unit: BaseUnit };
 
 type LineState = {
@@ -89,6 +89,7 @@ export function InvoiceReview({
   const [busy, setBusy] = React.useState<null | "save" | "read" | "discard">(null);
   const [supplierName, setSupplierName] = React.useState(suggestions.supplierName ?? reading.supplier.name ?? "");
   const [trn, setTrn] = React.useState(reading.supplier.trn ?? "");
+  const [phone, setPhone] = React.useState(reading.supplier.phone ?? "");
   const [invoiceNo, setInvoiceNo] = React.useState(reading.invoiceNumber ?? "");
   const [invoiceDate, setInvoiceDate] = React.useState(reading.invoiceDate ?? "");
   const [paymentMode, setPaymentMode] = React.useState(reading.paymentMode ?? "");
@@ -138,7 +139,7 @@ export function InvoiceReview({
     () =>
       checkExtraction({
         ...reading,
-        supplier: { name: supplierName || null, trn: trn || null, phone: null },
+        supplier: { name: supplierName || null, trn: trn || null, phone: phone || null },
         invoiceDate: invoiceDate || null,
         subtotal: num(subtotal),
         discount: num(discount),
@@ -161,7 +162,7 @@ export function InvoiceReview({
           note: l.note,
         })),
       }),
-    [reading, supplierName, trn, invoiceDate, subtotal, discount, vat, total, lines],
+    [reading, supplierName, trn, phone, invoiceDate, subtotal, discount, vat, total, lines],
   );
   const docFlags = flags.filter((f) => !f.field.startsWith("line:"));
   const lineFlags = (i: number) => flags.filter((f) => f.field === `line:${i}`);
@@ -199,7 +200,7 @@ export function InvoiceReview({
       return;
 
     const input: SaveInvoiceInput = {
-      supplier: { id: supplier?.id ?? null, name: supplier?.name ?? supplierName.trim(), trn: trn.trim() || null },
+      supplier: { id: supplier?.id ?? null, name: supplier?.name ?? supplierName.trim(), trn: trn.trim() || null, phone: phone.trim() || null },
       invoiceNo: invoiceNo.trim() || null,
       invoiceDate,
       paymentMode: (paymentMode || null) as SaveInvoiceInput["paymentMode"],
@@ -297,6 +298,12 @@ export function InvoiceReview({
           </Field>
           <Field label={t("TRN")}>
             <TextInput dir="ltr" value={trn} onChange={(e) => setTrn(e.target.value)} inputMode="numeric" placeholder={t("15 digits")} />
+          </Field>
+          <Field
+            label={t("Phone")}
+            hint={supplier?.phone && phone.trim() && phone.trim() !== supplier.phone ? t("Saved: {phone} (kept)", { phone: supplier.phone }) : undefined}
+          >
+            <TextInput dir="ltr" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={supplier?.phone ?? undefined} />
           </Field>
           <Field label={t("Invoice number")}>
             <TextInput dir="ltr" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />

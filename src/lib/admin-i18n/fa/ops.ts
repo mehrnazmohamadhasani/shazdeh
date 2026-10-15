@@ -131,6 +131,7 @@ export const ops: Record<string, string> = {
   "e.g. Unknown (handwritten veg)": "مثلاً Unknown (handwritten veg)",
   TRN: "TRN",
   "15 digits": "15 رقم",
+  "Saved: {phone} (kept)": "ذخیره‌شده: {phone} (همان می‌ماند)",
   "Invoice number": "شماره‌ی فاکتور",
   "Invoice date": "تاریخ فاکتور",
   "Not shown": "مشخص نیست",
