@@ -145,6 +145,20 @@ export async function getIngredient(id: string) {
   return { ...ingredient, onHand: onHand._sum.quantity ?? 0 };
 }
 
+/** A new food ingredient with no stock yet; it gets a price from its first invoice. */
+export async function createIngredient(data: { name: string; nameFa: string | null; unit: "G" | "ML" | "PCS" }, actor: Actor) {
+  const clash = await prisma.ingredient.findFirst({ where: { name: { equals: data.name, mode: "insensitive" } } });
+  if (clash) {
+    if (clash.unit !== data.unit) throw new OpsError(`"${clash.name}" already exists, counted in ${clash.unit.toLowerCase()}.`, 409);
+    return { id: clash.id, name: clash.name, nameFa: clash.nameFa, unit: clash.unit };
+  }
+  const ingredient = await prisma.ingredient.create({ data: { ...data, category: "FOOD" } });
+  await prisma.auditLog.create({
+    data: { actor: actor.email, action: "ingredient.create", entity: "Ingredient", entityId: ingredient.id, after: data },
+  });
+  return { id: ingredient.id, name: ingredient.name, nameFa: ingredient.nameFa, unit: ingredient.unit };
+}
+
 export async function updateIngredient(
   id: string,
   data: { name: string; nameFa: string | null; category: IngredientCategory },
@@ -181,6 +195,7 @@ export async function mergeIngredients(fromId: string, intoId: string, actor: Ac
     await tx.purchaseLine.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.supplierItem.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.recipeLine.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
+    await tx.recipeNameAlias.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.ingredient.update({ where: { id: intoId }, data: { nameFa: into.nameFa ?? from.nameFa } });
     await tx.ingredient.delete({ where: { id: fromId } });
     await tx.auditLog.create({

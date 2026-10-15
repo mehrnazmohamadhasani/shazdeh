@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { DeleteRecipeButton, DiscardDraftButton, DraftEditor, RecipeDetailsForm, RecipeSheet, type SheetLine } from "@/components/admin/ops/recipe-forms";
 import { UNIT, unitPrice } from "@/components/admin/ops/format";
@@ -15,11 +16,14 @@ export async function generateMetadata() {
   return { title: t("Recipe") };
 }
 
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
-  const [{ t, locale, money, number, date }, user, { id }] = await Promise.all([getAdminI18n(), requireAdmin(), params]);
+export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
+  const [{ t, locale, money, number, date }, user, { id }, query] = await Promise.all([getAdminI18n(), requireAdmin(), params, searchParams]);
   const data = await getRecipe(id);
   if (!data) notFound();
   const { recipe, approved, draft, history, usedIn, options } = data;
+  // The editor is open while there is a draft (or nothing approved yet); otherwise behind "Edit recipe".
+  const editing = !!draft || !approved || query.edit === "1";
+  const editHref = `/admin/ops/recipes/${recipe.id}?edit=1#edit`;
   const kind = recipe.kind;
   const name = (r: { name: string; nameFa?: string | null }) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
 
@@ -69,7 +73,16 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           )}
         </span>
       }
-      description={kind === "PREP" ? t("Prep — used by weight in other recipes.") : recipe.menuItem ? t("One portion of {dish}.", { dish: recipe.menuItem.name }) : undefined}
+      description={kind === "PREP" ? t("Prep — used by weight in other recipes.") : recipe.menuItem ? t("One portion of {dish}.", { dish: recipe.menuItem.name }) : t("Dish — not on the menu yet.")}
+      actions={
+        !editing ? (
+          <Button asChild size="md">
+            <Link href={editHref}>
+              <Pencil className="h-4 w-4" /> {t("Edit recipe")}
+            </Link>
+          </Button>
+        ) : undefined
+      }
     >
       {approved && (
         <Card
@@ -93,46 +106,81 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
             </ul>
           )}
           <RecipeSheet lines={sheetLines(approved)} kind={kind} yieldQuantity={approved.version.yieldQuantity} yieldUnit={approved.version.yieldUnit} />
+          {approved.version.method && (
+            <div className="border-t border-black-iron/[0.06] px-5 py-4 md:px-6">
+              <h3 className="mb-2 text-[13px] font-semibold text-dark-grey">{t("Method")}</h3>
+              <p dir="auto" className="whitespace-pre-line text-[14px] leading-relaxed">
+                {approved.version.method}
+              </p>
+            </div>
+          )}
+          {approved.version.sourceDocumentId && (
+            <p className="border-t border-black-iron/[0.06] px-5 py-3 text-[13px] md:px-6">
+              <Link href={`/admin/ops/recipes/import/${approved.version.sourceDocumentId}`} className="text-terracotta-ink underline-offset-4 hover:underline">
+                {t("Read from a photo — see the original")}
+              </Link>
+            </p>
+          )}
         </Card>
       )}
 
-      <Card
-        title={
-          draft ? (
-            <span className="flex flex-wrap items-center gap-2">
-              {t("Draft")} <StatusPill tone="warn">{t("Version {n}", { n: draft.version.number })}</StatusPill>
-            </span>
-          ) : (
-            t("Change the recipe")
-          )
-        }
-        description={draft ? t("Not used by the kitchen until it is approved.") : undefined}
-        actions={draft && approved ? <DiscardDraftButton recipeId={recipe.id} /> : undefined}
-      >
-        {draft && draft.cost.issues.some((i) => i.kind !== "draft") && (
-          <ul className="mb-4 text-[13px] text-cinnamon-bark">
-            {draft.cost.issues.filter((i) => i.kind !== "draft").map((i, k) => (
-              <li key={k}>{issueText(i, t)}</li>
-            ))}
-          </ul>
-        )}
-        <DraftEditor
-          key={editorKey}
-          recipeId={recipe.id}
-          kind={kind}
-          initial={{
-            yieldQuantity: base?.yieldQuantity ?? (kind === "DISH" ? 1 : 1000),
-            yieldUnit: base?.yieldUnit ?? (kind === "DISH" ? "PCS" : "G"),
-            note: draft?.version.note ?? null,
-            lines: (base?.lines ?? []).map((l) => ({ ingredientId: l.ingredientId, subRecipeId: l.subRecipeId, quantity: l.quantity, wastePct: l.wastePct, note: l.note })),
-          }}
-          options={options}
-          menuPriceAed={recipe.menuItem?.price ?? null}
-          canApprove={user.role === "ADMIN"}
-          startsNewVersion={!draft && !!approved}
-        />
-        {user.role !== "ADMIN" && <p className="mt-3 text-[12.5px] text-dark-grey">{t("Only the owner can approve a recipe.")}</p>}
-      </Card>
+      {editing && (
+        <div id="edit" className="scroll-mt-6">
+          <Card
+            title={
+              draft ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  {t("Draft")} <StatusPill tone="warn">{t("Version {n}", { n: draft.version.number })}</StatusPill>
+                </span>
+              ) : (
+                t("Change the recipe")
+              )
+            }
+            description={draft ? t("Not used by the kitchen until it is approved.") : undefined}
+            actions={
+              draft && approved ? (
+                <DiscardDraftButton recipeId={recipe.id} />
+              ) : !draft && approved ? (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href={`/admin/ops/recipes/${recipe.id}`}>{t("Cancel")}</Link>
+                </Button>
+              ) : undefined
+            }
+          >
+            {draft?.version.sourceDocumentId && (
+              <p className="mb-4 text-[13px]">
+                <Link href={`/admin/ops/recipes/import/${draft.version.sourceDocumentId}`} className="text-terracotta-ink underline-offset-4 hover:underline">
+                  {t("Read from a photo — see the original")}
+                </Link>
+              </p>
+            )}
+            {draft && draft.cost.issues.some((i) => i.kind !== "draft") && (
+              <ul className="mb-4 text-[13px] text-cinnamon-bark">
+                {draft.cost.issues.filter((i) => i.kind !== "draft").map((i, k) => (
+                  <li key={k}>{issueText(i, t)}</li>
+                ))}
+              </ul>
+            )}
+            <DraftEditor
+              key={editorKey}
+              recipeId={recipe.id}
+              kind={kind}
+              initial={{
+                yieldQuantity: base?.yieldQuantity ?? (kind === "DISH" ? 1 : 1000),
+                yieldUnit: base?.yieldUnit ?? (kind === "DISH" ? "PCS" : "G"),
+                note: draft?.version.note ?? null,
+                method: base?.method ?? null,
+                lines: (base?.lines ?? []).map((l) => ({ ingredientId: l.ingredientId, subRecipeId: l.subRecipeId, quantity: l.quantity, wastePct: l.wastePct, note: l.note })),
+              }}
+              options={options}
+              menuPriceAed={recipe.menuItem?.price ?? null}
+              canApprove={user.role === "ADMIN"}
+              startsNewVersion={!draft && !!approved}
+            />
+            {user.role !== "ADMIN" && <p className="mt-3 text-[12.5px] text-dark-grey">{t("Only the owner can approve a recipe.")}</p>}
+          </Card>
+        </div>
+      )}
 
       {usedIn.length > 0 && (
         <Card title={t("Used in")}>

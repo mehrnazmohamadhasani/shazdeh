@@ -91,15 +91,15 @@ export function costVersion(version: CostVersion, ctx: CostContext, path: string
       return { costFils: null };
     }
     const used = prep.approved ?? prep.draft;
-    if (!used) {
+    if (!used || used.lines.length === 0) {
       addIssue(issues, { kind: "empty_prep", name: prep.name });
       return { costFils: null };
     }
     if (!prep.approved) addIssue(issues, { kind: "draft_prep", name: prep.name });
     const inner = costVersion(used, ctx, [...path, prep.id]);
     for (const i of inner.issues) {
-      // The prep's own draft state is reported once, as draft_prep.
-      if (i.kind !== "draft") addIssue(issues, i);
+      // The prep's own state is reported once, as draft_prep / empty_prep.
+      if (i.kind !== "draft" && i.kind !== "no_lines") addIssue(issues, i);
     }
     return { costFils: amount * inner.perUnitFils };
   });

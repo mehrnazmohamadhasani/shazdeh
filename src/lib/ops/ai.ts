@@ -28,11 +28,31 @@ export class AiNotConfiguredError extends Error {
 }
 
 export async function readDocument(file: { data: Buffer; mimeType: string; name?: string | null }): Promise<ReadResult> {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
     if (process.env.NODE_ENV === "production") throw new AiNotConfiguredError();
     return sampleReading();
   }
+  const result = await readWithSchema(file, {
+    instructions: EXTRACTION_PROMPT,
+    prompt: "Read this document.",
+    schemaName: "purchase_document",
+    jsonSchema: extractionJsonSchema,
+  });
+  const parsed = extractionSchema.safeParse(result.json);
+  if (!parsed.success) throw new Error(`The reading didn't match the expected shape: ${parsed.error.message.slice(0, 300)}`);
+  return { extraction: parsed.data, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens };
+}
+
+/**
+ * One image or PDF in, JSON matching `jsonSchema` out (strict structured
+ * output). Shared by every kind of document the kitchen photographs.
+ */
+export async function readWithSchema(
+  file: { data: Buffer; mimeType: string; name?: string | null },
+  opts: { instructions: string; prompt: string; schemaName: string; jsonSchema: object },
+): Promise<{ json: unknown; model: string; inputTokens: number | null; outputTokens: number | null }> {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) throw new AiNotConfiguredError();
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
   const dataUrl = `data:${file.mimeType};base64,${file.data.toString("base64")}`;
   const attachment =
@@ -45,9 +65,9 @@ export async function readDocument(file: { data: Buffer; mimeType: string; name?
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
-      instructions: EXTRACTION_PROMPT,
-      input: [{ role: "user", content: [{ type: "input_text", text: "Read this document." }, attachment] }],
-      text: { format: { type: "json_schema", name: "purchase_document", schema: extractionJsonSchema, strict: true } },
+      instructions: opts.instructions,
+      input: [{ role: "user", content: [{ type: "input_text", text: opts.prompt }, attachment] }],
+      text: { format: { type: "json_schema", name: opts.schemaName, schema: opts.jsonSchema, strict: true } },
     }),
     signal: AbortSignal.timeout(110_000),
   });
@@ -64,15 +84,7 @@ export async function readDocument(file: { data: Buffer; mimeType: string; name?
   if (refusal) throw new Error(`The model declined to read this document: ${refusal.refusal ?? ""}`);
   const text = parts.find((p) => p.type === "output_text")?.text;
   if (!text) throw new Error("The model returned no reading.");
-
-  const parsed = extractionSchema.safeParse(JSON.parse(text));
-  if (!parsed.success) throw new Error(`The reading didn't match the expected shape: ${parsed.error.message.slice(0, 300)}`);
-  return {
-    extraction: parsed.data,
-    model,
-    inputTokens: body.usage?.input_tokens ?? null,
-    outputTokens: body.usage?.output_tokens ?? null,
-  };
+  return { json: JSON.parse(text), model, inputTokens: body.usage?.input_tokens ?? null, outputTokens: body.usage?.output_tokens ?? null };
 }
 
 /** Development only: a realistic reading (Rasti Lari rice + Hexing pantry lines). */

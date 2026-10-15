@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Link2,
   LogOut,
+  Menu,
   Package,
   ReceiptText,
   Settings as SettingsIcon,
@@ -24,6 +25,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { LanguageSwitch, LanguageToggle, useAdminI18n } from "@/components/admin/i18n";
 
@@ -34,24 +36,28 @@ const ADMIN_ONLY: Role[] = ["ADMIN"];
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; roles: Role[]; group: string };
 
-/* Grouped by how often staff need them: daily work, setup, settings. */
+/*
+ * Grouped by topic, so related screens sit together: everything about
+ * guests' orders, everything about the menu, the kitchen's purchasing and
+ * stock, the public website, and who has access.
+ */
 const NAV: NavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: CMS, group: "Daily" },
-  { href: "/admin/orders", label: "Orders", icon: ReceiptText, roles: ALL, group: "Daily" },
-  { href: "/admin/menu-items", label: "Menu", icon: UtensilsCrossed, roles: CMS, group: "Daily" },
-  { href: "/admin/ops/invoices", label: "Invoices", icon: FileText, roles: CMS, group: "Kitchen" },
-  { href: "/admin/ops/stock", label: "Stock", icon: Package, roles: CMS, group: "Kitchen" },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: CMS, group: "Home" },
+  { href: "/admin/orders", label: "Orders", icon: ReceiptText, roles: ALL, group: "Orders" },
+  { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Orders" },
+  { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Orders" },
+  { href: "/admin/ordering", label: "Online ordering", icon: SlidersHorizontal, roles: ADMIN_ONLY, group: "Orders" },
+  { href: "/admin/menu-items", label: "Menu", icon: UtensilsCrossed, roles: CMS, group: "Menu" },
+  { href: "/admin/categories", label: "Categories", icon: FolderTree, roles: CMS, group: "Menu" },
   { href: "/admin/ops/recipes", label: "Recipes", icon: ChefHat, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/stock", label: "Stock", icon: Package, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/invoices", label: "Invoices", icon: FileText, roles: CMS, group: "Kitchen" },
   { href: "/admin/ops/suppliers", label: "Suppliers", icon: Store, roles: CMS, group: "Kitchen" },
   { href: "/admin/ops/payables", label: "Payables", icon: Wallet, roles: CMS, group: "Kitchen" },
-  { href: "/admin/categories", label: "Categories", icon: FolderTree, roles: CMS, group: "Setup" },
-  { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Setup" },
-  { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Setup" },
-  { href: "/admin/gallery", label: "Gallery", icon: ImageIcon, roles: CMS, group: "Setup" },
-  { href: "/admin/social", label: "Links", icon: Link2, roles: CMS, group: "Setup" },
-  { href: "/admin/settings", label: "Business details", icon: SettingsIcon, roles: CMS, group: "Settings" },
-  { href: "/admin/ordering", label: "Online ordering", icon: SlidersHorizontal, roles: ADMIN_ONLY, group: "Settings" },
-  { href: "/admin/team", label: "Team", icon: Users, roles: ADMIN_ONLY, group: "Settings" },
+  { href: "/admin/settings", label: "Business details", icon: SettingsIcon, roles: CMS, group: "Website" },
+  { href: "/admin/gallery", label: "Gallery", icon: ImageIcon, roles: CMS, group: "Website" },
+  { href: "/admin/social", label: "Links", icon: Link2, roles: CMS, group: "Website" },
+  { href: "/admin/team", label: "Team", icon: Users, roles: ADMIN_ONLY, group: "Access" },
 ];
 
 function navFor(role: Role) {
@@ -97,7 +103,7 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
           const Icon = item.icon;
           return (
             <React.Fragment key={item.href}>
-              {heading && items.length > 1 && (
+              {heading && heading !== "Home" && items.length > 1 && (
                 <p className={cn("px-3 pb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-black-iron/40", i > 0 ? "pt-5" : "pt-2")}>
                   {t(heading)}
                 </p>
@@ -178,26 +184,66 @@ export function AdminMobileBar({ user }: { user: { email: string; name: string |
           </button>
         </div>
       </div>
-      {items.length > 1 && (
-        <nav aria-label={t("Admin menu")} className="no-scrollbar flex gap-1.5 overflow-x-auto px-[max(1rem,var(--safe-left))] pb-3">
-          {items.map((item) => {
+      {items.length > 1 && <MobileMenu items={items} pathname={pathname} />}
+    </header>
+  );
+}
+
+/**
+ * Phones: the current screen's name and a "Menu" button that opens every
+ * screen in the same groups as the desktop sidebar, as a bottom sheet —
+ * one tap, big targets, nothing hidden off to the side.
+ */
+function MobileMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  const { t } = useAdminI18n();
+  const [open, setOpen] = React.useState(false);
+  const current = items.find((i) => isActive(pathname, i.href));
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <div className="flex items-center gap-2 px-[max(1rem,var(--safe-left))] pb-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-black-iron/[0.05] px-4 text-[14px] font-medium text-black-iron"
+        >
+          <Menu className="h-[18px] w-[18px]" strokeWidth={1.8} />
+          {t("All screens")}
+        </button>
+        {current && (
+          <span className="inline-flex min-w-0 items-center gap-2 truncate text-[14px] text-terracotta-ink">
+            <current.icon className="h-4 w-4 shrink-0" strokeWidth={1.6} />
+            <span className="truncate">{t(current.label)}</span>
+          </span>
+        )}
+      </div>
+      <DialogContent className="bg-white text-black-iron">
+        <DialogTitle className="sr-only">{t("Admin menu")}</DialogTitle>
+        <DialogDescription className="sr-only">{t("Go to another screen")}</DialogDescription>
+        <nav aria-label={t("Admin menu")} className="px-4 pb-[max(1.25rem,var(--safe-bottom))] pt-5">
+          {items.map((item, i) => {
+            const heading = item.group !== items[i - 1]?.group && item.group !== "Home" ? item.group : null;
             const active = isActive(pathname, item.href);
+            const Icon = item.icon;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "inline-flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] transition-colors",
-                  active ? "bg-terracotta text-white" : "bg-black-iron/[0.04] text-black-iron/75",
-                )}
-              >
-                {t(item.label)}
-              </Link>
+              <React.Fragment key={item.href}>
+                {heading && <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.12em] text-black-iron/40">{t(heading)}</p>}
+                <Link
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-12 items-center gap-3 rounded-[12px] px-3 text-[15px]",
+                    active ? "bg-terracotta/[0.09] font-medium text-terracotta-ink" : "text-black-iron/80 active:bg-black-iron/[0.05]",
+                  )}
+                >
+                  <Icon className="h-5 w-5 shrink-0" strokeWidth={1.6} />
+                  {t(item.label)}
+                </Link>
+              </React.Fragment>
             );
           })}
         </nav>
-      )}
-    </header>
+      </DialogContent>
+    </Dialog>
   );
 }

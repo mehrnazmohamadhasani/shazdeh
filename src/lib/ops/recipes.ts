@@ -195,8 +195,8 @@ export async function createRecipe(
 ) {
   let name = input.name;
   let nameFa = input.nameFa;
-  if (input.kind === "DISH") {
-    if (!input.menuItemId) throw new OpsError("Choose the dish.");
+  // A dish can also be written before it is on the menu (name only); link it later.
+  if (input.kind === "DISH" && input.menuItemId) {
     const item = await prisma.menuItem.findUnique({ where: { id: input.menuItemId }, include: { recipe: { select: { id: true } } } });
     if (!item) throw new OpsError("Dish not found.", 404);
     if (item.recipe) return { id: item.recipe.id };
@@ -245,62 +245,79 @@ export async function updateRecipeDetails(id: string, data: { name: string; name
  * Saves the draft: replaces its lines, or starts a new draft (next number)
  * when only an approved version exists. Approved versions are never touched.
  */
-export async function saveDraft(
+export async function saveDraft(id: string, input: DraftInput, actor: Actor) {
+  return prisma.$transaction((tx) => writeDraft(tx, id, input, actor));
+}
+
+export type DraftInput = {
+  yieldQuantity: number;
+  yieldUnit: Unit;
+  note: string | null;
+  /** undefined = keep what the draft (or the approved version it starts from) has. */
+  method?: string | null;
+  lines: DraftLineInput[];
+};
+
+/** saveDraft inside a caller's transaction (the photo import uses it too). */
+export async function writeDraft(
+  tx: Prisma.TransactionClient,
   id: string,
-  input: { yieldQuantity: number; yieldUnit: Unit; note: string | null; lines: DraftLineInput[] },
+  input: DraftInput,
   actor: Actor,
+  source?: { documentId: string; via: string },
 ) {
-  return prisma.$transaction(async (tx) => {
-    await lockRecipe(tx, id);
-    const recipe = await tx.recipe.findUniqueOrThrow({ where: { id }, include: { versions: { include: { lines: true } } } });
-    const yieldQuantity = recipe.kind === "DISH" ? 1 : input.yieldQuantity;
-    const yieldUnit = recipe.kind === "DISH" ? "PCS" : input.yieldUnit;
+  await lockRecipe(tx, id);
+  const recipe = await tx.recipe.findUniqueOrThrow({ where: { id }, include: { versions: { include: { lines: true } } } });
+  const yieldQuantity = recipe.kind === "DISH" ? 1 : input.yieldQuantity;
+  const yieldUnit = recipe.kind === "DISH" ? "PCS" : input.yieldUnit;
 
-    // Every source must exist and preps must not lead back to this recipe.
-    const ingredientIds = [...new Set(input.lines.flatMap((l) => (l.ingredientId ? [l.ingredientId] : [])))];
-    const subIds = [...new Set(input.lines.flatMap((l) => (l.subRecipeId ? [l.subRecipeId] : [])))];
-    const [foundIngredients, subs] = await Promise.all([
-      tx.ingredient.count({ where: { id: { in: ingredientIds } } }),
-      tx.recipe.findMany({ where: { id: { in: subIds } }, select: { id: true, kind: true } }),
-    ]);
-    if (foundIngredients !== ingredientIds.length) throw new OpsError("An ingredient on this recipe no longer exists. Reload and try again.");
-    if (subs.length !== subIds.length || subs.some((s) => s.kind !== "PREP")) throw new OpsError("Only preps can be used inside a recipe.");
-    if (subIds.includes(id)) throw new OpsError("A recipe can't contain itself.");
-    if (subIds.length) {
-      const graph = await tx.recipe.findMany({ select: { id: true, versions: { where: { status: { in: ["APPROVED", "DRAFT"] } }, select: { lines: { select: { subRecipeId: true } } } } } });
-      if (wouldCycle(id, subIds, new Map(graph.map((g) => [g.id, g])))) throw new OpsError("That prep already uses this recipe, so it can't go inside it.");
-    }
+  // Every source must exist and preps must not lead back to this recipe.
+  const ingredientIds = [...new Set(input.lines.flatMap((l) => (l.ingredientId ? [l.ingredientId] : [])))];
+  const subIds = [...new Set(input.lines.flatMap((l) => (l.subRecipeId ? [l.subRecipeId] : [])))];
+  const [foundIngredients, subs] = await Promise.all([
+    tx.ingredient.count({ where: { id: { in: ingredientIds } } }),
+    tx.recipe.findMany({ where: { id: { in: subIds } }, select: { id: true, kind: true } }),
+  ]);
+  if (foundIngredients !== ingredientIds.length) throw new OpsError("An ingredient on this recipe no longer exists. Reload and try again.");
+  if (subs.length !== subIds.length || subs.some((s) => s.kind !== "PREP")) throw new OpsError("Only preps can be used inside a recipe.");
+  if (subIds.includes(id)) throw new OpsError("A recipe can't contain itself.");
+  if (subIds.length) {
+    const graph = await tx.recipe.findMany({ select: { id: true, versions: { where: { status: { in: ["APPROVED", "DRAFT"] } }, select: { lines: { select: { subRecipeId: true } } } } } });
+    if (wouldCycle(id, subIds, new Map(graph.map((g) => [g.id, g])))) throw new OpsError("That prep already uses this recipe, so it can't go inside it.");
+  }
 
-    const draft = recipe.versions.find((v) => v.status === "DRAFT");
-    const approved = recipe.versions.find((v) => v.status === "APPROVED");
-    const lines = input.lines.map((l, order) => ({ ...l, order }));
-    let versionId: string;
-    if (draft) {
-      await tx.recipeLine.deleteMany({ where: { versionId: draft.id } });
-      await tx.recipeVersion.update({
-        where: { id: draft.id },
-        data: { yieldQuantity, yieldUnit, note: input.note, lines: { create: lines } },
-      });
-      versionId = draft.id;
-    } else {
-      const number = Math.max(0, ...recipe.versions.map((v) => v.number)) + 1;
-      const created = await tx.recipeVersion.create({
-        data: { recipeId: id, number, status: "DRAFT", yieldQuantity, yieldUnit, note: input.note, createdById: actor.id, lines: { create: lines } },
-      });
-      versionId = created.id;
-    }
-    await tx.auditLog.create({
-      data: {
-        actor: actor.email,
-        action: "recipe.draft.save",
-        entity: "RecipeVersion",
-        entityId: versionId,
-        before: { lines: linesSnapshot((draft ?? approved)?.lines ?? []), yieldQuantity: (draft ?? approved)?.yieldQuantity ?? null },
-        after: { lines: linesSnapshot(input.lines), yieldQuantity },
-      },
+  const draft = recipe.versions.find((v) => v.status === "DRAFT");
+  const approved = recipe.versions.find((v) => v.status === "APPROVED");
+  const lines = input.lines.map((l, order) => ({ ...l, order }));
+  const method = input.method === undefined ? (draft ?? approved)?.method ?? null : input.method;
+  const sourceDocumentId = source?.documentId ?? (draft ?? approved)?.sourceDocumentId ?? null;
+  let versionId: string;
+  if (draft) {
+    await tx.recipeLine.deleteMany({ where: { versionId: draft.id } });
+    await tx.recipeVersion.update({
+      where: { id: draft.id },
+      data: { yieldQuantity, yieldUnit, note: input.note, method, sourceDocumentId, lines: { create: lines } },
     });
-    return { versionId };
+    versionId = draft.id;
+  } else {
+    const number = Math.max(0, ...recipe.versions.map((v) => v.number)) + 1;
+    const created = await tx.recipeVersion.create({
+      data: { recipeId: id, number, status: "DRAFT", yieldQuantity, yieldUnit, note: input.note, method, sourceDocumentId, createdById: actor.id, lines: { create: lines } },
+    });
+    versionId = created.id;
+  }
+  await tx.auditLog.create({
+    data: {
+      actor: actor.email,
+      action: "recipe.draft.save",
+      entity: "RecipeVersion",
+      entityId: versionId,
+      via: source?.via ?? "manual",
+      before: { lines: linesSnapshot((draft ?? approved)?.lines ?? []), yieldQuantity: (draft ?? approved)?.yieldQuantity ?? null },
+      after: { lines: linesSnapshot(input.lines), yieldQuantity, ...(source ? { sourceDocumentId: source.documentId } : {}) },
+    },
   });
+  return { versionId };
 }
 
 /** Makes the draft the kitchen standard; the previous standard is retired, not deleted. */

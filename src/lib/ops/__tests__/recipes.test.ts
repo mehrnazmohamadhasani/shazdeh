@@ -68,6 +68,12 @@ test("a prep with no versions is flagged", () => {
   assert.deepEqual(c.issues, [{ kind: "empty_prep", name: "Tahdig" }]);
 });
 
+test("a new prep with no lines yet is reported as having no recipe", () => {
+  const soaked: CostRecipe = { id: "soaked", name: "Soaked beans", approved: null, draft: v([], { status: "DRAFT", yieldQuantity: 1000 }) };
+  const c = costVersion(v([prep("soaked", 45)]), ctx(soaked));
+  assert.deepEqual(c.issues, [{ kind: "empty_prep", name: "Soaked beans" }]);
+});
+
 test("cycles are detected, never looped", () => {
   const a: CostRecipe = { id: "a", name: "A", approved: v([prep("b", 10)], { yieldQuantity: 100 }), draft: null };
   const b: CostRecipe = { id: "b", name: "B", approved: v([prep("a", 10)], { yieldQuantity: 100 }), draft: null };
@@ -89,4 +95,15 @@ test("food cost % on the ex-VAT menu price", () => {
   assert.equal(m.priceExVatFils, 9333);
   assert.equal(m.marginFils, 6533);
   assert.ok(Math.abs(m.foodCostPct! - 30.0) < 0.01);
+});
+
+test("recipe photo reading: sample fits the schema, strict JSON schema lists every field", async () => {
+  const { recipeReadingSchema, recipeReadingJsonSchema, sampleRecipeReading } = await import("../recipe-reading");
+  assert.equal(recipeReadingSchema.safeParse(sampleRecipeReading()).success, true);
+  // OpenAI strict mode: every property required, no extras — at both levels.
+  const top = recipeReadingJsonSchema as unknown as { properties: Record<string, unknown>; required: string[] };
+  assert.deepEqual([...top.required].sort(), Object.keys(top.properties).sort());
+  assert.deepEqual([...top.required].sort(), Object.keys(recipeReadingSchema.shape).sort());
+  const line = (top.properties.lines as { items: { properties: Record<string, unknown>; required: string[] } }).items;
+  assert.deepEqual([...line.required].sort(), Object.keys(line.properties).sort());
 });

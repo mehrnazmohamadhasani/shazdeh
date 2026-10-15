@@ -445,11 +445,11 @@ function HistoryTable({ orders }: { orders: BoardOrder[] }) {
       <table className="w-full text-start text-[13px]">
         <thead className="border-b border-black-iron/[0.08] text-[10px] uppercase tracking-[0.2em] text-dark-grey">
           <tr>
-            <th className="px-4 py-3 font-medium">{t("Order")}</th>
-            <th className="px-4 py-3 font-medium max-md:hidden">{t("Placed")}</th>
-            <th className="px-4 py-3 font-medium max-sm:hidden">{t("Customer")}</th>
-            <th className="px-4 py-3 font-medium max-lg:hidden">{t("Phone")}</th>
-            <th className="px-4 py-3 font-medium">{t("Status")}</th>
+            <th className="px-4 py-3 text-start font-medium">{t("Order")}</th>
+            <th className="px-4 py-3 text-start font-medium max-md:hidden">{t("Placed")}</th>
+            <th className="px-4 py-3 text-start font-medium max-sm:hidden">{t("Customer")}</th>
+            <th className="px-4 py-3 text-start font-medium max-lg:hidden">{t("Phone")}</th>
+            <th className="px-4 py-3 text-start font-medium">{t("Status")}</th>
             <th className="px-4 py-3 text-end font-medium">{t("Total")}</th>
           </tr>
         </thead>

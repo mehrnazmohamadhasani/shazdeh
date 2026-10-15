@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 // The AI reading happens inside this request.
 export const maxDuration = 120;
 
-/** Upload a purchase document (photo or PDF); it is read by AI before this returns. */
+/** Upload a purchase document or a recipe sheet (photo or PDF); it is read by AI before this returns. */
 export async function POST(req: Request) {
   const auth = await requireAuth(CMS_ROLES);
   if (auth.response) return auth.response;
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     const id = await uploadDocument(
       { data: Buffer.from(await file.arrayBuffer()), mimeType: file.type, name: file.name || null },
       auth.user.id,
+      form.get("kind") === "recipe" ? "recipe" : "supplier_invoice",
     );
     return NextResponse.json({ id }, { status: 201 });
   } catch (e) {

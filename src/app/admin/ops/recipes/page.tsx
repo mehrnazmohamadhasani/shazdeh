@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { NewDishRecipeButton, NewPrepForm } from "@/components/admin/ops/recipe-forms";
+import { NewDishRecipeButton, NewRecipeDialog } from "@/components/admin/ops/recipe-forms";
 import { UNIT, unitPrice } from "@/components/admin/ops/format";
 import { issueText } from "@/components/admin/ops/recipe-issues";
 import { listRecipes } from "@/lib/ops/recipes";
+import { listRecipeDocuments, parseStoredRecipe } from "@/lib/ops/recipe-import";
+import { UploadButton } from "@/components/admin/ops/upload-button";
+import { TableFilter } from "@/components/admin/table-filter";
+import { DOC_STATUS } from "@/components/admin/ops/status";
+import { day } from "@/components/admin/ops/format";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +19,21 @@ export async function generateMetadata() {
 }
 
 export default async function RecipesPage() {
-  const { t, locale, money, number, price } = await getAdminI18n();
-  const { dishes, orphanDishes, preps } = await listRecipes();
+  const { t, locale, money, number, price, intl } = await getAdminI18n();
+  const [{ dishes, orphanDishes, preps }, photos] = await Promise.all([listRecipes(), listRecipeDocuments()]);
   const done = dishes.filter((d) => d.recipe?.hasApproved).length;
   const name = (r: { name: string; nameFa: string | null }) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
+
+  const withoutRecipe = dishes.filter((d) => !d.recipe).map((d) => d.menuItem);
+  // Big enough to hit with a wet thumb; opens the recipe straight in its editor.
+  const edit = (id: string) => (
+    <Link
+      href={`/admin/ops/recipes/${id}?edit=1#edit`}
+      className="inline-flex h-10 items-center gap-1.5 rounded-full border border-black-iron/15 px-3.5 text-[13px] font-medium hover:border-terracotta hover:text-terracotta-ink"
+    >
+      <Pencil className="h-3.5 w-3.5" /> {t("Edit")}
+    </Link>
+  );
 
   type Row = (typeof preps)[number];
   const status = (r: Row) =>
@@ -32,26 +49,58 @@ export default async function RecipesPage() {
     <AdminPage
       title={t("Recipes")}
       description={t("Grams per portion for every dish. The cost follows the latest invoice prices; only approved recipes count as the kitchen standard.")}
+      actions={
+        <>
+          <NewRecipeDialog dishes={withoutRecipe} variant="outline" />
+          <UploadButton kind="recipe" label={t("Read recipe from photo")} />
+        </>
+      }
     >
+      {photos.length > 0 && (
+        <Card title={t("Recipe photos to check")} description={t("Read by AI — check each one and save it as a draft.")} bodyClassName="p-0">
+          <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
+            {photos.map((p) => {
+              const reading = parseStoredRecipe(p.extraction);
+              const status = DOC_STATUS[p.status];
+              return (
+                <li key={p.id}>
+                  <Link href={`/admin/ops/recipes/import/${p.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-black-iron/[0.02] md:px-6">
+                    <span dir="auto" className="min-w-0 flex-1 truncate font-medium">
+                      {reading?.title ?? t("Recipe photo")}
+                      {reading && <span className="font-normal text-dark-grey"> · {t("{n} ingredients", { n: reading.lines.length })}</span>}
+                    </span>
+                    <span className="shrink-0 text-[12.5px] text-dark-grey">{day(p.createdAt, false, intl)}</span>
+                    <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
       <Card
         title={t("Dishes")}
         description={t("{done} of {total} dishes have an approved recipe.", { done, total: dishes.length })}
         bodyClassName="p-0"
       >
+        <div className="border-b border-black-iron/[0.06] p-3 md:px-6">
+          <TableFilter target="dish-rows" placeholder={t("Search dishes")} className="max-w-sm" />
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-[14px]">
+          <table className="w-full text-[14px]">
             <thead>
               <tr className="border-b border-black-iron/[0.06] text-start text-[12px] text-dark-grey">
                 <th className="px-5 py-3 text-start font-medium md:px-6">{t("Dish")}</th>
-                <th className="px-3 py-3 text-end font-medium">{t("Menu price")}</th>
-                <th className="px-3 py-3 text-end font-medium">{t("Food cost")}</th>
+                <th className="px-3 py-3 text-end font-medium max-sm:hidden">{t("Menu price")}</th>
+                <th className="px-3 py-3 text-end font-medium max-sm:hidden">{t("Food cost")}</th>
                 <th className="px-3 py-3 text-end font-medium">{t("Food cost %")}</th>
                 <th className="px-5 py-3 text-end font-medium md:px-6" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-black-iron/[0.06]">
+            <tbody id="dish-rows" className="divide-y divide-black-iron/[0.06]">
               {dishes.map(({ menuItem, recipe }) => (
-                <tr key={menuItem.id} className="hover:bg-black-iron/[0.02]">
+                <tr key={menuItem.id} data-search={`${menuItem.name} ${menuItem.nameFa ?? ""} ${menuItem.category.name}`} className="hover:bg-black-iron/[0.02]">
                   <td className="px-5 py-3 md:px-6">
                     {recipe ? (
                       <Link href={`/admin/ops/recipes/${recipe.id}`} dir="auto" className="font-medium hover:underline">
@@ -62,23 +111,37 @@ export default async function RecipesPage() {
                     )}
                     <span className="ms-2 text-[12px] text-dark-grey">{menuItem.category.name}</span>
                   </td>
-                  <td className="px-3 py-3 text-end tabular-nums text-dark-grey">{price(menuItem.price)}</td>
-                  <td className="px-3 py-3 text-end tabular-nums">{recipe?.perUnitFils != null ? money(Math.round(recipe.perUnitFils)) : "—"}</td>
+                  <td className="px-3 py-3 text-end tabular-nums text-dark-grey max-sm:hidden">{price(menuItem.price)}</td>
+                  <td className="px-3 py-3 text-end tabular-nums max-sm:hidden">{recipe?.perUnitFils != null ? money(Math.round(recipe.perUnitFils)) : "—"}</td>
                   <td className="px-3 py-3 text-end tabular-nums">
                     {recipe?.margin?.foodCostPct != null ? `${number(recipe.margin.foodCostPct, { max: 1 })}%` : "—"}
                   </td>
-                  <td className="px-5 py-3 text-end md:px-6">{recipe ? status(recipe) : <NewDishRecipeButton menuItemId={menuItem.id} />}</td>
+                  <td className="px-5 py-3 text-end md:px-6">
+                    {recipe ? (
+                      <span className="inline-flex items-center gap-2">
+                        {status(recipe)}
+                        {edit(recipe.id)}
+                      </span>
+                    ) : (
+                      <NewDishRecipeButton menuItemId={menuItem.id} />
+                    )}
+                  </td>
                 </tr>
               ))}
               {orphanDishes.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} data-search={`${r.name} ${r.nameFa ?? ""}`}>
                   <td className="px-5 py-3 md:px-6" colSpan={4}>
                     <Link href={`/admin/ops/recipes/${r.id}`} dir="auto" className="font-medium hover:underline">
                       {name(r)}
                     </Link>
                     <span className="ms-2 text-[12px] text-dark-grey">{t("not on the menu")}</span>
                   </td>
-                  <td className="px-5 py-3 text-end md:px-6">{status(r)}</td>
+                  <td className="px-5 py-3 text-end md:px-6">
+                    <span className="inline-flex items-center gap-2">
+                      {status(r)}
+                      {edit(r.id)}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -102,12 +165,13 @@ export default async function RecipesPage() {
                   {p.perUnitFils != null && p.perUnitFils > 0 ? unitPrice(p.perUnitFils, UNIT[p.yieldUnit], locale) : "—"}
                 </span>
                 {status(p)}
+                {edit(p.id)}
               </li>
             ))}
           </ul>
         )}
         <div className="p-5 md:p-6">
-          <NewPrepForm />
+          <NewRecipeDialog dishes={withoutRecipe} kind="PREP" label={t("New prep")} variant="outline" />
         </div>
       </Card>
     </AdminPage>
