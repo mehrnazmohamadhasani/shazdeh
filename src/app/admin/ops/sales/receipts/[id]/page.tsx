@@ -156,9 +156,14 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
   } else {
     body = (
       <Card title={doc.status === "FAILED" ? t("AI couldn't read this receipt") : t(status.label)}>
-        {doc.error && <p className="text-[14px] text-pomegranate-red">{t(doc.error)}</p>}
+        {doc.error && doc.status !== "DISCARDED" && <p className="text-[14px] text-pomegranate-red">{t(doc.error)}</p>}
         {doc.status === "DISCARDED" ? (
-          <p className="text-[14px] text-dark-grey">{t("This receipt was discarded. Nothing was saved from it.")}</p>
+          <>
+            <p className="text-[14px] text-dark-grey">{t("This receipt was discarded. Nothing was saved from it.")}</p>
+            <div className="mt-4">
+              <RetryRead documentId={doc.id} />
+            </div>
+          </>
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <RetryRead documentId={doc.id} />

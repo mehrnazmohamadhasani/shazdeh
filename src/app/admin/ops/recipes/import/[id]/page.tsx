@@ -90,6 +90,11 @@ export default async function RecipeImportPage({ params }: { params: Promise<{ i
     body = (
       <Card>
         <p className="text-[14px] text-dark-grey">{doc.status === "PROCESSING" ? t("Still reading — refresh in a moment.") : t("This photo was discarded.")}</p>
+        {doc.status === "DISCARDED" && (
+          <div className="mt-4">
+            <RetryRead documentId={doc.id} />
+          </div>
+        )}
       </Card>
     );
   }

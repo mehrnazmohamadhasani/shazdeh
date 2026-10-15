@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     if (kind === "recipe" && !CMS_ROLES.includes(auth.user.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const id = await uploadDocument(
       { data: Buffer.from(await file.arrayBuffer()), mimeType: file.type, name: file.name || null },
-      auth.user.id,
+      auth.user,
       kind,
     );
     return NextResponse.json({ id }, { status: 201 });

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { canReadAgain } from "./document-state";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toFils } from "@/lib/ordering/money";
@@ -45,14 +46,23 @@ export class OpsError extends Error {
 }
 
 /** Stores the file (once — duplicates are caught by hash) and reads it. */
+type DocumentKind = "supplier_invoice" | "recipe" | "platform_order";
+
 export async function uploadDocument(
   file: { data: Buffer; mimeType: string; name: string | null },
-  userId: string,
-  kind: "supplier_invoice" | "recipe" | "platform_order" = "supplier_invoice",
+  actor: { id: string; email: string },
+  kind: DocumentKind = "supplier_invoice",
 ) {
   const sha256 = createHash("sha256").update(file.data).digest("hex");
-  const existing = await prisma.opsDocument.findUnique({ where: { sha256 }, select: { id: true } });
-  if (existing) throw new OpsError("This file was already uploaded.", 409, { id: existing.id });
+  const existing = await prisma.opsDocument.findUnique({ where: { sha256 }, select: { id: true, status: true, kind: true, updatedAt: true } });
+  if (existing) {
+    // The same photo again after it was discarded or failed: read it again
+    // (as what it was uploaded as now) instead of opening a dead end.
+    if (!canReadAgain(existing)) throw new OpsError("This file was already uploaded.", 409, { id: existing.id });
+    await reopenDocument(existing, actor, "upload", kind);
+    await processDocument(existing.id);
+    return existing.id;
+  }
 
   const doc = await prisma.opsDocument.create({
     data: {
@@ -62,12 +72,48 @@ export async function uploadDocument(
       data: new Uint8Array(file.data),
       originalName: file.name,
       kind,
-      uploadedById: userId,
+      uploadedById: actor.id,
     },
     select: { id: true },
   });
   await processDocument(doc.id);
   return doc.id;
+}
+
+/** Puts a discarded / failed / stuck document back to be read, with an audit row saying who and how. */
+async function reopenDocument(
+  doc: { id: string; status: string; kind: string },
+  actor: { email: string },
+  how: "upload" | "button",
+  kind: DocumentKind = doc.kind as DocumentKind,
+) {
+  await prisma.$transaction([
+    prisma.opsDocument.update({ where: { id: doc.id }, data: { status: "PROCESSING", kind, error: null } }),
+    prisma.auditLog.create({
+      data: {
+        actor: actor.email,
+        action: "document.read_again",
+        entity: "OpsDocument",
+        entityId: doc.id,
+        via: how === "upload" ? "photo" : "manual",
+        before: { status: doc.status, kind: doc.kind },
+        after: { status: "PROCESSING", kind },
+      },
+    }),
+  ]);
+}
+
+/** "Read again" from a document's page. Saved documents and ones waiting for review are left alone. */
+export async function readAgain(id: string, actor: { email: string }) {
+  const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { id: true, status: true, kind: true, updatedAt: true } });
+  if (!doc) throw new OpsError("Document not found.", 404);
+  if (doc.status === "SAVED") throw new OpsError("Already saved.", 409);
+  // Waiting for review: reading again replaces the reading (as before), no reopening needed.
+  if (doc.status !== "NEEDS_REVIEW") {
+    if (!canReadAgain(doc)) throw new OpsError("Still reading — refresh in a moment.", 409);
+    await reopenDocument(doc, actor, "button");
+  }
+  await processDocument(id);
 }
 
 /** (Re-)reads a document with AI. Never throws: failures are stored on the document. */
