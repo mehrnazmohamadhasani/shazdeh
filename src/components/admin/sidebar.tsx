@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  ChefHat,
   ExternalLink,
   FileText,
   FolderTree,
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { href: "/admin/menu-items", label: "Menu", icon: UtensilsCrossed, roles: CMS, group: "Daily" },
   { href: "/admin/ops/invoices", label: "Invoices", icon: FileText, roles: CMS, group: "Kitchen" },
   { href: "/admin/ops/stock", label: "Stock", icon: Package, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/recipes", label: "Recipes", icon: ChefHat, roles: CMS, group: "Kitchen" },
   { href: "/admin/ops/suppliers", label: "Suppliers", icon: Store, roles: CMS, group: "Kitchen" },
   { href: "/admin/ops/payables", label: "Payables", icon: Wallet, roles: CMS, group: "Kitchen" },
   { href: "/admin/categories", label: "Categories", icon: FolderTree, roles: CMS, group: "Setup" },

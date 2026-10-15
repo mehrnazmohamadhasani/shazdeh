@@ -3,6 +3,7 @@ import { orders } from "./orders";
 import { menu } from "./menu";
 import { ops } from "./ops";
 import { stock } from "./stock";
+import { recipes } from "./recipes";
 import { setup } from "./setup";
 import { settings } from "./settings";
 
@@ -17,6 +18,7 @@ export const FA: Record<string, string> = {
   ...menu,
   ...ops,
   ...stock,
+  ...recipes,
   ...setup,
   ...settings,
 };

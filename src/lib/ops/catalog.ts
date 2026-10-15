@@ -167,7 +167,7 @@ export async function updateIngredient(
   });
 }
 
-/** Moves stock, purchases and supplier memory of `fromId` onto `intoId` (same unit), then removes `fromId`. */
+/** Moves stock, purchases, supplier memory and recipe lines of `fromId` onto `intoId` (same unit), then removes `fromId`. */
 export async function mergeIngredients(fromId: string, intoId: string, actor: Actor) {
   if (fromId === intoId) throw new OpsError("Choose a different ingredient.");
   return prisma.$transaction(async (tx) => {
@@ -180,6 +180,7 @@ export async function mergeIngredients(fromId: string, intoId: string, actor: Ac
     const moved = await tx.stockMovement.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.purchaseLine.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.supplierItem.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
+    await tx.recipeLine.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.ingredient.update({ where: { id: intoId }, data: { nameFa: into.nameFa ?? from.nameFa } });
     await tx.ingredient.delete({ where: { id: fromId } });
     await tx.auditLog.create({
