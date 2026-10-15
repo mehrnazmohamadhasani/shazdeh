@@ -55,3 +55,41 @@ export const openingSchema = z.object({
     .min(1)
     .max(1000),
 });
+
+// ─── Recipes ────────────────────────────────────────────────────────────────
+
+const recipeUnit = z.enum(["G", "ML", "PCS"]);
+
+export const recipeCreateSchema = z.object({
+  kind: z.enum(["DISH", "PREP"]),
+  menuItemId: z.string().min(1).nullable(),
+  name: text(120),
+  nameFa: text(120),
+  yieldUnit: recipeUnit.default("G"),
+});
+
+export const recipeDetailsSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  nameFa: text(120),
+});
+
+export const recipeDraftSchema = z.object({
+  /** Ignored for dishes (always one portion). */
+  yieldQuantity: z.number().finite().positive().max(1_000_000),
+  yieldUnit: recipeUnit,
+  note: text(500),
+  lines: z
+    .array(
+      z
+        .object({
+          ingredientId: z.string().min(1).nullable(),
+          subRecipeId: z.string().min(1).nullable(),
+          /** In the ingredient's unit or the prep's yield unit (g / ml / pcs). */
+          quantity: z.number().finite().positive().max(1_000_000),
+          wastePct: z.number().finite().min(0).max(95),
+          note: text(200),
+        })
+        .refine((l) => (l.ingredientId == null) !== (l.subRecipeId == null), "Each line needs an ingredient or a prep"),
+    )
+    .max(80),
+});

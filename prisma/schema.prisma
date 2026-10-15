@@ -69,6 +69,7 @@ model MenuItem {
   order          Int             @default(0)
   modifierGroups ModifierGroup[]
   orderItems     OrderItem[]
+  recipe         Recipe?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -547,6 +548,7 @@ model Ingredient {
   supplierItems SupplierItem[]
   purchaseLines PurchaseLine[]
   movements     StockMovement[]
+  recipeLines   RecipeLine[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
@@ -657,6 +659,81 @@ model StockMovement {
 
 /// Shared rate-limit counters (sign-in, orders), so the limits hold
 /// across every server instance. Expired rows are deleted lazily.
+// ─── Ops: recipes ───────────────────────────────────────────────────────────
+// A dish recipe is one portion of a menu item; a PREP is a sub-recipe
+// (cooked rice, tahdig, khoresh base) that dishes use by weight. Recipes
+// are versioned: drafts are edited, an approved version is the kitchen
+// standard and is never changed. Costs are calculated on read from the
+// latest purchase prices, never stored (see src/lib/ops/recipes.ts).
+
+enum RecipeKind {
+  DISH
+  PREP
+}
+
+enum RecipeVersionStatus {
+  DRAFT
+  APPROVED
+  /// Was approved; replaced by a newer approved version.
+  RETIRED
+}
+
+model Recipe {
+  id         String          @id @default(cuid())
+  kind       RecipeKind
+  name       String          @unique
+  nameFa     String?
+  /// DISH only: the menu item this is one portion of.
+  menuItemId String?         @unique
+  menuItem   MenuItem?       @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  versions   RecipeVersion[]
+  usedIn     RecipeLine[]    @relation("SubRecipe")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model RecipeVersion {
+  id            String              @id @default(cuid())
+  recipeId      String
+  recipe        Recipe              @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  number        Int
+  status        RecipeVersionStatus @default(DRAFT)
+  /// DISH: 1 PCS (one portion). PREP: what one batch makes, e.g. 5000 G.
+  yieldQuantity Float
+  yieldUnit     StockUnit
+  note          String?
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  lines         RecipeLine[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([recipeId, number])
+  @@index([recipeId, status])
+}
+
+/// Exactly one of ingredientId / subRecipeId is set (CHECK in the migration).
+model RecipeLine {
+  id           String        @id @default(cuid())
+  versionId    String
+  version      RecipeVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  order        Int           @default(0)
+  ingredientId String?
+  ingredient   Ingredient?   @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  subRecipeId  String?
+  subRecipe    Recipe?       @relation("SubRecipe", fields: [subRecipeId], references: [id], onDelete: Restrict)
+  /// Amount used, in the ingredient's unit or the sub-recipe's yield unit.
+  quantity     Float
+  /// Trim / peel loss in percent: amount bought = quantity / (1 − wastePct/100).
+  wastePct     Float         @default(0)
+  note         String?
+
+  @@index([versionId])
+  @@index([ingredientId])
+  @@index([subRecipeId])
+}
+
 model RateLimitBucket {
   key     String   @id
   count   Int
