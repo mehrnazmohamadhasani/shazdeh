@@ -6,6 +6,7 @@ import { UploadButton } from "@/components/admin/ops/upload-button";
 import { TableFilter } from "@/components/admin/table-filter";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { stockSummary } from "@/lib/ops/documents";
+import { getOpsSettings } from "@/lib/ops/settings";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function generateMetadata() {
 
 export default async function StockPage() {
   const { t, locale, intl } = await getAdminI18n();
-  const rows = await stockSummary();
+  const [rows, settings] = await Promise.all([stockSummary(), getOpsSettings()]);
   return (
     <AdminPage
       title={t("Stock")}
@@ -62,7 +63,7 @@ export default async function StockPage() {
                 <tr className="border-b border-black-iron/[0.06] text-start text-[12px] text-dark-grey">
                   <th className="px-5 py-3 text-start font-medium md:px-6">{t("Ingredient")}</th>
                   <th className="px-3 py-3 text-end font-medium">{t("On hand")}</th>
-                  <th className="px-3 py-3 text-end font-medium">{t("Last price (ex VAT)")}</th>
+                  <th className="px-3 py-3 text-end font-medium">{t(settings.foodCostIncludesVat ? "Last price (with VAT)" : "Last price (ex VAT)")}</th>
                   <th className="px-5 py-3 text-start font-medium max-sm:hidden md:px-6">{t("Last bought")}</th>
                 </tr>
               </thead>

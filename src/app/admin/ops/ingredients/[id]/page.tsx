@@ -5,6 +5,7 @@ import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { getIngredient } from "@/lib/ops/catalog";
+import { chosenCost, getOpsSettings } from "@/lib/ops/settings";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 
@@ -27,7 +28,7 @@ const MOVEMENT_LABEL: Record<string, string> = {
 export default async function IngredientPage({ params }: { params: Promise<{ id: string }> }) {
   const { t, locale, intl } = await getAdminI18n();
   const { id } = await params;
-  const ingredient = await getIngredient(id);
+  const [ingredient, settings] = await Promise.all([getIngredient(id), getOpsSettings()]);
   if (!ingredient) notFound();
   const unit = UNIT[ingredient.unit];
   const sameUnit = await prisma.ingredient.findMany({
@@ -36,7 +37,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
     orderBy: { name: "asc" },
   });
 
-  // Price per kg / L / piece, ex VAT, for each purchase.
+  // Price per kg / L / piece for each purchase, with or without VAT as chosen in Ops settings.
   const prices = ingredient.purchaseLines
     .filter((l) => l.baseQty && l.netFils != null)
     .map((l) => ({
@@ -45,7 +46,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
       supplier: l.invoice.supplier,
       documentId: l.invoice.documentId,
       qty: l.baseQty!,
-      perBase: l.netFils! / l.baseQty!,
+      perBase: chosenCost(l.netFils, l.grossFils, settings.foodCostIncludesVat)! / l.baseQty!,
     }));
   // Latest price from each supplier → who is cheapest now.
   const latestBySupplier = new Map<string, (typeof prices)[number]>();
@@ -74,7 +75,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
           <p className="mt-1 text-[24px] font-bold tabular-nums">{amountText(ingredient.onHand, unit, locale)}</p>
         </Card>
         <Card>
-          <p className="text-[12.5px] text-dark-grey">{t("Last price (ex VAT)")}</p>
+          <p className="text-[12.5px] text-dark-grey">{t(settings.foodCostIncludesVat ? "Last price (with VAT)" : "Last price (ex VAT)")}</p>
           <p className="mt-1 text-[24px] font-bold tabular-nums">{prices[0] ? unitPrice(prices[0].perBase, unit, locale) : "—"}</p>
         </Card>
         <Card>

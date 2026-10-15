@@ -4,13 +4,16 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toFils } from "@/lib/ordering/money";
 import { readDocument } from "./ai";
-import { costLines } from "./costing";
+import { costLines, grossLines } from "./costing";
 import { extractionSchema, isStockCategory, type Extraction } from "./extraction";
 import { suggestMatches, type Suggestions } from "./match";
 import type { SaveInvoiceInput } from "./save-schema";
 import { normalizeName } from "./units";
 import { reportError } from "@/lib/report-error";
 import { processRecipeDocument } from "./recipe-import";
+import { processPlatformDocument } from "./platform-import";
+import { chosenCost, getOpsSettings } from "./settings";
+import { AiBudgetError } from "./ai-usage";
 
 /*
  * Purchase documents: upload → AI reading → review → saved invoice and
@@ -44,7 +47,7 @@ export class OpsError extends Error {
 export async function uploadDocument(
   file: { data: Buffer; mimeType: string; name: string | null },
   userId: string,
-  kind: "supplier_invoice" | "recipe" = "supplier_invoice",
+  kind: "supplier_invoice" | "recipe" | "platform_order" = "supplier_invoice",
 ) {
   const sha256 = createHash("sha256").update(file.data).digest("hex");
   const existing = await prisma.opsDocument.findUnique({ where: { sha256 }, select: { id: true } });
@@ -71,9 +74,12 @@ export async function processDocument(id: string) {
   const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { data: true, mimeType: true, originalName: true, kind: true } });
   if (!doc) return;
   if (doc.kind === "recipe") return processRecipeDocument(id);
+  if (doc.kind === "platform_order") return processPlatformDocument(id);
   await prisma.opsDocument.update({ where: { id }, data: { status: "PROCESSING", error: null } });
   try {
-    const result = await readDocument({ data: Buffer.from(doc.data), mimeType: doc.mimeType, name: doc.originalName });
+    const result = await readDocument({ data: Buffer.from(doc.data), mimeType: doc.mimeType, name: doc.originalName }, id);
+    // A delivery-platform receipt photographed as an invoice: read it as a sale instead.
+    if (result.extraction.documentType === "platform_order") return processPlatformDocument(id);
     const suggestions = await suggestMatches(result.extraction);
     const stored: StoredReading = { reading: result.extraction, suggestions };
     await prisma.opsDocument.update({
@@ -87,7 +93,7 @@ export async function processDocument(id: string) {
       },
     });
   } catch (e) {
-    await reportError(e, { where: `ops document read ${id}` });
+    if (!(e instanceof AiBudgetError)) await reportError(e, { where: `ops document read ${id}` });
     await prisma.opsDocument.update({
       where: { id },
       data: { status: "FAILED", error: (e instanceof Error ? e.message : String(e)).slice(0, 1000) },
@@ -97,8 +103,8 @@ export async function processDocument(id: string) {
 
 export async function listDocuments() {
   return prisma.opsDocument.findMany({
-    // Recipe photos have their own list on the recipes screen.
-    where: { kind: { not: "recipe" } },
+    // Recipe photos and platform receipts have their own lists.
+    where: { kind: "supplier_invoice" },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
@@ -118,6 +124,7 @@ export async function getDocument(id: string) {
     where: { id },
     select: {
       id: true,
+      kind: true,
       status: true,
       createdAt: true,
       mimeType: true,
@@ -182,6 +189,10 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
 
       const at = dubaiDate(input.invoiceDate);
       const costs = costLines(input.lines, { pricesIncludeVat: input.pricesIncludeVat, discount: input.discount });
+      const gross = grossLines(
+        costs.map((c) => c.netFils),
+        { totalFils: toFils(input.total), hasVat: input.pricesIncludeVat || (input.vat ?? 0) > 0 || costs.some((c) => (c.vatFils ?? 0) > 0) },
+      );
       const credit = input.paymentMode === "credit";
       const dueDate = credit
         ? input.dueDate
@@ -248,6 +259,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
             vatFils: costs[i].vatFils,
             lineTotalFils: toFils(line.lineTotal),
             netFils: costs[i].netFils,
+            grossFils: gross[i],
             category: DB_CATEGORY[line.category],
             ingredientId,
             baseQty: stocked ? line.stockQuantity : null,
@@ -487,7 +499,7 @@ export async function discardDocument(id: string, actor: { email: string }) {
 
 /** Stock on hand per ingredient (sum of movements) with the last purchase. */
 export async function stockSummary() {
-  const [ingredients, sums, lastPurchases] = await Promise.all([
+  const [ingredients, sums, lastPurchases, settings] = await Promise.all([
     prisma.ingredient.findMany({ orderBy: { name: "asc" } }),
     prisma.stockMovement.groupBy({ by: ["ingredientId"], _sum: { quantity: true } }),
     prisma.stockMovement.findMany({
@@ -500,9 +512,10 @@ export async function stockSummary() {
         at: true,
         quantity: true,
         costFils: true,
-        purchaseLine: { select: { invoice: { select: { supplier: { select: { name: true } } } } } },
+        purchaseLine: { select: { grossFils: true, invoice: { select: { supplier: { select: { name: true } } } } } },
       },
     }),
+    getOpsSettings(),
   ]);
   return ingredients.map((i) => {
     const last = lastPurchases.find((p) => p.ingredientId === i.id);
@@ -517,7 +530,10 @@ export async function stockSummary() {
         ? {
             at: last.at.toISOString(),
             supplier: last.purchaseLine?.invoice.supplier.name ?? null,
-            costPerUnitFils: last.costFils != null && last.quantity > 0 ? last.costFils / last.quantity : null,
+            costPerUnitFils:
+              last.costFils != null && last.quantity > 0
+                ? chosenCost(last.costFils, last.purchaseLine?.grossFils, settings.foodCostIncludesVat)! / last.quantity
+                : null,
           }
         : null,
     };

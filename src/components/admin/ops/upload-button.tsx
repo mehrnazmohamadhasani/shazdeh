@@ -73,10 +73,12 @@ export function UploadButton({
   variant = "primary",
 }: {
   label?: string;
-  kind?: "supplier_invoice" | "recipe";
+  kind?: "supplier_invoice" | "recipe" | "platform_order";
   variant?: "primary" | "outline";
 }) {
   const recipe = kind === "recipe";
+  const sale = kind === "platform_order";
+  const openPath = (id: string) => (recipe ? `/admin/ops/recipes/import/${id}` : sale ? `/admin/ops/sales/receipts/${id}` : `/admin/ops/invoices/${id}`);
   const { t } = useAdminI18n();
   const router = useRouter();
   const input = React.useRef<HTMLInputElement>(null);
@@ -87,7 +89,7 @@ export function UploadButton({
     const blob = await shrink(file);
     const form = new FormData();
     const name = file.type === "application/pdf" ? file.name : file.name.replace(/\.\w+$/, "") + ".jpg";
-    form.append("file", blob, name || (recipe ? "recipe.jpg" : "invoice.jpg"));
+    form.append("file", blob, name || (recipe ? "recipe.jpg" : sale ? "receipt.jpg" : "invoice.jpg"));
     form.append("kind", kind);
     const res = await fetch("/api/admin/ops/documents", { method: "POST", body: form });
     const body = await res.json().catch(() => ({}));
@@ -100,7 +102,7 @@ export function UploadButton({
     setProgress({ done: 0, total: picked.length });
     let files: File[];
     try {
-      // A recipe PDF with several pages is one recipe; invoices may be one per page.
+      // A recipe PDF with several pages is one recipe; invoices and receipts may be one per page.
       files = recipe ? picked : await splitPdfs(picked, t);
     } catch (e) {
       toast.error(t(messageFromUnknown(e, "Could not open the PDF")));
@@ -113,7 +115,7 @@ export function UploadButton({
       try {
         const { id, duplicate } = await upload(files[0]);
         if (duplicate) toast.info(t("Already uploaded — opening it."));
-        router.push(recipe ? `/admin/ops/recipes/import/${id}` : `/admin/ops/invoices/${id}`);
+        router.push(openPath(id));
         router.refresh();
       } catch (e) {
         toast.error(t(messageFromUnknown(e, "Upload failed")));
@@ -138,7 +140,7 @@ export function UploadButton({
     if (duplicates) toast.info(t("{n} already uploaded before", { n: duplicates }));
     if (failed.length) toast.error(failed.join("\n"));
     setProgress(null);
-    router.push(recipe ? "/admin/ops/recipes" : "/admin/ops/invoices");
+    router.push(recipe ? "/admin/ops/recipes" : sale ? "/admin/ops/sales" : "/admin/ops/invoices");
     router.refresh();
   }
 

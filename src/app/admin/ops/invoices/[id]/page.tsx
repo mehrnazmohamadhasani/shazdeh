@@ -1,17 +1,19 @@
 /* eslint-disable @next/next/no-img-element -- private document served by an authenticated route, not next/image */
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { DOC_STATUS } from "@/components/admin/ops/status";
 import { InvoiceReview } from "@/components/admin/ops/invoice-review";
 import { DiscardButton, EditInvoiceButton, MarkPaidButton, RetryRead } from "@/components/admin/ops/document-actions";
+import { ReadAsSaleButton } from "@/components/admin/ops/platform-forms";
 import { EDIT_REASON, getDocument, parseStoredReading } from "@/lib/ops/documents";
 import { reconcileStatement } from "@/lib/ops/catalog";
 import { toFils } from "@/lib/ordering/money";
 import { prisma } from "@/lib/prisma";
 import { UNIT, amountText, day } from "@/components/admin/ops/format";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -22,9 +24,12 @@ export async function generateMetadata() {
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { t, money, intl, locale } = await getAdminI18n();
+  // Recording payments is for the money pages' users, not the purchaser.
+  const canPay = (await requireAdmin()).role !== "PURCHASER";
   const date = (d: Date) => day(d, true, intl);
   const doc = await getDocument(id);
   if (!doc) notFound();
+  if (doc.kind === "platform_order") redirect(`/admin/ops/sales/receipts/${doc.id}`);
   const stored = parseStoredReading(doc.extraction);
   const fileUrl = `/api/admin/ops/documents/${doc.id}/file`;
   const status = DOC_STATUS[doc.status];
@@ -132,12 +137,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 <StatusPill tone={overdue ? "bad" : "warn"}>{overdue ? t("Overdue") : t("Unpaid")}</StatusPill>
                 <span className="ms-2">{inv.dueDate ? t("Due {date}", { date: date(inv.dueDate) }) : t("No due date")}</span>
               </p>
-              <MarkPaidButton invoiceId={inv.id} />
+              {canPay && <MarkPaidButton invoiceId={inv.id} />}
             </div>
           ) : (
             <div className="space-y-3">
               <p className="text-[14px] text-dark-grey">{t("Payment not recorded.")}</p>
-              <MarkPaidButton invoiceId={inv.id} />
+              {canPay && <MarkPaidButton invoiceId={inv.id} />}
             </div>
           )}
         </Card>
@@ -218,11 +223,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <p className="text-[14px] leading-relaxed text-dark-grey">
           {saleBefore}
           <strong className="text-black-iron">{t("sale")}</strong>
-          {saleAfter} {t("Reading platform orders and their fees comes in the next step.")}
+          {saleAfter}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
+          <ReadAsSaleButton documentId={doc.id} />
           <DiscardButton documentId={doc.id} />
-          <RetryRead documentId={doc.id} />
         </div>
       </Card>
     );

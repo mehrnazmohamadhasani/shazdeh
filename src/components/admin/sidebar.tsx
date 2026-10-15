@@ -23,15 +23,20 @@ import {
   Users,
   UtensilsCrossed,
   Wallet,
+  Banknote,
+  Percent,
+  TrendingUp,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { roleHome } from "@/lib/roles";
 import { LanguageSwitch, LanguageToggle, useAdminI18n } from "@/components/admin/i18n";
 
-type Role = "ADMIN" | "EDITOR" | "STAFF";
+type Role = "ADMIN" | "EDITOR" | "STAFF" | "PURCHASER";
 const ALL: Role[] = ["ADMIN", "EDITOR", "STAFF"];
 const CMS: Role[] = ["ADMIN", "EDITOR"];
+const PURCHASING: Role[] = ["ADMIN", "EDITOR", "PURCHASER"];
 const ADMIN_ONLY: Role[] = ["ADMIN"];
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; roles: Role[]; group: string };
@@ -47,13 +52,17 @@ const NAV: NavItem[] = [
   { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Orders" },
   { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Orders" },
   { href: "/admin/ordering", label: "Online ordering", icon: SlidersHorizontal, roles: ADMIN_ONLY, group: "Orders" },
+  { href: "/admin/ops/sales", label: "Sales", icon: TrendingUp, roles: CMS, group: "Sales" },
+  { href: "/admin/ops/channels", label: "Channels & fees", icon: Percent, roles: CMS, group: "Sales" },
   { href: "/admin/menu-items", label: "Menu", icon: UtensilsCrossed, roles: CMS, group: "Menu" },
   { href: "/admin/categories", label: "Categories", icon: FolderTree, roles: CMS, group: "Menu" },
   { href: "/admin/ops/recipes", label: "Recipes", icon: ChefHat, roles: CMS, group: "Kitchen" },
-  { href: "/admin/ops/stock", label: "Stock", icon: Package, roles: CMS, group: "Kitchen" },
-  { href: "/admin/ops/invoices", label: "Invoices", icon: FileText, roles: CMS, group: "Kitchen" },
-  { href: "/admin/ops/suppliers", label: "Suppliers", icon: Store, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/stock", label: "Stock", icon: Package, roles: PURCHASING, group: "Kitchen" },
+  { href: "/admin/ops/invoices", label: "Invoices", icon: FileText, roles: PURCHASING, group: "Kitchen" },
+  { href: "/admin/ops/suppliers", label: "Suppliers", icon: Store, roles: PURCHASING, group: "Kitchen" },
   { href: "/admin/ops/payables", label: "Payables", icon: Wallet, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/cash", label: "Owner cash", icon: Banknote, roles: CMS, group: "Kitchen" },
+  { href: "/admin/ops/settings", label: "Kitchen settings", icon: SlidersHorizontal, roles: CMS, group: "Kitchen" },
   { href: "/admin/settings", label: "Business details", icon: SettingsIcon, roles: CMS, group: "Website" },
   { href: "/admin/gallery", label: "Gallery", icon: ImageIcon, roles: CMS, group: "Website" },
   { href: "/admin/social", label: "Links", icon: Link2, roles: CMS, group: "Website" },
@@ -91,7 +100,7 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-e border-black-iron/[0.07] bg-white pb-[var(--safe-bottom)] pt-[var(--safe-top)] lg:flex print:!hidden">
       <div className="flex h-16 items-center px-5">
-        <Link href={user.role === "STAFF" ? "/admin/orders" : "/admin"} aria-label={t("SHĀZDEH admin home")}>
+        <Link href={roleHome(user.role)} aria-label={t("SHĀZDEH admin home")}>
           <Wordmark size="sm" />
         </Link>
       </div>
@@ -169,7 +178,7 @@ export function AdminMobileBar({ user }: { user: { email: string; name: string |
   return (
     <header className="sticky top-0 z-40 border-b border-black-iron/[0.07] bg-white/95 pt-[var(--safe-top)] backdrop-blur lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between px-[max(1rem,var(--safe-left))]">
-        <Link href={user.role === "STAFF" ? "/admin/orders" : "/admin"} aria-label={t("SHĀZDEH admin home")}>
+        <Link href={roleHome(user.role)} aria-label={t("SHĀZDEH admin home")}>
           <Wordmark size="xs" />
         </Link>
         <div className="-me-2 flex items-center">

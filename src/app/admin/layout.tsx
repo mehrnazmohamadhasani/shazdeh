@@ -7,6 +7,7 @@ import { OrderAlarm } from "@/components/admin/orders/order-alarm";
 import { AdminI18nProvider } from "@/components/admin/i18n";
 import { vapidPublicKey } from "@/lib/notifications/push";
 import { getAdminLocale } from "@/lib/admin-i18n/server";
+import { roleHome, roleMayOpen } from "@/lib/roles";
 
 export async function generateMetadata(): Promise<Metadata> {
   const fa = (await getAdminLocale()) === "fa";
@@ -33,8 +34,8 @@ export default async function AdminLayout({
   // The proxy checks the token's role; this re-checks the current role
   // from the database so a demotion applies on the next page load.
   const pathname = (await headers()).get("x-pathname") ?? "";
-  if (user.role === "STAFF" && !pathname.startsWith("/admin/orders")) {
-    redirect("/admin/orders");
+  if (!roleMayOpen(user.role, pathname)) {
+    redirect(roleHome(user.role));
   }
 
   return (

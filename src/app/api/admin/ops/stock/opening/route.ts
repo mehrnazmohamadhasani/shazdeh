@@ -1,11 +1,11 @@
-import { CMS_ROLES, ok, parseJson, requireAuth } from "@/lib/api";
+import { PURCHASING_ROLES, ok, parseJson, requireAuth } from "@/lib/api";
 import { recordOpeningStock } from "@/lib/ops/catalog";
 import { openingSchema } from "@/lib/ops/catalog-schemas";
 import { opsError } from "@/lib/ops/http";
 
 /** Save the opening stock: what was in the kitchen on the first day. */
 export async function POST(req: Request) {
-  const auth = await requireAuth(CMS_ROLES);
+  const auth = await requireAuth(PURCHASING_ROLES);
   if (auth.response) return auth.response;
   const parsed = await parseJson(req, openingSchema);
   if (!parsed.ok) return parsed.response;

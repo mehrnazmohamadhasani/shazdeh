@@ -6,6 +6,7 @@ import {
   SESSION_COOKIE,
   getAuthSecret,
 } from "@/lib/auth-secret";
+import { roleHome, roleMayOpen } from "@/lib/roles";
 
 /** Role from a valid session cookie, or null. */
 async function sessionRole(req: NextRequest): Promise<string | null> {
@@ -23,9 +24,6 @@ async function sessionRole(req: NextRequest): Promise<string | null> {
     return null;
   }
 }
-
-// Kitchen staff see the order board only; the CMS stays with editors.
-const STAFF_PATHS = ["/admin/orders"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -50,20 +48,18 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (
-    role === "STAFF" &&
-    pathname.startsWith("/admin") &&
-    !STAFF_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-  ) {
+  // Kitchen staff see the order board only, the purchaser the purchasing
+  // screens; the CMS stays with editors (src/lib/roles.ts).
+  if (role && pathname.startsWith("/admin") && !roleMayOpen(role, pathname)) {
     const url = req.nextUrl.clone();
-    url.pathname = "/admin/orders";
+    url.pathname = roleHome(role);
     url.search = "";
     return NextResponse.redirect(url);
   }
 
   if (pathname === "/login" && role) {
     const url = req.nextUrl.clone();
-    url.pathname = role === "STAFF" ? "/admin/orders" : "/admin";
+    url.pathname = roleHome(role);
     url.search = "";
     return NextResponse.redirect(url);
   }

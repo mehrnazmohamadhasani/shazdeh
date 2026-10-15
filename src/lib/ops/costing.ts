@@ -56,3 +56,23 @@ export function costLines(lines: CostLineInput[], opts: { pricesIncludeVat: bool
   }
   return parts.map((p, i) => ({ netFils: netFils[i], vatFils: p.vat == null ? null : Math.round(p.vat * 100) }));
 }
+
+/**
+ * Each line's cost WITH its share of the invoice's VAT, in fils: the net
+ * costs scaled up so they add up to what was actually paid. When the
+ * printed totals don't add up (factor outside 1–1.06), assume 5 % if the
+ * invoice shows VAT and none otherwise — never more than was printed.
+ */
+export function grossLines(netFils: number[], opts: { totalFils: number; hasVat: boolean }) {
+  const netSum = netFils.reduce((s, n) => s + n, 0);
+  const paid = netSum > 0 ? opts.totalFils / netSum : 0;
+  const factor = paid >= 1 && paid <= 1.06 ? paid : opts.hasVat ? 1 + VAT_RATE : 1;
+  const gross = netFils.map((n) => Math.round(n * factor));
+  const target = Math.round(netSum * factor);
+  const drift = target - gross.reduce((s, n) => s + n, 0);
+  if (drift !== 0 && gross.length) {
+    const largest = gross.indexOf(Math.max(...gross));
+    gross[largest] += drift;
+  }
+  return gross;
+}
