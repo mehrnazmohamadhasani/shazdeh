@@ -10,29 +10,46 @@ import { EASE } from "@/lib/motion";
  * line set large. The image is the LCP element, so it is fetched with
  * high priority and served responsively; a dark base keeps the headline
  * legible while it loads. Phones get a portrait photo instead (art
- * direction), with a muted looping video playing over it.
+ * direction). Each size has a muted looping video playing over its photo.
  */
 
 const HERO_IMAGE = "/menu/shazdeh-mix.jpg";
 const HERO_IMAGE_MOBILE = "/brand/hero-mobile.jpg";
 const HERO_VIDEO_MOBILE = "/brand/hero-mobile.mp4";
 const HERO_VIDEO_MOBILE_POSTER = "/brand/hero-mobile-poster.jpg";
+const HERO_VIDEO_DESKTOP = "/brand/hero-desktop.mp4";
+const HERO_VIDEO_DESKTOP_POSTER = "/brand/hero-desktop-poster.jpg";
 
-/* Phone widths only (below Tailwind `sm`), and never for reduced motion —
- * so desktop never downloads the clip. */
-const MOBILE_VIDEO_QUERY =
-  "(max-width: 639px) and (prefers-reduced-motion: no-preference)";
+/* Picked by width (Tailwind `sm` split, matching the photo's art
+ * direction) so each device downloads only its own clip — and none at
+ * all for reduced motion. */
+const MOBILE_QUERY = "(max-width: 639px)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
-function useMobileVideo() {
-  const [enabled, setEnabled] = React.useState(false);
+type HeroVideo = { src: string; poster: string };
+
+function useHeroVideo(): HeroVideo | null {
+  const [video, setVideo] = React.useState<HeroVideo | null>(null);
   React.useEffect(() => {
-    const mq = window.matchMedia(MOBILE_VIDEO_QUERY);
-    const update = () => setEnabled(mq.matches);
+    const mobile = window.matchMedia(MOBILE_QUERY);
+    const reduced = window.matchMedia(REDUCED_MOTION_QUERY);
+    const update = () =>
+      setVideo(
+        reduced.matches
+          ? null
+          : mobile.matches
+            ? { src: HERO_VIDEO_MOBILE, poster: HERO_VIDEO_MOBILE_POSTER }
+            : { src: HERO_VIDEO_DESKTOP, poster: HERO_VIDEO_DESKTOP_POSTER },
+      );
     update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    mobile.addEventListener("change", update);
+    reduced.addEventListener("change", update);
+    return () => {
+      mobile.removeEventListener("change", update);
+      reduced.removeEventListener("change", update);
+    };
   }, []);
-  return enabled;
+  return video;
 }
 
 const HERO_IMAGE_COMMON = {
@@ -57,7 +74,7 @@ export function HomeHero({
   subtitle?: string | null;
 }) {
   const sectionRef = React.useRef<HTMLElement>(null);
-  const showVideo = useMobileVideo();
+  const video = useHeroVideo();
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -83,12 +100,13 @@ export function HomeHero({
             className="object-cover sm:object-[50%_58%] sm:brightness-[1.05] sm:saturate-[1.05]"
           />
         </picture>
-        {/* Mobile: looping video over the photo, which stays as the fallback */}
-        {showVideo && (
+        {/* Looping video over the photo, which stays as the fallback */}
+        {video && (
           <video
+            key={video.src}
             aria-hidden
-            src={HERO_VIDEO_MOBILE}
-            poster={HERO_VIDEO_MOBILE_POSTER}
+            src={video.src}
+            poster={video.poster}
             autoPlay
             muted
             loop
