@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { OpsError } from "./documents";
 import { chosenCost, getOpsSettings } from "./settings";
 import { costVersion, dishMargin, wouldCycle, type CostContext, type CostRecipe, type CostVersion } from "./recipe-cost";
+import { dishCostFrom, type DishCost } from "./profit";
 
 /*
  * Recipes: a DISH is one portion of a menu item, a PREP is a sub-recipe
@@ -88,6 +89,22 @@ async function loadCostContext(asOf = new Date()) {
     ),
   };
   return { ctx, ingredients, prices, recipes };
+}
+
+/**
+ * Cost of one portion of every dish from its APPROVED recipe, with prices
+ * as of `asOf` (menu item id → cost or why it is unknown). Dishes with no
+ * recipe are absent. Used for estimated profit — drafts never count.
+ */
+export async function approvedDishCosts(asOf = new Date()) {
+  const { ctx, recipes } = await loadCostContext(asOf);
+  const out = new Map<string, DishCost>();
+  for (const r of recipes) {
+    if (r.kind !== "DISH" || !r.menuItemId) continue;
+    const approved = ctx.recipes.get(r.id)?.approved ?? null;
+    out.set(r.menuItemId, dishCostFrom(approved ? costVersion(approved, ctx, [r.id]) : null));
+  }
+  return out;
 }
 
 // ─── Reading ────────────────────────────────────────────────────────────────

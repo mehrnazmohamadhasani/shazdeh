@@ -67,25 +67,22 @@ async function splitPdfs(files: File[], t: Translate): Promise<File[]> {
   return out;
 }
 
-export function UploadButton({
-  label,
-  kind = "supplier_invoice",
-  variant = "primary",
-}: {
-  label?: string;
-  kind?: "supplier_invoice" | "recipe" | "platform_order";
-  variant?: "primary" | "outline";
-}) {
-  const recipe = kind === "recipe";
-  const sale = kind === "platform_order";
-  const openPath = (id: string) => (recipe ? `/admin/ops/recipes/import/${id}` : sale ? `/admin/ops/sales/receipts/${id}` : `/admin/ops/invoices/${id}`);
+export type DocumentKind = "supplier_invoice" | "recipe" | "platform_order";
+
+/**
+ * Uploads picked files as documents of one kind and opens what was read:
+ * one file opens its reading, several are read in turn and the list is
+ * shown. Shared by the upload buttons and the Today screen's Add sheet.
+ */
+export function useDocumentUpload() {
   const { t } = useAdminI18n();
   const router = useRouter();
-  const input = React.useRef<HTMLInputElement>(null);
   const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
 
   /** Uploads one file; returns the document id (existing one for a duplicate). */
-  async function upload(file: File): Promise<{ id: string; duplicate: boolean }> {
+  async function upload(kind: DocumentKind, file: File): Promise<{ id: string; duplicate: boolean }> {
+    const recipe = kind === "recipe";
+    const sale = kind === "platform_order";
     const blob = await shrink(file);
     const form = new FormData();
     const name = file.type === "application/pdf" ? file.name : file.name.replace(/\.\w+$/, "") + ".jpg";
@@ -98,7 +95,10 @@ export function UploadButton({
     return { id: body.id, duplicate: false };
   }
 
-  async function send(picked: File[]) {
+  async function send(kind: DocumentKind, picked: File[]) {
+    const recipe = kind === "recipe";
+    const sale = kind === "platform_order";
+    const openPath = (id: string) => (recipe ? `/admin/ops/recipes/import/${id}` : sale ? `/admin/ops/sales/receipts/${id}` : `/admin/ops/invoices/${id}`);
     setProgress({ done: 0, total: picked.length });
     let files: File[];
     try {
@@ -113,7 +113,7 @@ export function UploadButton({
     // One photo: open it. Several: read them one after another, then show the list.
     if (files.length === 1) {
       try {
-        const { id, duplicate } = await upload(files[0]);
+        const { id, duplicate } = await upload(kind, files[0]);
         if (duplicate) toast.info(t("Already uploaded — opening it."));
         router.push(openPath(id));
         router.refresh();
@@ -128,7 +128,7 @@ export function UploadButton({
     const failed: string[] = [];
     for (const [i, file] of files.entries()) {
       try {
-        const r = await upload(file);
+        const r = await upload(kind, file);
         if (r.duplicate) duplicates++;
         else ok++;
       } catch (e) {
@@ -144,6 +144,27 @@ export function UploadButton({
     router.refresh();
   }
 
+  const progressLabel = progress
+    ? progress.total > 1
+      ? t("Reading {done} of {total}…", { done: Math.min(progress.done + 1, progress.total), total: progress.total })
+      : t("Reading… up to a minute")
+    : null;
+  return { busy: !!progress, progressLabel, send };
+}
+
+export function UploadButton({
+  label,
+  kind = "supplier_invoice",
+  variant = "primary",
+}: {
+  label?: string;
+  kind?: DocumentKind;
+  variant?: "primary" | "outline";
+}) {
+  const { t } = useAdminI18n();
+  const input = React.useRef<HTMLInputElement>(null);
+  const { busy, progressLabel, send } = useDocumentUpload();
+
   return (
     <>
       <input
@@ -156,16 +177,12 @@ export function UploadButton({
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (files.length) void send(files);
+          if (files.length) void send(kind, files);
         }}
       />
-      <Button size="md" variant={variant} disabled={!!progress} onClick={() => input.current?.click()}>
-        {progress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-        {progress
-          ? progress.total > 1
-            ? t("Reading {done} of {total}…", { done: Math.min(progress.done + 1, progress.total), total: progress.total })
-            : t("Reading… up to a minute")
-          : (label ?? t("Add invoice"))}
+      <Button size="md" variant={variant} disabled={busy} onClick={() => input.current?.click()}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+        {progressLabel ?? label ?? t("Add invoice")}
       </Button>
     </>
   );

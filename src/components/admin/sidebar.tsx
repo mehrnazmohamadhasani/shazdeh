@@ -47,7 +47,7 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; role
  * stock, the public website, and who has access.
  */
 const NAV: NavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: CMS, group: "Home" },
+  { href: "/admin", label: "Today", icon: LayoutDashboard, roles: CMS, group: "Home" },
   { href: "/admin/orders", label: "Orders", icon: ReceiptText, roles: ALL, group: "Orders" },
   { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Orders" },
   { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Orders" },

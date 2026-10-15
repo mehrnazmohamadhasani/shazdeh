@@ -213,19 +213,29 @@ export function MergeForm({
 export function IngredientForm({
   ingredient,
 }: {
-  ingredient: { id: string; name: string; nameFa: string | null; category: "FOOD" | "PACKAGING" | "SUPPLIES" };
+  ingredient: { id: string; name: string; nameFa: string | null; category: "FOOD" | "PACKAGING" | "SUPPLIES"; unit: BaseUnit; lowStockAt: number | null };
 }) {
   const { t } = useAdminI18n();
   const { busy, submit } = useSubmit();
   const [name, setName] = React.useState(ingredient.name);
   const [nameFa, setNameFa] = React.useState(ingredient.nameFa ?? "");
   const [category, setCategory] = React.useState(ingredient.category);
+  const per = PER[ingredient.unit];
+  const [lowStock, setLowStock] = React.useState(ingredient.lowStockAt == null ? "" : String(ingredient.lowStockAt / per));
+  const big = t(ingredient.unit === "g" ? "kg" : ingredient.unit === "ml" ? "litres" : "pieces");
   return (
     <form
-      className="grid gap-4 sm:grid-cols-3"
+      className="grid gap-4 sm:grid-cols-4"
       onSubmit={(e) => {
         e.preventDefault();
-        void submit(`/api/admin/ops/ingredients/${ingredient.id}`, "PATCH", { name, nameFa, category }, t("Ingredient saved"));
+        const level = lowStock.trim() === "" ? null : num(lowStock);
+        if (lowStock.trim() !== "" && (level == null || level < 0)) return toast.error(t("Enter an amount"));
+        void submit(
+          `/api/admin/ops/ingredients/${ingredient.id}`,
+          "PATCH",
+          { name, nameFa, category, lowStockAt: level == null ? null : level * per },
+          t("Ingredient saved"),
+        );
       }}
     >
       <Field label={t("Name")} required>
@@ -241,7 +251,10 @@ export function IngredientForm({
                     <option value="SUPPLIES">{t("Supplies")}</option>
         </Select>
       </Field>
-      <div className="sm:col-span-3">
+      <Field label={t("Warn when stock is at or below ({unit})", { unit: big })} hint={t("Shown on Today. Leave empty for no warning.")}>
+        <TextInput inputMode="decimal" value={lowStock} onChange={(e) => setLowStock(e.target.value)} placeholder="—" />
+      </Field>
+      <div className="sm:col-span-4">
         <Button type="submit" size="sm" disabled={busy}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           {t("Save")}
