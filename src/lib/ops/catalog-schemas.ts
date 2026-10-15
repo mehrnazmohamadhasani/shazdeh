@@ -78,6 +78,8 @@ export const recipeDraftSchema = z.object({
   yieldQuantity: z.number().finite().positive().max(1_000_000),
   yieldUnit: recipeUnit,
   note: text(500),
+  /** Steps and quality notes; left out = keep what the draft has. */
+  method: text(8000).optional(),
   lines: z
     .array(
       z
@@ -91,5 +93,43 @@ export const recipeDraftSchema = z.object({
         })
         .refine((l) => (l.ingredientId == null) !== (l.subRecipeId == null), "Each line needs an ingredient or a prep"),
     )
+    .max(80),
+});
+
+export const ingredientCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  nameFa: text(120),
+  unit: recipeUnit,
+});
+
+const importSource = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("ingredient"), id: z.string().min(1) }),
+  z.object({ type: z.literal("prep"), id: z.string().min(1) }),
+  z.object({ type: z.literal("newIngredient"), name: z.string().trim().min(1).max(120), nameFa: text(120), unit: recipeUnit }),
+  z.object({ type: z.literal("newPrep"), name: z.string().trim().min(1).max(120), nameFa: text(120), unit: recipeUnit }),
+]);
+
+/** Saving a recipe photo as a draft (see src/lib/ops/recipe-import.ts). */
+export const recipeImportSchema = z.object({
+  target: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("recipe"), recipeId: z.string().min(1) }),
+    z.object({ type: z.literal("dish"), menuItemId: z.string().min(1) }),
+    z.object({ type: z.literal("prep"), name: z.string().trim().min(1).max(120), nameFa: text(120) }),
+  ]),
+  portions: z.number().finite().positive().max(1000),
+  yieldQuantity: z.number().finite().positive().max(1_000_000),
+  yieldUnit: recipeUnit,
+  method: text(8000),
+  lines: z
+    .array(
+      z.object({
+        rawName: z.string().trim().max(200),
+        source: importSource,
+        quantity: z.number().finite().positive().max(1_000_000),
+        wastePct: z.number().finite().min(0).max(95),
+        note: text(200),
+      }),
+    )
+    .min(1, "Keep at least one line")
     .max(80),
 });

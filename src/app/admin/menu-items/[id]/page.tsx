@@ -1,5 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, ChefHat } from "lucide-react";
 import { AdminPage } from "@/components/admin/ui";
+import { Button } from "@/components/ui/button";
+import { NewDishRecipeButton } from "@/components/admin/ops/recipe-forms";
 import { MenuItemForm } from "@/components/admin/menu-item-form";
 import { ModifiersEditor } from "@/components/admin/ordering/modifiers-editor";
 import { prisma } from "@/lib/prisma";
@@ -12,12 +16,13 @@ export async function generateMetadata() {
 }
 
 export default async function EditMenuItemPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  const [{ id }, { t }] = await Promise.all([params, getAdminI18n()]);
   const [item, categories] = await Promise.all([
     prisma.menuItem.findUnique({
       where: { id },
       include: {
         modifierGroups: { orderBy: { order: "asc" }, include: { options: { orderBy: { order: "asc" } } } },
+        recipe: { select: { id: true } },
       },
     }),
     prisma.category.findMany({ orderBy: { order: "asc" }, select: { id: true, name: true } }),
@@ -25,7 +30,27 @@ export default async function EditMenuItemPage({ params }: { params: Promise<{ i
   if (!item) notFound();
 
   return (
-    <AdminPage title={<span dir="auto">{item.name}</span>}>
+    <AdminPage
+      title={
+        <span className="flex items-center gap-3">
+          <Link href="/admin/menu-items" aria-label={t("Back to menu")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+            <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
+          </Link>
+          <span dir="auto">{item.name}</span>
+        </span>
+      }
+      actions={
+        item.recipe ? (
+          <Button asChild variant="outline" size="md">
+            <Link href={`/admin/ops/recipes/${item.recipe.id}`}>
+              <ChefHat className="h-4 w-4" /> {t("Recipe & food cost")}
+            </Link>
+          </Button>
+        ) : (
+          <NewDishRecipeButton menuItemId={item.id} />
+        )
+      }
+    >
       <MenuItemForm
         categories={categories}
         initial={{

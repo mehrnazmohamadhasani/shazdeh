@@ -51,7 +51,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
                     {inv.invoiceNo ? <span dir="ltr">#{inv.invoiceNo}</span> : t("No number")} · {day(inv.invoiceDate, true, intl)}
                   </span>
                   {inv.voidedAt ? (
-                    <StatusPill>{t("Undone")}</StatusPill>
+                    <StatusPill>{t("Not counted")}</StatusPill>
                   ) : inv.paidAt ? (
                     <StatusPill tone="good">{t("Paid")}</StatusPill>
                   ) : inv.paymentMode === "credit" ? (

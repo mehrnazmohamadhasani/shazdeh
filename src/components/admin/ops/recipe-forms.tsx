@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, IconButton, Select, TextInput } from "@/components/admin/ui";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Field, IconButton, Select, TextArea, TextInput } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { amountText } from "@/components/admin/ops/format";
 import { messageFromUnknown } from "@/lib/error-message";
@@ -77,7 +78,7 @@ export function NewDishRecipeButton({ menuItemId }: { menuItemId: string }) {
       onClick={() =>
         run(async () => {
           const json = await send("/api/admin/ops/recipes", "POST", { kind: "DISH", menuItemId, name: null, nameFa: null, yieldUnit: "PCS" });
-          router.push(`/admin/ops/recipes/${json.id}`);
+          router.push(`/admin/ops/recipes/${json.id}?edit=1#edit`);
         })
       }
     >
@@ -86,41 +87,119 @@ export function NewDishRecipeButton({ menuItemId }: { menuItemId: string }) {
   );
 }
 
-export function NewPrepForm() {
-  const { t } = useAdminI18n();
+/**
+ * "New recipe": a dish (one on the menu, or one not on it yet) or a prep.
+ * Opens the new recipe ready to type its ingredients.
+ */
+export function NewRecipeDialog({
+  dishes,
+  kind: initialKind = "DISH",
+  label,
+  variant = "primary",
+}: {
+  /** Menu dishes that have no recipe yet. */
+  dishes: { id: string; name: string; nameFa: string | null }[];
+  kind?: "DISH" | "PREP";
+  label?: string;
+  variant?: "primary" | "outline";
+}) {
+  const { t, locale } = useAdminI18n();
   const router = useRouter();
   const { busy, run } = useBusy();
+  const [open, setOpen] = React.useState(false);
+  const [kind, setKind] = React.useState<"DISH" | "PREP">(initialKind);
+  const [menuItemId, setMenuItemId] = React.useState(dishes[0]?.id ?? "new");
   const [name, setName] = React.useState("");
   const [nameFa, setNameFa] = React.useState("");
   const [unit, setUnit] = React.useState<Unit>("G");
+  const needsName = kind === "PREP" || menuItemId === "new";
+
   return (
-    <form
-      className="grid gap-3 sm:grid-cols-[1fr_1fr_8rem_auto] sm:items-end"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void run(async () => {
-          const json = await send("/api/admin/ops/recipes", "POST", { kind: "PREP", menuItemId: null, name, nameFa, yieldUnit: unit });
-          router.push(`/admin/ops/recipes/${json.id}`);
-        });
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) setKind(initialKind);
       }}
     >
-      <Field label={t("Name")} required>
-        <TextInput dir="auto" required value={name} onChange={(e) => setName(e.target.value)} placeholder={t("e.g. {example}", { example: "Cooked rice" })} />
-      </Field>
-      <Field label={t("Persian name")}>
-        <TextInput lang="fa" dir="rtl" value={nameFa} onChange={(e) => setNameFa(e.target.value)} placeholder="برنج پخته" />
-      </Field>
-      <Field label={t("Measured in")}>
-        <Select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
-          <option value="G">{t("g")}</option>
-          <option value="ML">{t("ml")}</option>
-          <option value="PCS">{t("pcs")}</option>
-        </Select>
-      </Field>
-      <Button type="submit" size="md" disabled={busy}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {t("New prep")}
+      <Button size="md" variant={variant} onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" /> {label ?? t("New recipe")}
       </Button>
-    </form>
+      <DialogContent className="bg-white text-black-iron sm:max-w-lg">
+        <form
+          className="space-y-5 p-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              const body =
+                kind === "DISH"
+                  ? { kind, menuItemId: menuItemId === "new" ? null : menuItemId, name: menuItemId === "new" ? name : null, nameFa: menuItemId === "new" ? nameFa : null, yieldUnit: "PCS" }
+                  : { kind, menuItemId: null, name, nameFa, yieldUnit: unit };
+              const json = await send("/api/admin/ops/recipes", "POST", body);
+              setOpen(false);
+              router.push(`/admin/ops/recipes/${json.id}?edit=1#edit`);
+            });
+          }}
+        >
+          <DialogTitle className="text-[22px] font-bold text-black-iron">{t("New recipe")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("A dish or a prep")}</DialogDescription>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("Kind")}>
+            {(["DISH", "PREP"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={kind === k}
+                onClick={() => setKind(k)}
+                className={cn(
+                  "rounded-[12px] border px-4 py-3 text-start transition-colors",
+                  kind === k ? "border-terracotta bg-terracotta/[0.06]" : "border-black-iron/15 hover:border-black-iron/30",
+                )}
+              >
+                <span className="block text-[15px] font-semibold">{k === "DISH" ? t("Dish") : t("Prep")}</span>
+                <span className="block text-[12.5px] text-dark-grey">{k === "DISH" ? t("One portion served to a guest") : t("Cooked in batches, used in dishes")}</span>
+              </button>
+            ))}
+          </div>
+          {kind === "DISH" && (
+            <Field label={t("Which dish?")}>
+              <Select value={menuItemId} onChange={(e) => setMenuItemId(e.target.value)}>
+                {dishes.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {locale === "fa" && d.nameFa ? d.nameFa : d.name}
+                  </option>
+                ))}
+                <option value="new">{t("A new dish, not on the menu yet")}</option>
+              </Select>
+            </Field>
+          )}
+          {needsName && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={t("Name")} required>
+                <TextInput dir="auto" required autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "PREP" ? t("e.g. {example}", { example: "Saffron rice" }) : ""} />
+              </Field>
+              <Field label={t("Persian name")}>
+                <TextInput lang="fa" dir="rtl" value={nameFa} onChange={(e) => setNameFa(e.target.value)} />
+              </Field>
+            </div>
+          )}
+          {kind === "PREP" && (
+            <Field label={t("Measured in")}>
+              <Select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+                <option value="G">{t("g")}</option>
+                <option value="ML">{t("ml")}</option>
+                <option value="PCS">{t("pcs")}</option>
+              </Select>
+            </Field>
+          )}
+          <div className="flex justify-end">
+            <Button type="submit" size="md" disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {t("Create and add ingredients")}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -143,6 +222,7 @@ export function DraftEditor({
     yieldQuantity: number;
     yieldUnit: Unit;
     note: string | null;
+    method: string | null;
     lines: { ingredientId: string | null; subRecipeId: string | null; quantity: number; wastePct: number; note: string | null }[];
   };
   options: { ingredients: SourceOption[]; preps: (SourceOption & { approved: boolean })[] };
@@ -155,22 +235,39 @@ export function DraftEditor({
   const router = useRouter();
   const { busy, run } = useBusy();
   const nextKey = React.useRef(initial.lines.length + 1);
+  // A new recipe starts with one empty line, ready to type into.
   const [rows, setRows] = React.useState<Row[]>(() =>
-    initial.lines.map((l, i) => ({
-      key: i + 1,
-      source: l.ingredientId ? `i:${l.ingredientId}` : `p:${l.subRecipeId}`,
-      quantity: String(l.quantity),
-      wastePct: l.wastePct ? String(l.wastePct) : "",
-      note: l.note,
-    })),
+    initial.lines.length === 0
+      ? [{ key: 0, source: "", quantity: "", wastePct: "", note: null }]
+      : initial.lines.map((l, i) => ({
+          key: i + 1,
+          source: l.ingredientId ? `i:${l.ingredientId}` : `p:${l.subRecipeId}`,
+          quantity: String(l.quantity),
+          wastePct: l.wastePct ? String(l.wastePct) : "",
+          note: l.note,
+        })),
   );
   const [yieldQuantity, setYieldQuantity] = React.useState(String(initial.yieldQuantity));
   const [yieldUnit, setYieldUnit] = React.useState<Unit>(initial.yieldUnit);
   const [note, setNote] = React.useState(initial.note ?? "");
+  const [method, setMethod] = React.useState(initial.method ?? "");
   const [dirty, setDirty] = React.useState(false);
+  // Ingredients created here (not bought yet) join the list without a reload.
+  const [ingredients, setIngredients] = React.useState(options.ingredients);
+  const [adding, setAdding] = React.useState<{ rowKey: number; name: string; nameFa: string; unit: Unit } | null>(null);
 
   const sourceOf = (source: string): SourceOption | undefined =>
-    source.startsWith("i:") ? options.ingredients.find((o) => o.id === source.slice(2)) : options.preps.find((o) => o.id === source.slice(2));
+    source.startsWith("i:") ? ingredients.find((o) => o.id === source.slice(2)) : options.preps.find((o) => o.id === source.slice(2));
+
+  const createIngredient = () =>
+    run(async () => {
+      if (!adding?.name.trim()) throw { error: "Enter a name." };
+      const json = await send("/api/admin/ops/ingredients", "POST", { name: adding.name, nameFa: adding.nameFa, unit: adding.unit });
+      const created = { id: String(json.id), name: String(json.name), nameFa: (json.nameFa as string | null) ?? null, unit: json.unit as Unit, filsPerUnit: null };
+      setIngredients((list) => (list.some((i) => i.id === created.id) ? list : [...list, created].sort((a, b) => a.name.localeCompare(b.name))));
+      update(adding.rowKey, { source: `i:${created.id}` });
+      setAdding(null);
+    });
   const label = (o: SourceOption) => (locale === "fa" && o.nameFa ? o.nameFa : o.name);
   const update = (key: number, patch: Partial<Row>) => {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -204,7 +301,7 @@ export function DraftEditor({
         };
       });
     if (kind === "PREP" && !(yieldNum > 0)) throw { error: "Enter how much one batch makes" };
-    return { yieldQuantity: kind === "DISH" ? 1 : yieldNum, yieldUnit: kind === "DISH" ? "PCS" : yieldUnit, note: note.trim() || null, lines };
+    return { yieldQuantity: kind === "DISH" ? 1 : yieldNum, yieldUnit: kind === "DISH" ? "PCS" : yieldUnit, note: note.trim() || null, method: method.trim() || null, lines };
   }
 
   const save = (approve: boolean) =>
@@ -213,6 +310,8 @@ export function DraftEditor({
       if (approve) {
         await send(`/api/admin/ops/recipes/${recipeId}/approve`, "POST");
         toast.success(t("Approved — this is now the kitchen standard"));
+        // Back to reading the recipe; "Edit recipe" opens the editor again.
+        router.replace(`/admin/ops/recipes/${recipeId}`);
       } else {
         toast.success(t("Draft saved"));
       }
@@ -273,9 +372,13 @@ export function DraftEditor({
                 aria-label={t("Ingredient or prep")}
                 className="col-span-2 sm:col-span-1"
                 value={r.source}
-                onChange={(e) => update(r.key, { source: e.target.value })}
+                onChange={(e) => {
+                  if (e.target.value === "new") setAdding({ rowKey: r.key, name: "", nameFa: "", unit: "G" });
+                  else update(r.key, { source: e.target.value });
+                }}
               >
                 <option value="">{t("Choose…")}</option>
+                <option value="new">{t("+ New ingredient")}</option>
                 {options.preps.length > 0 && (
                   <optgroup label={t("Preps")}>
                     {options.preps.map((p) => (
@@ -287,7 +390,7 @@ export function DraftEditor({
                   </optgroup>
                 )}
                 <optgroup label={t("Ingredients")}>
-                  {options.ingredients.map((o) => (
+                  {ingredients.map((o) => (
                     <option key={o.id} value={`i:${o.id}`}>
                       {label(o)}
                     </option>
@@ -345,6 +448,36 @@ export function DraftEditor({
           <Plus className="h-4 w-4" /> {t("Add line")}
         </Button>
       </div>
+
+      {adding && (
+        <div className="grid gap-2 rounded-[12px] border border-terracotta/30 bg-terracotta/[0.03] p-3 sm:grid-cols-[1fr_1fr_6rem_auto] sm:items-end">
+          <Field label={t("New ingredient")}>
+            <TextInput dir="auto" autoFocus value={adding.name} onChange={(e) => setAdding({ ...adding, name: e.target.value })} placeholder={t("e.g. {example}", { example: "Turmeric" })} />
+          </Field>
+          <Field label={t("Persian name")}>
+            <TextInput lang="fa" dir="rtl" value={adding.nameFa} onChange={(e) => setAdding({ ...adding, nameFa: e.target.value })} placeholder="زردچوبه" />
+          </Field>
+          <Field label={t("Measured in")}>
+            <Select value={adding.unit} onChange={(e) => setAdding({ ...adding, unit: e.target.value as Unit })}>
+              <option value="G">{t("g")}</option>
+              <option value="ML">{t("ml")}</option>
+              <option value="PCS">{t("pcs")}</option>
+            </Select>
+          </Field>
+          <div className="flex gap-2">
+            <Button type="button" size="md" disabled={busy} onClick={createIngredient}>
+              {t("Add")}
+            </Button>
+            <Button type="button" variant="ghost" size="md" onClick={() => setAdding(null)}>
+              {t("Cancel")}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Field label={t("Method")} hint={t("Steps, timings and quality notes. Kept with the recipe for the kitchen sheet.")}>
+        <TextArea dir="auto" rows={5} value={method} onChange={(e) => { setMethod(e.target.value); setDirty(true); }} />
+      </Field>
 
       <Field label={t("What changed")} hint={t("Optional, e.g. “less oil, agreed with the chef”.")}>
         <TextInput dir="auto" value={note} onChange={(e) => { setNote(e.target.value); setDirty(true); }} />

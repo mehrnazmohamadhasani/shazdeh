@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, RotateCw } from "lucide-react";
+import { Loader2, Pencil, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { messageFromUnknown } from "@/lib/error-message";
 import { useAdminI18n } from "@/components/admin/i18n";
@@ -34,7 +34,7 @@ export function RetryRead({ documentId }: { documentId: string }) {
   );
 }
 
-export function DiscardButton({ documentId, label }: { documentId: string; label?: string }) {
+export function DiscardButton({ documentId, label, redirectTo = "/admin/ops/invoices" }: { documentId: string; label?: string; redirectTo?: string }) {
   const { t } = useAdminI18n();
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -48,7 +48,7 @@ export function DiscardButton({ documentId, label }: { documentId: string; label
         try {
           const res = await fetch(`/api/admin/ops/documents/${documentId}/discard`, { method: "POST" });
           if (!res.ok) throw await res.json().catch(() => ({}));
-          router.push("/admin/ops/invoices");
+          router.push(redirectTo);
           router.refresh();
         } catch (e) {
           toast.error(t(messageFromUnknown(e, "Could not discard")));
@@ -69,40 +69,34 @@ async function postJson(url: string, body: unknown) {
   return json;
 }
 
-/** Undo a saved invoice (asks why — the reason goes into the audit log). */
-export function UndoInvoiceButton({ invoiceId }: { invoiceId: string }) {
+/**
+ * Edit a saved invoice: it opens again on the review screen with what was
+ * saved, ready to correct. Its stock stops counting until it is saved
+ * again (or discarded, to remove it completely).
+ */
+export function EditInvoiceButton({ invoiceId }: { invoiceId: string }) {
   const { t } = useAdminI18n();
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
       disabled={busy}
-      className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]"
       onClick={async () => {
-        const reason = window.prompt(
-          `${t("Undo this invoice? Its stock is taken back out and you can correct and save it again.")}\n\n${t("Why? (e.g. wrong quantity)")}`,
-        );
-        if (!reason?.trim()) return;
+        if (!window.confirm(t("Edit this invoice? Its stock stops counting until you save it again."))) return;
         setBusy(true);
         try {
-          const result = await postJson(`/api/admin/ops/invoices/${invoiceId}/void`, { reason: reason.trim() });
-          toast.success(
-            result.reversed
-              ? t(result.reversed > 1 ? "Undone — {n} stock entries reversed" : "Undone — {n} stock entry reversed", { n: result.reversed })
-              : t("Undone"),
-          );
+          await postJson(`/api/admin/ops/invoices/${invoiceId}/edit`, {});
           router.refresh();
         } catch (e) {
-          toast.error(t(messageFromUnknown(e, "Could not undo")));
-        } finally {
+          toast.error(t(messageFromUnknown(e, "Could not open the invoice for editing")));
           setBusy(false);
         }
       }}
     >
-      {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-      {t("Undo invoice")}
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+      {t("Edit")}
     </Button>
   );
 }

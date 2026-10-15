@@ -232,4 +232,12 @@ export const ops: Record<string, string> = {
     "خواندن با هوش مصنوعی راه‌اندازی نشده: OPENAI_API_KEY را به تنظیمات محیط اضافه کنید.",
   "The model returned no reading.": "هوش مصنوعی چیزی برنگرداند.",
   "invoice|Subtotal": "جمع قبل از مالیات",
+
+  // Editing a saved invoice
+  "You are editing a saved invoice. Its stock doesn't count until you save it again. To remove it completely, press Discard.":
+    "در حال ویرایش یک فاکتور ذخیره‌شده هستید. موجودی آن تا ذخیره‌ی دوباره حساب نمی‌شود. برای حذف کامل، «کنار گذاشتن» را بزنید.",
+  "Not counted": "حساب نمی‌شود",
+  "Edit this invoice? Its stock stops counting until you save it again.": "این فاکتور ویرایش شود؟ موجودی آن تا ذخیره‌ی دوباره حساب نمی‌شود.",
+  "Could not open the invoice for editing": "باز کردن فاکتور برای ویرایش ممکن نشد",
+  "This invoice is already being edited.": "این فاکتور در حال ویرایش است.",
 };

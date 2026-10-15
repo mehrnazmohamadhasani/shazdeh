@@ -494,6 +494,7 @@ enum StockMovementType {
 /// An uploaded file, kept immutably (private — served only to admins).
 model OpsDocument {
   id             String            @id @default(cuid())
+  /// supplier_invoice (purchases, statements, platform receipts) | recipe
   kind           String            @default("supplier_invoice")
   status         OpsDocumentStatus @default(PROCESSING)
   sha256         String            @unique // duplicate uploads are caught here
@@ -512,10 +513,12 @@ model OpsDocument {
   uploadedBy     User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   invoice        PurchaseInvoice?  @relation("InvoiceDocument")
   voidedInvoices PurchaseInvoice[] @relation("VoidedInvoiceDocument")
+  recipeVersions RecipeVersion[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   @@index([status, createdAt])
+  @@index([kind, status])
 }
 
 model Supplier {
@@ -540,17 +543,18 @@ model Supplier {
 }
 
 model Ingredient {
-  id            String          @id @default(cuid())
-  name          String          @unique
+  id            String            @id @default(cuid())
+  name          String            @unique
   nameFa        String?
   unit          StockUnit
-  category      SpendCategory   @default(FOOD)
+  category      SpendCategory     @default(FOOD)
   supplierItems SupplierItem[]
   purchaseLines PurchaseLine[]
   movements     StockMovement[]
   recipeLines   RecipeLine[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  recipeAliases RecipeNameAlias[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 /// Learned from confirmations: how a supplier prints an item, and how
@@ -679,38 +683,45 @@ enum RecipeVersionStatus {
 }
 
 model Recipe {
-  id         String          @id @default(cuid())
+  id         String            @id @default(cuid())
   kind       RecipeKind
-  name       String          @unique
+  name       String            @unique
   nameFa     String?
   /// DISH only: the menu item this is one portion of.
-  menuItemId String?         @unique
-  menuItem   MenuItem?       @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  menuItemId String?           @unique
+  menuItem   MenuItem?         @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   versions   RecipeVersion[]
-  usedIn     RecipeLine[]    @relation("SubRecipe")
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  usedIn     RecipeLine[]      @relation("SubRecipe")
+  aliases    RecipeNameAlias[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 }
 
 model RecipeVersion {
-  id            String              @id @default(cuid())
-  recipeId      String
-  recipe        Recipe              @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  number        Int
-  status        RecipeVersionStatus @default(DRAFT)
+  id               String              @id @default(cuid())
+  recipeId         String
+  recipe           Recipe              @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  number           Int
+  status           RecipeVersionStatus @default(DRAFT)
   /// DISH: 1 PCS (one portion). PREP: what one batch makes, e.g. 5000 G.
-  yieldQuantity Float
-  yieldUnit     StockUnit
-  note          String?
-  createdById   String?
-  approvedById  String?
-  approvedAt    DateTime?
-  lines         RecipeLine[]
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  yieldQuantity    Float
+  yieldUnit        StockUnit
+  note             String?
+  /// Steps, timings and quality notes, as the kitchen sheet says them.
+  method           String?
+  /// The photo this version was read from, if any.
+  sourceDocumentId String?
+  sourceDocument   OpsDocument?        @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  createdById      String?
+  approvedById     String?
+  approvedAt       DateTime?
+  lines            RecipeLine[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@unique([recipeId, number])
   @@index([recipeId, status])
+  @@index([sourceDocumentId])
 }
 
 /// Exactly one of ingredientId / subRecipeId is set (CHECK in the migration).
@@ -732,6 +743,20 @@ model RecipeLine {
   @@index([versionId])
   @@index([ingredientId])
   @@index([subRecipeId])
+}
+
+/// What a name on a recipe sheet turned out to be, learned when someone
+/// confirms a photo reading ("Parboiled rice" → the prep "Cooked rice").
+/// Exactly one of ingredientId / recipeId is set.
+model RecipeNameAlias {
+  id           String      @id @default(cuid())
+  rawName      String      @unique // normalised: lower-case, single spaces
+  ingredientId String?
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  recipeId     String?
+  recipe       Recipe?     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 model RateLimitBucket {

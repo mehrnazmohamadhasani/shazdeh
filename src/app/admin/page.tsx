@@ -9,6 +9,7 @@ import { KITCHEN_TIMEZONE } from "@/lib/ordering/config";
 import { STAFF_LABEL } from "@/lib/ordering/status";
 import { ACTIVE_STATUSES } from "@/lib/ordering/admin";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { UploadButton } from "@/components/admin/ops/upload-button";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -26,7 +27,7 @@ function startOfDubaiDay(now = new Date()) {
 
 export default async function Dashboard() {
   const { t, money, price } = await getAdminI18n();
-  const [today, waiting, inProgress, soldOut, latestOrders, recentDishes] = await Promise.all([
+  const [today, waiting, inProgress, soldOut, latestOrders, recentDishes, kitchen] = await Promise.all([
     prisma.order.aggregate({
       where: {
         placedAt: { gte: startOfDubaiDay() },
@@ -57,6 +58,7 @@ export default async function Dashboard() {
         category: { select: { name: true } },
       },
     }),
+    kitchenSummary(),
   ]);
 
   const stats = [
@@ -159,6 +161,68 @@ export default async function Dashboard() {
           </ul>
         </Card>
       </div>
+
+      <Card
+        title={t("Kitchen")}
+        actions={
+          <span className="flex flex-wrap justify-end gap-2">
+            <UploadButton kind="recipe" label={t("Recipe photo")} variant="outline" />
+            <UploadButton label={t("Add invoice")} />
+          </span>
+        }
+        bodyClassName="p-0 md:p-0"
+      >
+        <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
+          {[
+            {
+              href: "/admin/ops/invoices",
+              label: t("Invoices to check"),
+              value: String(kitchen.invoicesToCheck),
+              alert: kitchen.invoicesToCheck > 0,
+            },
+            {
+              href: "/admin/ops/recipes",
+              label: t("Recipe photos to check"),
+              value: String(kitchen.recipePhotosToCheck),
+              alert: kitchen.recipePhotosToCheck > 0,
+            },
+            {
+              href: "/admin/ops/payables",
+              label: t("Owed to suppliers"),
+              value: money(kitchen.owedFils),
+              note: kitchen.overdue > 0 ? t("{n} overdue", { n: kitchen.overdue }) : null,
+              alert: kitchen.overdue > 0,
+            },
+            {
+              href: "/admin/ops/recipes",
+              label: t("Dishes with an approved recipe"),
+              value: t("{done} of {total}", { done: kitchen.approvedDishes, total: kitchen.activeDishes }),
+            },
+          ].map((row) => (
+            <li key={row.label}>
+              <Link href={row.href} className="flex min-h-14 items-center gap-3 px-5 py-3 hover:bg-black-iron/[0.02] md:px-6">
+                <span className="min-w-0 flex-1">{row.label}</span>
+                {row.note && <StatusPill tone="bad">{row.note}</StatusPill>}
+                <span className={`font-semibold tabular-nums ${row.alert ? "text-terracotta-ink" : ""}`}>{row.value}</span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
     </AdminPage>
   );
+}
+
+/** What needs doing in the kitchen: documents to check, money owed, recipe progress. */
+async function kitchenSummary() {
+  const [invoicesToCheck, recipePhotosToCheck, owed, overdue, approvedDishes, activeDishes] = await Promise.all([
+    prisma.opsDocument.count({ where: { kind: { not: "recipe" }, status: { in: ["NEEDS_REVIEW", "FAILED"] } } }),
+    prisma.opsDocument.count({ where: { kind: "recipe", status: { in: ["NEEDS_REVIEW", "FAILED"] } } }),
+    prisma.purchaseInvoice.aggregate({ where: { voidedAt: null, paidAt: null, paymentMode: "credit" }, _sum: { totalFils: true } }),
+    prisma.purchaseInvoice.count({ where: { voidedAt: null, paidAt: null, paymentMode: "credit", dueDate: { lt: new Date() } } }),
+    prisma.recipe.count({ where: { kind: "DISH", menuItem: { isActive: true }, versions: { some: { status: "APPROVED" } } } }),
+    prisma.menuItem.count({ where: { isActive: true } }),
+  ]);
+  return { invoicesToCheck, recipePhotosToCheck, owedFils: owed._sum.totalFils ?? 0, overdue, approvedDishes, activeDishes };
 }

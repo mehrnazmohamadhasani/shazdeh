@@ -3,6 +3,7 @@ import { ClipboardList, PackageOpen } from "lucide-react";
 import { AdminPage, Card, EmptyState } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { UploadButton } from "@/components/admin/ops/upload-button";
+import { TableFilter } from "@/components/admin/table-filter";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { stockSummary } from "@/lib/ops/documents";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
@@ -37,6 +38,11 @@ export default async function StockPage() {
       }
     >
       <Card bodyClassName="p-0">
+        {rows.length > 8 && (
+          <div className="border-b border-black-iron/[0.06] p-3 md:px-6">
+            <TableFilter target="stock-rows" placeholder={t("Search ingredients")} className="max-w-sm" />
+          </div>
+        )}
         {rows.length === 0 ? (
           <EmptyState
             title={t("No stock yet")}
@@ -51,23 +57,23 @@ export default async function StockPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-[14px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b border-black-iron/[0.06] text-start text-[12px] text-dark-grey">
-                  <th className="px-5 py-3 font-medium md:px-6">{t("Ingredient")}</th>
+                  <th className="px-5 py-3 text-start font-medium md:px-6">{t("Ingredient")}</th>
                   <th className="px-3 py-3 text-end font-medium">{t("On hand")}</th>
                   <th className="px-3 py-3 text-end font-medium">{t("Last price (ex VAT)")}</th>
-                  <th className="px-5 py-3 font-medium md:px-6">{t("Last bought")}</th>
+                  <th className="px-5 py-3 text-start font-medium max-sm:hidden md:px-6">{t("Last bought")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black-iron/[0.06]">
+              <tbody id="stock-rows" className="divide-y divide-black-iron/[0.06]">
                 {rows.map((r) => {
                   const unit = UNIT[r.unit];
                   return (
-                    <tr key={r.id} className="hover:bg-black-iron/[0.02]">
+                    <tr key={r.id} data-search={`${r.name} ${r.nameFa ?? ""}`} className="hover:bg-black-iron/[0.02]">
                       <td className="px-5 py-3 font-medium md:px-6">
                         <Link href={`/admin/ops/ingredients/${r.id}`} dir="auto" className="hover:underline">
-                          {r.name}
+                          {locale === "fa" && r.nameFa ? r.nameFa : r.name}
                         </Link>
                         {r.category === "PACKAGING" && <span className="ms-2 text-[12px] font-normal text-dark-grey">{t("packaging")}</span>}
                         {r.category === "SUPPLIES" && <span className="ms-2 text-[12px] font-normal text-dark-grey">{t("supplies")}</span>}
@@ -76,7 +82,7 @@ export default async function StockPage() {
                       <td className="px-3 py-3 text-end tabular-nums text-dark-grey">
                         {r.lastPurchase?.costPerUnitFils != null ? unitPrice(r.lastPurchase.costPerUnitFils, unit, locale) : "—"}
                       </td>
-                      <td className="px-5 py-3 text-dark-grey md:px-6">
+                      <td className="px-5 py-3 text-dark-grey max-sm:hidden md:px-6">
                         {r.lastPurchase ? (
                           <>
                             {day(r.lastPurchase.at, false, intl)}

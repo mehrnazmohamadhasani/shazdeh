@@ -5,8 +5,8 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { DOC_STATUS } from "@/components/admin/ops/status";
 import { InvoiceReview } from "@/components/admin/ops/invoice-review";
-import { DiscardButton, MarkPaidButton, RetryRead, UndoInvoiceButton } from "@/components/admin/ops/document-actions";
-import { getDocument, parseStoredReading } from "@/lib/ops/documents";
+import { DiscardButton, EditInvoiceButton, MarkPaidButton, RetryRead } from "@/components/admin/ops/document-actions";
+import { EDIT_REASON, getDocument, parseStoredReading } from "@/lib/ops/documents";
 import { reconcileStatement } from "@/lib/ops/catalog";
 import { toFils } from "@/lib/ordering/money";
 import { prisma } from "@/lib/prisma";
@@ -76,7 +76,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               ? t("Invoice {number} · {date}", { number: inv.invoiceNo, date: date(inv.invoiceDate) })
               : date(inv.invoiceDate)
           }
-          actions={<UndoInvoiceButton invoiceId={inv.id} />}
+          actions={<EditInvoiceButton invoiceId={inv.id} />}
           bodyClassName="p-0"
         >
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
@@ -236,7 +236,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <>
         {undone?.voidedAt && (
           <p className="mb-5 rounded-[16px] border border-saffron-orange/30 bg-saffron-orange/[0.08] px-4 py-3 text-[13.5px] text-cinnamon-bark">
-            {undone.voidReason
+            {undone.voidReason === EDIT_REASON
+              ? t("You are editing a saved invoice. Its stock doesn't count until you save it again. To remove it completely, press Discard.")
+              : undone.voidReason
               ? t("Saved before and undone on {date} — “{reason}”. Correct it and save again.", {
                   date: date(undone.voidedAt),
                   reason: undone.voidReason,

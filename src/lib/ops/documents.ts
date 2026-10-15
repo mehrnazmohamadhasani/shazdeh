@@ -10,6 +10,7 @@ import { suggestMatches, type Suggestions } from "./match";
 import type { SaveInvoiceInput } from "./save-schema";
 import { normalizeName } from "./units";
 import { reportError } from "@/lib/report-error";
+import { processRecipeDocument } from "./recipe-import";
 
 /*
  * Purchase documents: upload → AI reading → review → saved invoice and
@@ -40,7 +41,11 @@ export class OpsError extends Error {
 }
 
 /** Stores the file (once — duplicates are caught by hash) and reads it. */
-export async function uploadDocument(file: { data: Buffer; mimeType: string; name: string | null }, userId: string) {
+export async function uploadDocument(
+  file: { data: Buffer; mimeType: string; name: string | null },
+  userId: string,
+  kind: "supplier_invoice" | "recipe" = "supplier_invoice",
+) {
   const sha256 = createHash("sha256").update(file.data).digest("hex");
   const existing = await prisma.opsDocument.findUnique({ where: { sha256 }, select: { id: true } });
   if (existing) throw new OpsError("This file was already uploaded.", 409, { id: existing.id });
@@ -52,6 +57,7 @@ export async function uploadDocument(file: { data: Buffer; mimeType: string; nam
       sizeBytes: file.data.length,
       data: new Uint8Array(file.data),
       originalName: file.name,
+      kind,
       uploadedById: userId,
     },
     select: { id: true },
@@ -62,8 +68,9 @@ export async function uploadDocument(file: { data: Buffer; mimeType: string; nam
 
 /** (Re-)reads a document with AI. Never throws: failures are stored on the document. */
 export async function processDocument(id: string) {
-  const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { data: true, mimeType: true, originalName: true } });
+  const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { data: true, mimeType: true, originalName: true, kind: true } });
   if (!doc) return;
+  if (doc.kind === "recipe") return processRecipeDocument(id);
   await prisma.opsDocument.update({ where: { id }, data: { status: "PROCESSING", error: null } });
   try {
     const result = await readDocument({ data: Buffer.from(doc.data), mimeType: doc.mimeType, name: doc.originalName });
@@ -90,6 +97,8 @@ export async function processDocument(id: string) {
 
 export async function listDocuments() {
   return prisma.opsDocument.findMany({
+    // Recipe photos have their own list on the recipes screen.
+    where: { kind: { not: "recipe" } },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
@@ -344,6 +353,86 @@ export async function voidInvoice(invoiceId: string, reason: string, actor: { id
   });
 }
 
+/** Why an invoice was voided when someone pressed "Edit" (shown on the review screen). */
+export const EDIT_REASON = "Edited";
+
+/**
+ * "Edit" on a saved invoice: puts its saved values (not the AI's first
+ * reading) back on the review screen, then takes the invoice and its
+ * stock out until it is saved again. History is kept: the old invoice
+ * stays as voided and the edit is audited.
+ */
+export async function editInvoice(invoiceId: string, actor: { id: string; email: string }) {
+  const inv = await prisma.purchaseInvoice.findUnique({
+    where: { id: invoiceId },
+    include: {
+      supplier: true,
+      lines: { include: { ingredient: { select: { id: true, name: true, unit: true } } } },
+      document: { select: { id: true, extraction: true } },
+    },
+  });
+  if (!inv) throw new OpsError("Invoice not found.", 404);
+  if (inv.voidedAt) throw new OpsError("This invoice is already being edited.", 409);
+  if (!inv.document) throw new OpsError("This invoice has no document to edit.", 409);
+
+  const aed = (fils: number | null) => (fils == null ? null : fils / 100);
+  const unitOf = { G: "g", ML: "ml", PCS: "pcs" } as const;
+  const reading: Extraction = {
+    documentType: "supplier_invoice",
+    handwritten: false,
+    supplier: { name: inv.supplier.name, trn: inv.supplier.trn, phone: inv.supplier.phone },
+    invoiceNumber: inv.invoiceNo,
+    invoiceDate: new Date(inv.invoiceDate.getTime() + 4 * 3_600_000).toISOString().slice(0, 10),
+    paymentMode: (inv.paymentMode as Extraction["paymentMode"]) ?? null,
+    currency: "AED",
+    pricesIncludeVat: inv.pricesIncludeVat,
+    lines: inv.lines.map((l) => ({
+      description: l.rawName,
+      itemCode: l.itemCode,
+      quantity: l.quantity,
+      unit: l.unit,
+      packSize: null,
+      unitPrice: aed(l.unitPriceFils),
+      discount: aed(l.discountFils) || null,
+      vat: aed(l.vatFils),
+      lineTotal: aed(l.lineTotalFils),
+      category: l.category.toLowerCase() as Extraction["lines"][number]["category"],
+      stockUnit: l.ingredient ? unitOf[l.ingredient.unit] : null,
+      stockQuantity: l.baseQty,
+      confidence: 1,
+      note: null,
+    })),
+    subtotal: aed(inv.subtotalFils),
+    discount: aed(inv.discountFils) || null,
+    vat: aed(inv.vatFils),
+    total: aed(inv.totalFils)!,
+    notes: inv.notes,
+    confidence: 1,
+  };
+  const suggestions: Suggestions = {
+    supplierId: inv.supplierId,
+    supplierName: inv.supplier.name,
+    lines: inv.lines.map((l) => ({
+      ingredientId: l.ingredient?.id ?? null,
+      ingredientName: l.ingredient?.name ?? null,
+      unit: l.ingredient ? unitOf[l.ingredient.unit] : null,
+      quantity: l.baseQty,
+      source: l.ingredient ? ("learned" as const) : null,
+    })),
+  };
+  const previous = inv.document.extraction as { reading?: unknown; aiReading?: unknown } | null;
+
+  await voidInvoice(invoiceId, EDIT_REASON, actor);
+  await prisma.opsDocument.update({
+    where: { id: inv.document.id },
+    data: {
+      // The AI's first reading is kept next to the values being edited.
+      extraction: { reading, suggestions, aiReading: previous?.aiReading ?? previous?.reading ?? null } as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return { documentId: inv.document.id };
+}
+
 /** Record payment of a credit invoice. */
 export async function markInvoicePaid(
   invoiceId: string,
@@ -410,6 +499,7 @@ export async function stockSummary() {
     return {
       id: i.id,
       name: i.name,
+      nameFa: i.nameFa,
       unit: i.unit,
       category: i.category,
       onHand: sums.find((s) => s.ingredientId === i.id)?._sum.quantity ?? 0,
