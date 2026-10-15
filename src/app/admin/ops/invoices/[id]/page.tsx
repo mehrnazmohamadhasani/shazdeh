@@ -284,6 +284,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </Link>
           <span dir="auto">{stored?.reading.supplier.name ?? doc.invoice?.supplier.name ?? t("Invoice")}</span>
           <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
+          {doc.status === "SAVED" && doc.autoSaved && <StatusPill tone="accent">{t("Saved automatically")}</StatusPill>}
         </span>
       }
       className="max-w-[1400px]"

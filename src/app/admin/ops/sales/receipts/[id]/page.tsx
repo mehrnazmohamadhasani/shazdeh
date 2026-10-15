@@ -10,12 +10,23 @@ import { day } from "@/components/admin/ops/format";
 import { getPlatformDocument } from "@/lib/ops/platform-import";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { requireAdmin } from "@/lib/auth";
+import { saleStockStatus } from "@/lib/ops/stock-use";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   const { t } = await getAdminI18n();
   return { title: t("Platform receipt") };
 }
+
+/** Why a dish of a saved sale didn't take stock. */
+const STOCK_REASON = {
+  not_matched: "Not matched to a menu dish — stock not reduced.",
+  no_recipe: "No recipe yet — stock not reduced.",
+  not_approved: "Recipe not approved yet — stock not reduced.",
+  prep_not_approved: "A prep in the recipe isn't approved yet — stock not reduced.",
+  cycle: "The recipe contains itself — stock not reduced.",
+  saved_before_recipe: "Saved before its recipe was approved — stock not reduced.",
+} as const;
 
 const FUNDED = { UNKNOWN: "Not known", RESTAURANT: "Restaurant", PLATFORM: "Platform", SHARED: "Shared" } as const;
 
@@ -54,6 +65,13 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
       <p className="mt-2 px-1 text-[12px] text-dark-grey">{t("Uploaded {date}", { date: day(doc.createdAt, true, intl) })}</p>
     </Card>
   );
+
+  const stock = order
+    ? await saleStockStatus(
+        { platformOrderId: order.id },
+        order.items.map((i) => ({ menuItemId: i.menuItemId, name: i.rawName, quantity: i.quantity })),
+      )
+    : [];
 
   let body: React.ReactNode;
   if (doc.status === "SAVED" && order) {
@@ -97,7 +115,7 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
           )}
         </dl>
         <ul className="mt-5 divide-y divide-black-iron/[0.06] rounded-[12px] border border-black-iron/[0.06] text-[14px]">
-          {order.items.map((i) => (
+          {order.items.map((i, n) => (
             <li key={i.id} className="flex items-center gap-3 px-4 py-2.5">
               <span className="w-8 tabular-nums text-dark-grey">{i.quantity}×</span>
               <span className="min-w-0 flex-1">
@@ -105,6 +123,11 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
                 <span dir="auto" className="block text-[12px] text-dark-grey">
                   {t("on the receipt: {name}", { name: i.rawName })}
                 </span>
+                {stock[n] && (
+                  <span className={`block text-[12px] ${stock[n].used ? "text-dark-grey" : "text-cinnamon-bark"}`}>
+                    {stock[n].used ? t("Ingredients taken from stock.") : t(STOCK_REASON[stock[n].reason])}
+                  </span>
+                )}
               </span>
               <span className="tabular-nums">{i.lineTotalFils != null ? money(i.lineTotalFils) : "—"}</span>
             </li>
@@ -114,14 +137,21 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
     );
   } else if (doc.status === "NEEDS_REVIEW" && reading && draft) {
     body = (
-      <PlatformReview
+      <>
+        {doc.error && (
+          <p className="mb-5 rounded-[16px] border border-saffron-orange/30 bg-saffron-orange/[0.08] px-4 py-3 text-[13.5px] text-cinnamon-bark">
+            {t("Not saved automatically: {reason}", { reason: t(doc.error) })}
+          </p>
+        )}
+        <PlatformReview
         documentId={doc.id}
         draft={draft}
         itemCount={reading.itemCount}
         isPlatformReceipt={reading.isPlatformReceipt}
         channels={channels.filter((c) => c.kind === "PLATFORM" && c.isActive).map((c) => ({ code: c.code, name: c.name }))}
         menu={menu}
-      />
+        />
+      </>
     );
   } else {
     body = (
@@ -148,6 +178,7 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
           </Link>
           <span>{order ? `${order.channel.name} #${order.orderNo}` : reading ? `${reading.platformPrinted ?? reading.platform} ${reading.orderNo ? `#${reading.orderNo}` : ""}` : t("Platform receipt")}</span>
           <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
+          {doc.status === "SAVED" && doc.autoSaved && <StatusPill tone="accent">{t("Saved automatically")}</StatusPill>}
         </span>
       }
       className="max-w-[1400px]"

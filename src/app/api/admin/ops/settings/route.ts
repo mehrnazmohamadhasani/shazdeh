@@ -6,6 +6,8 @@ import { updateOpsSettings } from "@/lib/ops/settings";
 const schema = z.object({
   foodCostIncludesVat: z.boolean().optional(),
   aiMonthlyCapUsd: z.number().min(0).max(10_000).optional(),
+  autoSavePlatform: z.boolean().optional(),
+  autoSaveInvoices: z.boolean().optional(),
 });
 
 /** Food cost with/without VAT and the monthly AI limit. Admins only. */
