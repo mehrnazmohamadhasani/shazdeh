@@ -28,7 +28,15 @@ export async function assertAiBudget() {
   if (spent.usd >= settings.aiMonthlyCapUsd) throw new AiBudgetError(settings.aiMonthlyCapUsd);
 }
 
-export async function recordAiUsage(entry: { kind: "invoice" | "recipe" | "platform"; model: string; inputTokens: number | null; outputTokens: number | null; documentId?: string | null }) {
+export async function recordAiUsage(entry: {
+  kind: "invoice" | "recipe" | "platform" | "assistant" | "voice";
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  documentId?: string | null;
+  /** When the call isn't priced by the reading model's tokens (speech-to-text). */
+  costMicroUsd?: number;
+}) {
   const inputTokens = entry.inputTokens ?? 0;
   const outputTokens = entry.outputTokens ?? 0;
   await prisma.aiUsage.create({
@@ -37,7 +45,7 @@ export async function recordAiUsage(entry: { kind: "invoice" | "recipe" | "platf
       model: entry.model,
       inputTokens,
       outputTokens,
-      costMicroUsd: aiCostMicroUsd(inputTokens, outputTokens, aiPrices()),
+      costMicroUsd: entry.costMicroUsd ?? aiCostMicroUsd(inputTokens, outputTokens, aiPrices()),
       documentId: entry.documentId ?? null,
     },
   });

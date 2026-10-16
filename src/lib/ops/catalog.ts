@@ -220,6 +220,7 @@ export async function addMovement(
   ingredientId: string,
   input: { type: (typeof MANUAL_MOVEMENTS)[number]; quantity: number; day: string; note: string | null },
   actor: Actor,
+  via = "manual",
 ) {
   const quantity = input.type === "ADJUSTMENT" ? input.quantity : -Math.abs(input.quantity);
   if (quantity === 0) throw new OpsError("Enter an amount.");
@@ -227,15 +228,16 @@ export async function addMovement(
     data: { ingredientId, type: input.type, quantity, at: dubaiDate(input.day), note: input.note, createdById: actor.id },
   });
   await prisma.auditLog.create({
-    data: { actor: actor.email, action: "stock.movement", entity: "StockMovement", entityId: m.id, after: { ingredientId, type: input.type, quantity, note: input.note } },
+    data: { actor: actor.email, action: "stock.movement", entity: "StockMovement", entityId: m.id, via, after: { ingredientId, type: input.type, quantity, note: input.note } },
   });
+  return { id: m.id };
 }
 
 /**
  * A stock count: for each counted ingredient, a COUNT movement for the
  * difference between what the ledger says and what is on the shelf.
  */
-export async function recordCount(counts: { ingredientId: string; counted: number }[], day: string, actor: Actor) {
+export async function recordCount(counts: { ingredientId: string; counted: number }[], day: string, actor: Actor, via = "manual") {
   return prisma.$transaction(async (tx) => {
     // Lock the counted ingredients (in a fixed order, so two counts can't
     // deadlock) until this transaction ends: a second count of the same
@@ -250,19 +252,21 @@ export async function recordCount(counts: { ingredientId: string; counted: numbe
     });
     const at = dubaiDate(day);
     const changes: { ingredientId: string; from: number; to: number }[] = [];
+    const movementIds: string[] = [];
     for (const c of counts) {
       const ledger = sums.find((s) => s.ingredientId === c.ingredientId)?._sum.quantity ?? 0;
       const diff = c.counted - ledger;
       if (Math.abs(diff) < 1e-9) continue;
-      await tx.stockMovement.create({
+      const m = await tx.stockMovement.create({
         data: { ingredientId: c.ingredientId, type: "COUNT", quantity: diff, at, note: `Counted ${c.counted}`, createdById: actor.id },
       });
+      movementIds.push(m.id);
       changes.push({ ingredientId: c.ingredientId, from: ledger, to: c.counted });
     }
     await tx.auditLog.create({
-      data: { actor: actor.email, action: "stock.count", entity: "StockCount", entityId: day, after: { counted: counts.length, changed: changes } },
+      data: { actor: actor.email, action: "stock.count", entity: "StockCount", entityId: day, via, after: { counted: counts.length, changed: changes } },
     });
-    return { counted: counts.length, changed: changes.length };
+    return { counted: counts.length, changed: changes.length, movementIds };
   });
 }
 

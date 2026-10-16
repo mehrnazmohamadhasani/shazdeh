@@ -9,6 +9,7 @@ import { settings } from "./settings";
 import { purchasing } from "./purchasing";
 import { sales } from "./sales";
 import { today } from "./today";
+import { assistant } from "./assistant";
 
 /*
  * English → Persian for the admin panel, split by area so each file
@@ -27,4 +28,5 @@ export const FA: Record<string, string> = {
   ...purchasing,
   ...sales,
   ...today,
+  ...assistant,
 };

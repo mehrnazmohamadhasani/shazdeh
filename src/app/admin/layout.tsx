@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
 import { OrderAlarm } from "@/components/admin/orders/order-alarm";
+import { AssistantFab } from "@/components/admin/assistant/assistant-fab";
 import { AdminI18nProvider } from "@/components/admin/i18n";
 import { vapidPublicKey } from "@/lib/notifications/push";
 import { getAdminLocale } from "@/lib/admin-i18n/server";
@@ -50,6 +51,7 @@ export default async function AdminLayout({
           <AdminMobileBar user={user} />
           <OrderAlarm vapidPublicKey={vapidPublicKey()} />
           <main className="flex-1">{children}</main>
+          <AssistantFab role={user.role} />
         </div>
       </div>
     </AdminI18nProvider>

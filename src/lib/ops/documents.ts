@@ -232,7 +232,7 @@ export function dubaiDate(day: string) {
 const DAY_MS = 86_400_000;
 
 /** Saves a reviewed reading as a purchase invoice, its stock and what was learned. */
-export async function saveDocument(id: string, input: SaveInvoiceInput, actor: { id: string; email: string }) {
+export async function saveDocument(id: string, input: SaveInvoiceInput, actor: { id: string; email: string }, via = "photo") {
   try {
     return await prisma.$transaction(async (tx) => {
       const doc = await tx.opsDocument.findUnique({ where: { id }, select: { status: true } });
@@ -376,7 +376,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
           action: "purchase_invoice.create",
           entity: "PurchaseInvoice",
           entityId: invoice.id,
-          via: "photo",
+          via,
           after: {
             documentId: id,
             supplier: supplier.name,
@@ -403,7 +403,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
  * voided, and its document goes back to review so it can be fixed and
  * saved again.
  */
-export async function voidInvoice(invoiceId: string, reason: string, actor: { id: string; email: string }) {
+export async function voidInvoice(invoiceId: string, reason: string, actor: { id: string; email: string }, via = "manual") {
   return prisma.$transaction(async (tx) => {
     const invoice = await tx.purchaseInvoice.findUnique({
       where: { id: invoiceId },
@@ -444,6 +444,7 @@ export async function voidInvoice(invoiceId: string, reason: string, actor: { id
         action: "purchase_invoice.void",
         entity: "PurchaseInvoice",
         entityId: invoiceId,
+        via,
         before: { voidedAt: null, stockMovements: reversed },
         after: { voidedAt: now.toISOString(), reason },
       },
@@ -461,7 +462,7 @@ export const EDIT_REASON = "Edited";
  * stock out until it is saved again. History is kept: the old invoice
  * stays as voided and the edit is audited.
  */
-export async function editInvoice(invoiceId: string, actor: { id: string; email: string }) {
+export async function editInvoice(invoiceId: string, actor: { id: string; email: string }, via = "manual") {
   const inv = await prisma.purchaseInvoice.findUnique({
     where: { id: invoiceId },
     include: {
@@ -521,7 +522,7 @@ export async function editInvoice(invoiceId: string, actor: { id: string; email:
   };
   const previous = inv.document.extraction as { reading?: unknown; aiReading?: unknown } | null;
 
-  await voidInvoice(invoiceId, EDIT_REASON, actor);
+  await voidInvoice(invoiceId, EDIT_REASON, actor, via);
   await prisma.opsDocument.update({
     where: { id: inv.document.id },
     data: {

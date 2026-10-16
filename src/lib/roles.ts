@@ -10,7 +10,8 @@ export const LIMITED_ROLE_PATHS: Record<string, string[]> = {
   STAFF: ["/admin/orders"],
   // The person who buys and counts: invoices, stock and suppliers, and
   // platform receipts (to upload and save — not the sales totals or fees).
-  PURCHASER: ["/admin/ops/invoices", "/admin/ops/stock", "/admin/ops/ingredients", "/admin/ops/suppliers", "/admin/ops/sales/receipts"],
+  // The assistant answers and acts within the same limits (its tools check the role too).
+  PURCHASER: ["/admin/ops/invoices", "/admin/ops/stock", "/admin/ops/ingredients", "/admin/ops/suppliers", "/admin/ops/sales/receipts", "/admin/ops/assistant"],
 };
 
 /** Where a role lands after signing in, or when it opens a screen it may not see. */

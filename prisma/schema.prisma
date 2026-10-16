@@ -23,18 +23,20 @@ enum UserRole {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
+  id                String                  @id @default(cuid())
+  email             String                  @unique
   name              String?
   passwordHash      String
-  role              UserRole           @default(ADMIN)
+  role              UserRole                @default(ADMIN)
   /// Bumped when the password changes: sessions signed with an older
   /// version stop working on every device.
-  sessionVersion    Int                @default(0)
+  sessionVersion    Int                     @default(0)
   pushSubscriptions PushSubscription[]
   opsDocuments      OpsDocument[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  assistantActions  AssistantAction[]
+  assistantChats    AssistantConversation[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 }
 
 // ─── Menu ────────────────────────────────────────────────────────────────────
@@ -499,33 +501,35 @@ enum StockMovementType {
 
 /// An uploaded file, kept immutably (private — served only to admins).
 model OpsDocument {
-  id             String            @id @default(cuid())
+  id               String            @id @default(cuid())
   /// supplier_invoice (purchases, statements, platform receipts) | recipe
-  kind           String            @default("supplier_invoice")
-  status         OpsDocumentStatus @default(PROCESSING)
-  sha256         String            @unique // duplicate uploads are caught here
-  mimeType       String
-  sizeBytes      Int
-  data           Bytes
-  originalName   String?
+  kind             String            @default("supplier_invoice")
+  status           OpsDocumentStatus @default(PROCESSING)
+  sha256           String            @unique // duplicate uploads are caught here
+  mimeType         String
+  sizeBytes        Int
+  data             Bytes
+  originalName     String?
   /// Canonical AI output (src/lib/ops/extraction.ts) plus matches to
   /// existing suppliers/ingredients.
-  extraction     Json?
-  aiModel        String?
-  aiInputTokens  Int?
-  aiOutputTokens Int?
-  error          String?
-  uploadedById   String?
-  uploadedBy     User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  invoice        PurchaseInvoice?  @relation("InvoiceDocument")
-  voidedInvoices PurchaseInvoice[] @relation("VoidedInvoiceDocument")
-  recipeVersions RecipeVersion[]
-  platformOrder  PlatformOrder?
+  extraction       Json?
+  aiModel          String?
+  aiInputTokens    Int?
+  aiOutputTokens   Int?
+  error            String?
+  uploadedById     String?
+  uploadedBy       User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  invoice          PurchaseInvoice?  @relation("InvoiceDocument")
+  voidedInvoices   PurchaseInvoice[] @relation("VoidedInvoiceDocument")
+  recipeVersions   RecipeVersion[]
+  platformOrder    PlatformOrder?
+  /// Voice notes: the assistant changes this note asked for.
+  assistantActions AssistantAction[]
   /// Saved without a person checking it: every check passed and the
   /// reading was confident (Ops settings). Shown so someone can look.
-  autoSaved      Boolean           @default(false)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  autoSaved        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([status, createdAt])
   @@index([kind, status])
@@ -829,7 +833,7 @@ model CashWithdrawal {
 /// One AI call: what it cost, so a monthly cap can stop runaway spending.
 model AiUsage {
   id           String   @id @default(cuid())
-  /// invoice | recipe
+  /// invoice | recipe | platform | assistant | voice
   kind         String
   model        String
   inputTokens  Int
@@ -998,4 +1002,76 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// ─── Ops: assistant ─────────────────────────────────────────────────────────
+// The voice and chat assistant never writes on its own: each change it
+// suggests is stored here as a proposal with its before/after preview,
+// applied only when a person confirms, and can be undone.
+
+enum AssistantActionStatus {
+  PROPOSED
+  APPLIED
+  CANCELLED
+  UNDONE
+}
+
+model AssistantAction {
+  id               String                @id @default(cuid())
+  userId           String?
+  user             User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// record_waste | record_staff_meal | adjust_stock | stock_count | change_recipe | fix_invoice_price
+  tool             String
+  /// chat | voice
+  via              String
+  status           AssistantActionStatus @default(PROPOSED)
+  /// Needs a second confirmation (money, recipes, big differences).
+  sensitive        Boolean               @default(false)
+  /// The validated tool input, with names resolved to ids.
+  input            Json
+  /// What the person saw before confirming (before/after).
+  preview          Json
+  /// What applying made (movement ids, versions…), used to undo it.
+  result           Json?
+  /// The voice note this came from, if it was spoken.
+  sourceDocumentId String?
+  sourceDocument   OpsDocument?          @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  createdAt        DateTime              @default(now())
+  appliedAt        DateTime?
+  undoneAt         DateTime?
+
+  @@index([userId, createdAt])
+  @@index([sourceDocumentId])
+}
+
+/// A chat with the assistant, kept so the person can reopen or delete it
+/// (the screen lists their latest few). Deleting one never touches the
+/// changes it made: those live on in AssistantAction and AuditLog.
+model AssistantConversation {
+  id        String             @id @default(cuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The first thing said, shortened.
+  title     String
+  messages  AssistantMessage[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model AssistantMessage {
+  id              String                @id @default(cuid())
+  conversationId  String
+  conversation    AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// user | assistant
+  role            String
+  text            String
+  /// The changes this answer suggested (AssistantAction ids), shown as cards.
+  actionIds       String[]              @default([])
+  /// The voice note this message was spoken as, if any.
+  voiceDocumentId String?
+  createdAt       DateTime              @default(now())
+
+  @@index([conversationId, createdAt])
 }
