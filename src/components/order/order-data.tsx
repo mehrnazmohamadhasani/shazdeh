@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import { useCart, type CartLine } from "@/components/order/cart-store";
+import { rememberOrderSource } from "@/components/order/order-source";
 import { computeTotals, priceLines, type PricedLine, type Totals, type ZoneTerms } from "@/lib/ordering/pricing";
 import {
   variantToPricingItem,
@@ -50,6 +51,8 @@ export function OrderDataProvider({ data, children }: { data: OrderData; childre
       zoneById: (id) => (id ? zones.get(id) : undefined),
     };
   }, [data]);
+  // A customer arriving from the WhatsApp link is counted as a WhatsApp order.
+  React.useEffect(() => rememberOrderSource(), []);
   return <OrderDataContext.Provider value={value}>{children}</OrderDataContext.Provider>;
 }
 

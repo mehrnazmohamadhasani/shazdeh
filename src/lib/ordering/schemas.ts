@@ -67,7 +67,21 @@ export const placeOrderSchema = z.object({
   cutlery: z.boolean().optional().default(false),
   /** What the customer saw. If the server's total differs, we stop and re-confirm. */
   expectedTotalFils: z.number().int().nonnegative(),
+  /** "whatsapp" when the customer came from the link sent on WhatsApp (?src=whatsapp). */
+  source: z.enum(["website", "whatsapp"]).optional(),
 });
+
+/**
+ * An order a staff member enters for a customer who messaged on WhatsApp
+ * or called. Same lines, address and customer as the website (prices are
+ * still worked out on the server); pay on delivery only.
+ */
+export const staffOrderSchema = placeOrderSchema
+  .omit({ paymentMethod: true, source: true })
+  .extend({
+    source: z.enum(["WHATSAPP", "PHONE"]),
+    paymentMethod: z.enum(["CASH_ON_DELIVERY", "CARD_ON_DELIVERY"]),
+  });
 
 /** Tracking tokens this device remembers, for the "your orders" list. */
 export const trackStatusesSchema = z.object({
@@ -76,3 +90,4 @@ export const trackStatusesSchema = z.object({
 
 export type QuoteInput = z.infer<typeof quoteSchema>;
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
+export type StaffOrderInput = z.infer<typeof staffOrderSchema>;

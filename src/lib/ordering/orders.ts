@@ -22,7 +22,7 @@ import {
   STATUS_TIMESTAMP,
   type OrderStatusValue,
 } from "@/lib/ordering/status";
-import type { PlaceOrderInput, QuoteInput } from "@/lib/ordering/schemas";
+import type { PlaceOrderInput, QuoteInput, StaffOrderInput } from "@/lib/ordering/schemas";
 import { getOnlineProvider, getProviderById } from "@/lib/payments";
 import type { ProviderPaymentState } from "@/lib/payments/types";
 import type { DispatchResult } from "@/lib/delivery";
@@ -119,6 +119,145 @@ function orderNumber() {
 
 class CouponExhausted extends Error {}
 
+type OrderDraft = {
+  idempotencyKey: string;
+  status: OrderStatusValue;
+  paymentMethod: PlaceOrderInput["paymentMethod"];
+  /** "cash" for pay-on-delivery, else the online provider's id. */
+  paymentProvider: string;
+  online: boolean;
+  customer: { name: string; phone: string; email?: string | null; marketingOptIn?: boolean };
+  address: PlaceOrderInput["address"];
+  notes: string | null;
+  cutlery: boolean;
+  quote: Awaited<ReturnType<typeof quoteOrder>>;
+  source: "WEBSITE" | "WHATSAPP" | "PHONE";
+  enteredById: string | null;
+  event: { message: string; actor: string };
+  now: Date;
+};
+
+/**
+ * Writes a priced order (website checkout or staff entry): customer,
+ * order, lines, first event and payment, with the coupon use counted.
+ * Returns the order (created: false when this idempotency key already
+ * made one), "coupon" when the code was used up meanwhile, or null when
+ * no free order number was found.
+ */
+async function insertOrder(d: OrderDraft): Promise<{ created: boolean; id: string; number: string; trackingToken: string } | "coupon" | null> {
+  const { quote } = d;
+  const zone = quote.zone!;
+  const area = quote.area!;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const order = await prisma.$transaction(async (tx) => {
+        if (quote.couponId) {
+          const res = await tx.coupon.updateMany({
+            where: {
+              id: quote.couponId,
+              isActive: true,
+              ...(quote.couponUsageLimit !== null ? { usedCount: { lt: quote.couponUsageLimit } } : {}),
+            },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (res.count === 0) throw new CouponExhausted();
+        }
+
+        const customer = await tx.customer.upsert({
+          where: { phone: d.customer.phone },
+          create: {
+            phone: d.customer.phone,
+            name: d.customer.name,
+            email: d.customer.email ?? null,
+            marketingOptIn: d.customer.marketingOptIn ?? false,
+          },
+          update: {
+            name: d.customer.name,
+            ...(d.customer.email ? { email: d.customer.email } : {}),
+            ...(d.customer.marketingOptIn ? { marketingOptIn: true } : {}),
+          },
+        });
+
+        return tx.order.create({
+          data: {
+            number: orderNumber(),
+            trackingToken: randomBytes(18).toString("base64url"),
+            idempotencyKey: d.idempotencyKey,
+            status: d.status,
+            paymentMethod: d.paymentMethod,
+            paymentStatus: d.online ? "PENDING" : "PAY_ON_DELIVERY",
+            source: d.source,
+            enteredById: d.enteredById,
+            customerId: customer.id,
+            customerName: d.customer.name,
+            customerPhone: d.customer.phone,
+            customerEmail: d.customer.email ?? null,
+            zoneId: zone.id,
+            zoneName: zone.name,
+            areaName: area.name,
+            addressType: d.address.addressType,
+            building: d.address.building,
+            street: d.address.street || null,
+            unit: d.address.unit || null,
+            floor: d.address.floor || null,
+            instructions: d.address.instructions || null,
+            lat: d.address.lat ?? null,
+            lng: d.address.lng ?? null,
+            notes: d.notes || null,
+            cutlery: d.cutlery,
+            subtotalFils: quote.totals.subtotalFils,
+            deliveryFeeFils: quote.totals.deliveryFeeFils,
+            serviceFeeFils: quote.totals.serviceFeeFils,
+            discountFils: quote.totals.discountFils,
+            vatFils: quote.totals.vatFils,
+            totalFils: quote.totals.totalFils,
+            couponId: quote.couponId,
+            couponCode: quote.coupon?.code ?? null,
+            etaMin: zone.etaMin,
+            etaMax: zone.etaMax,
+            confirmedAt: d.status === "CONFIRMED" ? d.now : null,
+            items: {
+              create: quote.lines.map((l) => ({
+                menuItemId: l.itemId,
+                name: l.name,
+                portion: l.portion,
+                unitPriceFils: l.unitPriceFils,
+                quantity: l.quantity,
+                lineTotalFils: l.lineTotalFils,
+                notes: l.notes,
+                modifiers: l.modifiers,
+              })),
+            },
+            events: { create: { type: "status", status: d.status, message: d.event.message, actor: d.event.actor } },
+            payments: {
+              create: {
+                provider: d.paymentProvider,
+                method: d.paymentMethod,
+                amountFils: quote.totals.totalFils,
+                status: d.online ? "PENDING" : "PAY_ON_DELIVERY",
+              },
+            },
+          },
+          select: { id: true, number: true, trackingToken: true },
+        });
+      });
+      return { created: true, ...order };
+    } catch (e) {
+      if (e instanceof CouponExhausted) return "coupon";
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        // A double-tap racing this request may have just created the order
+        // (same idempotency key): return that one. Prisma 7 adapters don't
+        // say which column clashed, so always look before retrying.
+        const again = await prisma.order.findUnique({ where: { idempotencyKey: d.idempotencyKey } });
+        if (again) return { created: false, id: again.id, number: again.number, trackingToken: again.trackingToken };
+        continue; // order number (or tracking token) collision — try another
+      }
+      throw e;
+    }
+  }
+  return null;
+}
+
 export async function placeOrder(input: PlaceOrderInput, origin: string): Promise<PlaceResult> {
   // Idempotency: a double-tap or a retried request returns the same order.
   const existing = await prisma.order.findUnique({
@@ -162,124 +301,27 @@ export async function placeOrder(input: PlaceOrderInput, origin: string): Promis
   if (online && !provider) return { ok: false, status: 422, error: "Online payment isn't available right now." };
 
   const initialStatus: OrderStatusValue = online ? "PENDING_PAYMENT" : settings.autoAccept ? "CONFIRMED" : "RECEIVED";
-  const zone = quote.zone!;
-  const area = quote.area!;
   const now = new Date();
 
-  let created: { id: string; number: string; trackingToken: string } | null = null;
-  for (let attempt = 0; attempt < 5 && !created; attempt++) {
-    try {
-      created = await prisma.$transaction(async (tx) => {
-        if (quote.couponId) {
-          const res = await tx.coupon.updateMany({
-            where: {
-              id: quote.couponId,
-              isActive: true,
-              ...(quote.couponUsageLimit !== null ? { usedCount: { lt: quote.couponUsageLimit } } : {}),
-            },
-            data: { usedCount: { increment: 1 } },
-          });
-          if (res.count === 0) throw new CouponExhausted();
-        }
-
-        const customer = await tx.customer.upsert({
-          where: { phone: input.customer.phone },
-          create: {
-            phone: input.customer.phone,
-            name: input.customer.name,
-            email: input.customer.email ?? null,
-            marketingOptIn: input.customer.marketingOptIn,
-          },
-          update: {
-            name: input.customer.name,
-            ...(input.customer.email ? { email: input.customer.email } : {}),
-            ...(input.customer.marketingOptIn ? { marketingOptIn: true } : {}),
-          },
-        });
-
-        return tx.order.create({
-          data: {
-            number: orderNumber(),
-            trackingToken: randomBytes(18).toString("base64url"),
-            idempotencyKey: input.idempotencyKey,
-            status: initialStatus,
-            paymentMethod: input.paymentMethod,
-            paymentStatus: online ? "PENDING" : "PAY_ON_DELIVERY",
-            customerId: customer.id,
-            customerName: input.customer.name,
-            customerPhone: input.customer.phone,
-            customerEmail: input.customer.email ?? null,
-            zoneId: zone.id,
-            zoneName: zone.name,
-            areaName: area.name,
-            addressType: input.address.addressType,
-            building: input.address.building,
-            street: input.address.street || null,
-            unit: input.address.unit || null,
-            floor: input.address.floor || null,
-            instructions: input.address.instructions || null,
-            lat: input.address.lat ?? null,
-            lng: input.address.lng ?? null,
-            notes: input.notes || null,
-            cutlery: input.cutlery,
-            subtotalFils: quote.totals.subtotalFils,
-            deliveryFeeFils: quote.totals.deliveryFeeFils,
-            serviceFeeFils: quote.totals.serviceFeeFils,
-            discountFils: quote.totals.discountFils,
-            vatFils: quote.totals.vatFils,
-            totalFils: quote.totals.totalFils,
-            couponId: quote.couponId,
-            couponCode: quote.coupon?.code ?? null,
-            etaMin: zone.etaMin,
-            etaMax: zone.etaMax,
-            confirmedAt: initialStatus === "CONFIRMED" ? now : null,
-            items: {
-              create: quote.lines.map((l) => ({
-                menuItemId: l.itemId,
-                name: l.name,
-                portion: l.portion,
-                unitPriceFils: l.unitPriceFils,
-                quantity: l.quantity,
-                lineTotalFils: l.lineTotalFils,
-                notes: l.notes,
-                modifiers: l.modifiers,
-              })),
-            },
-            events: {
-              create: {
-                type: "status",
-                status: initialStatus,
-                message: online ? "Order created — waiting for online payment" : "Order placed",
-                actor: "customer",
-              },
-            },
-            payments: {
-              create: {
-                provider: online ? provider!.id : "cash",
-                method: input.paymentMethod,
-                amountFils: quote.totals.totalFils,
-                status: online ? "PENDING" : "PAY_ON_DELIVERY",
-              },
-            },
-          },
-          select: { id: true, number: true, trackingToken: true },
-        });
-      });
-    } catch (e) {
-      if (e instanceof CouponExhausted) {
-        return { ok: false, status: 409, code: "coupon", error: "That promo code has just been fully redeemed." };
-      }
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        // A double-tap racing this request may have just created the order
-        // (same idempotency key): return that one. Prisma 7 adapters don't
-        // say which column clashed, so always look before retrying.
-        const again = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-        if (again) return { ok: true, number: again.number, trackingToken: again.trackingToken, redirectUrl: null };
-        continue; // order number (or tracking token) collision — try another
-      }
-      throw e;
-    }
-  }
+  const inserted = await insertOrder({
+    idempotencyKey: input.idempotencyKey,
+    status: initialStatus,
+    paymentMethod: input.paymentMethod,
+    paymentProvider: online ? provider!.id : "cash",
+    online,
+    customer: input.customer,
+    address: input.address,
+    notes: input.notes ?? null,
+    cutlery: input.cutlery,
+    quote,
+    source: input.source === "whatsapp" ? "WHATSAPP" : "WEBSITE",
+    enteredById: null,
+    event: { message: online ? "Order created — waiting for online payment" : "Order placed", actor: "customer" },
+    now,
+  });
+  if (inserted === "coupon") return { ok: false, status: 409, code: "coupon", error: "That promo code has just been fully redeemed." };
+  if (inserted && !inserted.created) return { ok: true, number: inserted.number, trackingToken: inserted.trackingToken, redirectUrl: null };
+  const created = inserted;
   if (!created) return { ok: false, status: 503, error: "We couldn't place your order. Please try again." };
 
   if (!online) {
@@ -312,6 +354,77 @@ export async function placeOrder(input: PlaceOrderInput, origin: string): Promis
       error: "We couldn't start the online payment. Please try again, or choose to pay on delivery.",
     };
   }
+}
+
+/**
+ * An order staff enter for a WhatsApp message or a phone call. Priced
+ * exactly like a website order; it skips the online-ordering gates
+ * (paused, kitchen hours, minimum order) because the kitchen chose to
+ * take it, and starts as Accepted. It still rings the order alarm and
+ * prints like any order, and takes stock when it is ready.
+ */
+export async function placeStaffOrder(input: StaffOrderInput, staff: { id: string; email: string }): Promise<PlaceResult> {
+  const existing = await prisma.order.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    select: { number: true, trackingToken: true },
+  });
+  if (existing) return { ok: true, number: existing.number, trackingToken: existing.trackingToken, redirectUrl: null };
+
+  const quote = await quoteOrder({
+    lines: input.lines,
+    areaId: input.address.areaId,
+    couponCode: input.couponCode,
+    phone: input.customer.phone,
+    lat: input.address.lat,
+    lng: input.address.lng,
+  });
+  const blocker =
+    quote.lines.length === 0
+      ? "Add at least one dish."
+      : quote.issues.length
+        ? "Some dishes need attention (sold out or a choice is missing)."
+        : quote.deliveryError;
+  if (blocker) return { ok: false, status: 409, code: "blocked", error: blocker, quote: publicQuote(quote) };
+  if (input.couponCode?.trim() && !quote.coupon) {
+    return { ok: false, status: 409, code: "coupon", error: quote.couponError ?? "That promo code can't be used.", quote: publicQuote(quote) };
+  }
+  if (quote.totals.totalFils !== input.expectedTotalFils) {
+    return { ok: false, status: 409, code: "price_changed", error: "The total changed — check the new total and save again.", quote: publicQuote(quote) };
+  }
+
+  const via = input.source === "WHATSAPP" ? "WhatsApp" : "phone";
+  const inserted = await insertOrder({
+    idempotencyKey: input.idempotencyKey,
+    status: "CONFIRMED",
+    paymentMethod: input.paymentMethod,
+    paymentProvider: "cash",
+    online: false,
+    customer: input.customer,
+    address: input.address,
+    notes: input.notes ?? null,
+    cutlery: input.cutlery,
+    quote,
+    source: input.source,
+    enteredById: staff.id,
+    event: { message: `Order taken by ${via} and entered by staff`, actor: staff.email },
+    now: new Date(),
+  });
+  if (inserted === "coupon") return { ok: false, status: 409, code: "coupon", error: "That promo code has just been fully redeemed." };
+  if (!inserted) return { ok: false, status: 503, error: "The order couldn't be saved. Please try again." };
+  if (inserted.created) {
+    await prisma.auditLog.create({
+      data: {
+        actor: staff.email,
+        action: "order.create",
+        entity: "Order",
+        entityId: inserted.id,
+        after: { number: inserted.number, source: input.source, totalFils: quote.totals.totalFils, lines: quote.lines.length },
+      },
+    });
+    // Same as a website order: the kitchen is alerted and the customer gets the email, if one was given.
+    queueNotification(inserted.id, "order.received", { autoAccepted: true });
+  }
+  return { ok: true, number: inserted.number, trackingToken: inserted.trackingToken, redirectUrl: null };
 }
 
 /** Cancels an order that never got paid and gives its coupon use back. */

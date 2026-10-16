@@ -168,6 +168,15 @@ enum PaymentMethod {
   ONLINE
 }
 
+/// Where a Direct-channel order came from. Website orders are placed by the
+/// customer (a link with ?src=whatsapp marks them WHATSAPP); staff enter
+/// WhatsApp messages and phone calls in the admin.
+enum OrderSource {
+  WEBSITE
+  WHATSAPP
+  PHONE
+}
+
 enum OrderStatus {
   PENDING_PAYMENT // online payment started, not yet confirmed — hidden from the kitchen
   RECEIVED
@@ -293,6 +302,9 @@ model Order {
   status         OrderStatus
   paymentMethod  PaymentMethod
   paymentStatus  PaymentStatus
+  source         OrderSource   @default(WEBSITE)
+  /// Staff member who entered it (WhatsApp / phone orders); null when the customer ordered.
+  enteredById    String?
 
   customerId    String?
   customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -361,6 +373,7 @@ model Order {
   @@index([status, placedAt])
   @@index([customerPhone])
   @@index([placedAt])
+  @@index([source, placedAt])
 }
 
 model OrderItem {

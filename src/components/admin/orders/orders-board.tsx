@@ -16,6 +16,7 @@ import type { BoardOrder } from "@/lib/ordering/admin";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { formatPhone } from "@/lib/ordering/phone";
 import { STAFF_ACTION, STAFF_LABEL, nextStatus, type OrderStatusValue } from "@/lib/ordering/status";
+import { SourceBadge } from "@/components/admin/orders/source-badge";
 import { cn } from "@/lib/utils";
 
 /*
@@ -202,7 +203,7 @@ export function OrdersBoard({ initial, providers }: { initial: BoardData; provid
                   onClick={() => setMobileCol(i)}
                   className={cn(
                     "h-10 shrink-0 rounded-md px-3 text-[13px]",
-                    mobileCol === i ? "bg-black-iron text-black-iron" : "bg-black-iron/[0.05] text-black-iron/80",
+                    mobileCol === i ? "bg-black-iron text-warm-white" : "bg-black-iron/[0.05] text-black-iron/80",
                   )}
                 >
                   {t(c.title)} <span className="tabular-nums">{n}</span>
@@ -378,6 +379,7 @@ function OrderCard({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <SourceBadge source={o.source} />
         <PaymentBadge order={o} />
         <span className="text-[13px] font-semibold tabular-nums text-black-iron">{money(o.totalFils)}</span>
         {o.cutlery && (

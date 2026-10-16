@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, Banknote, Check, CreditCard, Loader2, Lock, MapPin, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { AreaPicker } from "@/components/order/area-picker";
+import { orderSource } from "@/components/order/order-source";
 import {
   cart,
   recentOrders,
@@ -217,6 +218,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
           notes: notes.trim() || null,
           cutlery,
           expectedTotalFils: quote.totals.totalFils,
+          source: orderSource(),
         }),
       });
       const json = await res.json().catch(() => ({}));

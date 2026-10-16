@@ -124,10 +124,11 @@ export async function takeStockForWebsiteOrder(orderId: string, status: string) 
     await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        select: { number: true, items: { select: { menuItemId: true, name: true, quantity: true } } },
+        select: { number: true, source: true, items: { select: { menuItemId: true, name: true, quantity: true } } },
       });
       if (!order) return;
-      await recordSaleUse(tx, { orderId }, { at: new Date(), label: `Website ${order.number}`, items: order.items, actorId: null });
+      const via = order.source === "WHATSAPP" ? "WhatsApp" : order.source === "PHONE" ? "Phone" : "Website";
+      await recordSaleUse(tx, { orderId }, { at: new Date(), label: `${via} ${order.number}`, items: order.items, actorId: null });
     });
   } catch (e) {
     await reportError(e, { where: `stock use for order ${orderId}` });
