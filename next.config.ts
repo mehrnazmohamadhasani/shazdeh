@@ -96,6 +96,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The admin assistant takes voice notes: the microphone is allowed
+        // for this site's admin pages only (later entries win for the same key).
+        source: "/admin/:path*",
+        headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(self)" }],
+      },
+      {
         // The worker must always be revalidated, or a deploy could be
         // stuck behind a cached copy of the old one.
         source: "/sw.js",

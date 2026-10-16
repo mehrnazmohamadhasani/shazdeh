@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { OpsError } from "./documents";
 import { chosenCost, getOpsSettings } from "./settings";
-import { costVersion, dishMargin, wouldCycle, type CostContext, type CostRecipe, type CostVersion } from "./recipe-cost";
+import { costVersion, dishMargin, wouldCycle, type CostContext, type CostLine, type CostRecipe, type CostVersion } from "./recipe-cost";
 import { dishCostFrom, type DishCost } from "./profit";
 
 /*
@@ -105,6 +105,20 @@ export async function approvedDishCosts(asOf = new Date()) {
     out.set(r.menuItemId, dishCostFrom(approved ? costVersion(approved, ctx, [r.id]) : null));
   }
   return out;
+}
+
+/**
+ * A recipe's cost now (approved version) and with `lines` in its place,
+ * as if approved — the assistant's before/after preview of a change.
+ */
+export async function previewRecipeCost(recipeId: string, lines: CostLine[]) {
+  const { ctx } = await loadCostContext();
+  const current = ctx.recipes.get(recipeId);
+  if (!current) throw new OpsError("Recipe not found.", 404);
+  const base = current.approved ?? current.draft;
+  const before = current.approved ? costVersion(current.approved, ctx, [recipeId]) : null;
+  const after = costVersion({ status: "APPROVED", yieldQuantity: base?.yieldQuantity ?? 1, lines }, ctx, [recipeId]);
+  return { before, after };
 }
 
 // ─── Reading ────────────────────────────────────────────────────────────────
@@ -291,7 +305,7 @@ export async function writeDraft(
   id: string,
   input: DraftInput,
   actor: Actor,
-  source?: { documentId: string; via: string },
+  source?: { documentId: string | null; via: string },
 ) {
   await lockRecipe(tx, id);
   const recipe = await tx.recipe.findUniqueOrThrow({ where: { id }, include: { versions: { include: { lines: true } } } });
@@ -341,7 +355,7 @@ export async function writeDraft(
       entityId: versionId,
       via: source?.via ?? "manual",
       before: { lines: linesSnapshot((draft ?? approved)?.lines ?? []), yieldQuantity: (draft ?? approved)?.yieldQuantity ?? null },
-      after: { lines: linesSnapshot(input.lines), yieldQuantity, ...(source ? { sourceDocumentId: source.documentId } : {}) },
+      after: { lines: linesSnapshot(input.lines), yieldQuantity, ...(source?.documentId ? { sourceDocumentId: source.documentId } : {}) },
     },
   });
   return { versionId };
@@ -349,30 +363,34 @@ export async function writeDraft(
 
 /** Makes the draft the kitchen standard; the previous standard is retired, not deleted. */
 export async function approveDraft(id: string, actor: Actor) {
-  return prisma.$transaction(async (tx) => {
-    await lockRecipe(tx, id);
-    const versions = await tx.recipeVersion.findMany({ where: { recipeId: id, status: { in: ["DRAFT", "APPROVED"] } }, include: { lines: true } });
-    const draft = versions.find((v) => v.status === "DRAFT");
-    const approved = versions.find((v) => v.status === "APPROVED");
-    if (!draft) throw new OpsError("There is no draft to approve.", 409);
-    if (draft.lines.length === 0) throw new OpsError("Add at least one ingredient before approving.");
-    if (approved) await tx.recipeVersion.update({ where: { id: approved.id }, data: { status: "RETIRED" } });
-    await tx.recipeVersion.update({ where: { id: draft.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: new Date() } });
-    await tx.auditLog.create({
-      data: {
-        actor: actor.email,
-        action: "recipe.approve",
-        entity: "RecipeVersion",
-        entityId: draft.id,
-        before: approved ? { version: approved.number, yieldQuantity: approved.yieldQuantity, lines: linesSnapshot(approved.lines) } : undefined,
-        after: { version: draft.number, yieldQuantity: draft.yieldQuantity, lines: linesSnapshot(draft.lines) },
-      },
-    });
-    return { version: draft.number };
-  });
+  return prisma.$transaction((tx) => approveDraftTx(tx, id, actor));
 }
 
-export async function discardDraft(id: string, actor: Actor) {
+/** approveDraft inside a caller's transaction (the assistant saves and approves in one go). */
+export async function approveDraftTx(tx: Prisma.TransactionClient, id: string, actor: Actor, via = "manual") {
+  await lockRecipe(tx, id);
+  const versions = await tx.recipeVersion.findMany({ where: { recipeId: id, status: { in: ["DRAFT", "APPROVED"] } }, include: { lines: true } });
+  const draft = versions.find((v) => v.status === "DRAFT");
+  const approved = versions.find((v) => v.status === "APPROVED");
+  if (!draft) throw new OpsError("There is no draft to approve.", 409);
+  if (draft.lines.length === 0) throw new OpsError("Add at least one ingredient before approving.");
+  if (approved) await tx.recipeVersion.update({ where: { id: approved.id }, data: { status: "RETIRED" } });
+  await tx.recipeVersion.update({ where: { id: draft.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: new Date() } });
+  await tx.auditLog.create({
+    data: {
+      actor: actor.email,
+      action: "recipe.approve",
+      entity: "RecipeVersion",
+      entityId: draft.id,
+      via,
+      before: approved ? { version: approved.number, yieldQuantity: approved.yieldQuantity, lines: linesSnapshot(approved.lines) } : undefined,
+      after: { version: draft.number, yieldQuantity: draft.yieldQuantity, lines: linesSnapshot(draft.lines) },
+    },
+  });
+  return { version: draft.number, versionId: draft.id, previousVersionId: approved?.id ?? null };
+}
+
+export async function discardDraft(id: string, actor: Actor, via = "manual") {
   return prisma.$transaction(async (tx) => {
     await lockRecipe(tx, id);
     const draft = await tx.recipeVersion.findFirst({ where: { recipeId: id, status: "DRAFT" }, include: { lines: true } });
@@ -381,7 +399,7 @@ export async function discardDraft(id: string, actor: Actor) {
     if (others === 0) throw new OpsError("This is the only version — delete the recipe instead.", 409);
     await tx.recipeVersion.delete({ where: { id: draft.id } });
     await tx.auditLog.create({
-      data: { actor: actor.email, action: "recipe.draft.discard", entity: "RecipeVersion", entityId: draft.id, before: { version: draft.number, lines: linesSnapshot(draft.lines) } },
+      data: { actor: actor.email, action: "recipe.draft.discard", entity: "RecipeVersion", entityId: draft.id, via, before: { version: draft.number, lines: linesSnapshot(draft.lines) } },
     });
   });
 }

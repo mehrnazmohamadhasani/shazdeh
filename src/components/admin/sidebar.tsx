@@ -23,6 +23,7 @@ import {
   Users,
   UtensilsCrossed,
   Wallet,
+  Sparkles,
   Banknote,
   Percent,
   TrendingUp,
@@ -48,6 +49,7 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; role
  */
 const NAV: NavItem[] = [
   { href: "/admin", label: "Today", icon: LayoutDashboard, roles: CMS, group: "Home" },
+  { href: "/admin/ops/assistant", label: "Assistant", icon: Sparkles, roles: PURCHASING, group: "Home" },
   { href: "/admin/orders", label: "Orders", icon: ReceiptText, roles: ALL, group: "Orders" },
   { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Orders" },
   { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Orders" },

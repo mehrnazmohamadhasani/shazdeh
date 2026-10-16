@@ -107,6 +107,7 @@ test("roles: the purchaser sees purchasing screens only", () => {
   assert.ok(roleMayOpen("PURCHASER", "/admin/ops/invoices/abc"));
   assert.ok(roleMayOpen("PURCHASER", "/admin/ops/stock/count"));
   assert.ok(roleMayOpen("PURCHASER", "/admin/ops/suppliers"));
+  assert.ok(roleMayOpen("PURCHASER", "/admin/ops/assistant"));
   assert.ok(roleMayOpen("PURCHASER", "/admin/ops/sales/receipts/abc")); // record platform receipts…
   assert.ok(!roleMayOpen("PURCHASER", "/admin/ops/sales")); // …but not the sales totals
   assert.ok(!roleMayOpen("PURCHASER", "/admin/ops/channels"));
