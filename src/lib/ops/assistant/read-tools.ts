@@ -38,13 +38,29 @@ export async function stockLevel(args: Args<"stock_level">, catalog: Catalog) {
       lastPrice: price ? { day: dubaiDay(price.at), from: price.supplier ?? "opening stock", ...pricePerBigUnit(price.filsPerUnit, item.unit) } : null,
     };
   }
+  // Everything with its amount (a kitchen has a few hundred items at most), so "list all stock" can be answered.
   const have = await onHand(catalog.ingredients.map((i) => i.id));
-  const low = catalog.ingredients
-    .filter((i) => i.lowStockAt != null && have.get(i.id)! <= i.lowStockAt)
-    .map((i) => ({ name: i.name, nameFa: i.nameFa, onHand: formatAmount(have.get(i.id)!, BASE[i.unit]), lowStockAt: formatAmount(i.lowStockAt!, BASE[i.unit]) }));
-  const out = catalog.ingredients.filter((i) => have.get(i.id)! <= 0 && i.lowStockAt == null).map((i) => ({ name: i.name, nameFa: i.nameFa }));
-  return { low, outWithoutWarningLevel: out.slice(0, 30), ingredients: catalog.ingredients.length };
+  const items = catalog.ingredients
+    .map((i) => {
+      const amount = have.get(i.id)!;
+      return {
+        name: i.name,
+        nameFa: i.nameFa,
+        onHand: formatAmount(amount, BASE[i.unit]),
+        status: amount <= 0 ? "out" : i.lowStockAt != null && amount <= i.lowStockAt ? "low" : "ok",
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return {
+    ingredients: items.length,
+    out: items.filter((i) => i.status === "out").length,
+    low: items.filter((i) => i.status === "low").length,
+    items: items.slice(0, STOCK_LIST_MAX),
+    ...(items.length > STOCK_LIST_MAX ? { more: items.length - STOCK_LIST_MAX } : {}),
+  };
 }
+
+const STOCK_LIST_MAX = 300;
 
 export async function recentPurchases(args: Args<"recent_purchases">, catalog: Catalog, today: string) {
   const days = args.days ?? 14;

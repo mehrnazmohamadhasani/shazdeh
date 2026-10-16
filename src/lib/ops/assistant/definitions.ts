@@ -64,8 +64,9 @@ export const TOOLS: Record<ToolName, Definition> = {
   stock_level: {
     roles: PURCHASING,
     write: false,
-    description: "Stock on hand of one ingredient (by name in any language), or with item null the items that are low or out.",
-    parameters: obj({ item: nullable("Ingredient name, or null for the low-stock list.") }),
+    description:
+      "Stock on hand of one ingredient (by name in any language), or with item null every ingredient with its amount and status (ok, low, out). Use null for a full or partial stock list, or for what is low or out.",
+    parameters: obj({ item: nullable("Ingredient name, or null for every ingredient.") }),
   },
   recent_purchases: {
     roles: PURCHASING,
