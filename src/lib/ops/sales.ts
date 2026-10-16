@@ -47,7 +47,9 @@ export async function salesOverview(month?: string | null) {
       orderBy: { placedAt: "desc" },
       include: { channel: { select: { code: true, name: true } }, items: { select: { quantity: true } }, document: { select: { autoSaved: true } } },
     }),
-    prisma.order.aggregate({
+    // Direct orders, split by where they came from (website, WhatsApp, phone).
+    prisma.order.groupBy({
+      by: ["source"],
       where: { placedAt: { gte: start, lt: end }, status: { in: [...COUNTED] } },
       _count: true,
       _sum: { subtotalFils: true, discountFils: true },
@@ -61,13 +63,21 @@ export async function salesOverview(month?: string | null) {
 
   const byChannel = channels.map((c) => {
     if (c.kind === "DIRECT") {
+      const sources = (["WEBSITE", "WHATSAPP", "PHONE"] as const)
+        .map((source) => {
+          const g = direct.find((d) => d.source === source);
+          return { source, orders: g?._count ?? 0, foodSalesFils: (g?._sum.subtotalFils ?? 0) - (g?._sum.discountFils ?? 0) };
+        })
+        .filter((x) => x.orders > 0);
+      const orders = sources.reduce((n, x) => n + x.orders, 0);
       return {
         code: c.code,
         name: c.name,
-        orders: direct._count,
-        foodSalesFils: (direct._sum.subtotalFils ?? 0) - (direct._sum.discountFils ?? 0),
+        orders,
+        foodSalesFils: sources.reduce((n, x) => n + x.foodSalesFils, 0),
         feesFils: 0 as number | null,
-        feesKnownFor: direct._count,
+        feesKnownFor: orders,
+        sources,
       };
     }
     const mine = platformOrders.filter((o) => o.channelId === c.id);

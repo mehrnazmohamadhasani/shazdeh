@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { computeTotals, priceLines, repriceAfterRemoval, validateSelection, type PricingItem } from "../pricing";
 import { kitchenStatus, parseWindow } from "../hours";
 import { canTransition, nextStatus } from "../status";
-import { formatPhone, maskPhone, normalizeMobile } from "../phone";
+import { formatPhone, maskPhone, mobileCountries, normalizeMobile, readMobile } from "../phone";
 
 const khoresh: PricingItem = {
   id: "k",
@@ -146,4 +146,19 @@ test("removing a sold-out dish keeps fees, shrinks percent promos, never raises 
   const fixed = repriceAfterRemoval({ ...base, subtotalFils: 1000, discountFils: 5000, coupon: { type: "FIXED", value: 50, maxDiscountFils: null } });
   assert.equal(fixed.discountFils, 1700);
   assert.equal(fixed.totalFils, 0);
+});
+
+test("a WhatsApp number from any country: with +code as written, without it in the chosen country", () => {
+  // A German mobile typed the national way is not a UAE number…
+  assert.equal(normalizeMobile("015739396987"), null);
+  // …but is with Germany picked, and always when written with +49 or 0049.
+  assert.equal(normalizeMobile("015739396987", "DE"), "+4915739396987");
+  assert.equal(normalizeMobile("+49 1573 9396987", "AE"), "+4915739396987");
+  assert.equal(normalizeMobile("0049 1573 9396987"), "+4915739396987");
+  assert.equal(normalizeMobile("050 123 4567", "AE"), "+971501234567");
+  assert.deepEqual(readMobile("0912 345 6789", "IR"), { e164: "+989123456789", country: "IR", international: "+98 912 345 6789" });
+  assert.equal(readMobile("12345", "DE"), null);
+  const countries = mobileCountries();
+  assert.ok(countries.length > 200);
+  assert.deepEqual(countries.find((c) => c.code === "AE"), { code: "AE", callingCode: "971" });
 });

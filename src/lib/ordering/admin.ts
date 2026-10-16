@@ -13,6 +13,7 @@ const LIST_SELECT = {
   status: true,
   paymentMethod: true,
   paymentStatus: true,
+  source: true,
   placedAt: true,
   etaMin: true,
   etaMax: true,

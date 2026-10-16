@@ -29,6 +29,7 @@ import {
   type PaymentMethodValue,
   type PaymentStatusValue,
 } from "@/lib/ordering/status";
+import { SourceBadge, type OrderSourceValue } from "@/components/admin/orders/source-badge";
 import { cn } from "@/lib/utils";
 
 export type OrderDetailData = {
@@ -37,6 +38,7 @@ export type OrderDetailData = {
   status: OrderStatusValue;
   paymentMethod: PaymentMethodValue;
   paymentStatus: PaymentStatusValue;
+  source: OrderSourceValue;
   customerName: string;
   customerPhone: string;
   customerEmail: string | null;
@@ -133,7 +135,9 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
           <p className="text-[12px] font-medium text-terracotta-ink">
             {t("{status} · placed {time}", { status: t(STAFF_LABEL[o.status]), time: dubaiTime(o.placedAt, true) })}
           </p>
-          <h1 className="mt-3 text-4xl font-bold tabular-nums tracking-[-0.04em] text-black-iron md:text-5xl">{o.number}</h1>
+          <h1 className="mt-3 flex flex-wrap items-center gap-3 text-4xl font-bold tabular-nums tracking-[-0.04em] text-black-iron md:text-5xl">
+            {o.number} <SourceBadge source={o.source} />
+          </h1>
           {o.rejectionReason && <p className="mt-2 text-[14px] text-pomegranate-red">{t("Reason: {reason}", { reason: o.rejectionReason })}</p>}
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
