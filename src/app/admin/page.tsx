@@ -65,10 +65,10 @@ function SalesCard({ summary, i18n }: { summary: TodaySummary; i18n: AdminI18n }
         </p>
       </Link>
       <ul className="divide-y divide-black-iron/[0.06] border-t border-black-iron/[0.06] text-[15px]">
-        {/* The website always shows; a platform only on a day it sold. */}
-        {byChannel.filter((c) => c.kind === "DIRECT" || c.orders > 0).map((c) => (
+        {/* The website always shows; WhatsApp, phone and each platform only on a day they sold. */}
+        {byChannel.filter((c) => c.code === "direct" || c.orders > 0).map((c) => (
           <li key={c.code} className={cn("flex min-h-12 items-center gap-3 px-5 py-2.5 md:px-6", c.orders === 0 && "text-dark-grey")}>
-            <span className="min-w-0 flex-1 truncate">{c.kind === "DIRECT" ? t("Website") : c.name}</span>
+            <span className="min-w-0 flex-1 truncate">{t(c.name)}</span>
             <span className="text-[13px] tabular-nums text-dark-grey">{orders(c.orders)}</span>
             <span className="w-28 text-end font-semibold tabular-nums">{money(c.foodSalesFils)}</span>
           </li>

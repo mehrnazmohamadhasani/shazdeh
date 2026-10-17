@@ -6,6 +6,10 @@ export const staffOrders: Record<string, string> = {
   "Order came by": "سفارش از طریق",
   WhatsApp: "WhatsApp",
   "Phone call": "تلفن",
+  "Direct order": "سفارش مستقیم",
+  "Orders a customer sends on WhatsApp, entered by staff (New order), or placed from the WhatsApp link shazdeh.ae/order?src=whatsapp. No platform commission.":
+    "سفارش‌هایی که مشتری در WhatsApp می‌فرستد و کارکنان ثبت می‌کنند (سفارش جدید)، یا از لینک WhatsApp ‏shazdeh.ae/order?src=whatsapp ثبت می‌شوند. بدون کمیسیون پلتفرم.",
+  "Orders taken by phone and entered by staff (New order). No platform commission.": "سفارش‌هایی که تلفنی گرفته و کارکنان ثبت می‌کنند (سفارش جدید). بدون کمیسیون پلتفرم.",
   "Add at least one dish.": "دست‌کم یک غذا اضافه کنید.",
   "A dish needs a choice (size or option).": "یکی از غذاها انتخاب لازم دارد (اندازه یا گزینه).",
   "Enter the customer's mobile number.": "شماره‌ی موبایل مشتری را وارد کنید.",
