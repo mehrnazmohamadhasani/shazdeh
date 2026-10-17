@@ -25,14 +25,25 @@ export default async function ChannelsPage() {
           key={c.id}
           title={
             <span className="flex flex-wrap items-center gap-2">
-              {c.name}
-              <StatusPill tone="neutral">{t(c.kind === "DIRECT" ? "Own website" : "Delivery platform")}</StatusPill>
-              <span className="text-[12.5px] font-normal text-dark-grey">{t(c._count.orders === 1 ? "{n} order recorded" : "{n} orders recorded", { n: c._count.orders })}</span>
+              {t(c.name)}
+              <StatusPill tone="neutral">{t(c.kind === "DIRECT" ? (c.code === "direct" ? "Own website" : "Direct order") : "Delivery platform")}</StatusPill>
+              {/* Platform receipts only; direct orders are counted in Sales. */}
+              {c.kind !== "DIRECT" && (
+                <span className="text-[12.5px] font-normal text-dark-grey">{t(c._count.orders === 1 ? "{n} order recorded" : "{n} orders recorded", { n: c._count.orders })}</span>
+              )}
             </span>
           }
         >
           {c.kind === "DIRECT" ? (
-            <p className="text-[14px] text-dark-grey">{t("Website orders pay no platform commission; card fees come with payment settlements later.")}</p>
+            <p className="text-[14px] text-dark-grey">
+              {t(
+                c.code === "whatsapp"
+                  ? "Orders a customer sends on WhatsApp, entered by staff (New order), or placed from the WhatsApp link shazdeh.ae/order?src=whatsapp. No platform commission."
+                  : c.code === "phone"
+                    ? "Orders taken by phone and entered by staff (New order). No platform commission."
+                    : "Website orders pay no platform commission; card fees come with payment settlements later.",
+              )}
+            </p>
           ) : (
             <div className="space-y-3">
               {c.feeRules.length === 0 ? (
