@@ -21,6 +21,7 @@ const MOVEMENT_LABEL: Record<string, string> = {
   CONSUMPTION: "Used",
   WASTE: "Waste",
   STAFF_MEAL: "Staff meal",
+  GIFT: "Given away",
   ADJUSTMENT: "Correction",
   COUNT: "Stock count",
 };

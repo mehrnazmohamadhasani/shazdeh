@@ -95,7 +95,12 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
         throw new Error(err?.error ? apiErrorText(err.error, t, locale === "fa") : t("Couldn't save the dish"));
       }
       toast.success(isEditing ? t("Dish saved") : t("Dish created"));
-      router.push("/admin/menu-items");
+      if (isEditing) router.push("/admin/menu-items");
+      else {
+        // A new dish goes straight to its page, where the next step is its recipe.
+        const created = await res.json().catch(() => null);
+        router.push(created?.id ? `/admin/menu-items/${created.id}?added=1#recipe` : "/admin/menu-items");
+      }
       router.refresh();
     } catch (err) {
       toast.error((err as Error).message);

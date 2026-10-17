@@ -12,7 +12,7 @@ import { ASSISTANT_ROLES } from "@/lib/ops/assistant/types";
  * list screens, so it never covers a form's save bar; on Today's phone
  * layout it sits above the Add bar.
  */
-const SCREENS = ["/admin", "/admin/ops/stock", "/admin/ops/invoices", "/admin/ops/recipes", "/admin/ops/suppliers", "/admin/ops/sales", "/admin/ops/payables"];
+const SCREENS = ["/admin", "/admin/ops/stock", "/admin/ops/invoices", "/admin/ops/recipes", "/admin/ops/suppliers", "/admin/ops/sales"];
 
 export function AssistantFab({ role }: { role: string }) {
   const pathname = usePathname();

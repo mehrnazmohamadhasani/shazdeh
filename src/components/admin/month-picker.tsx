@@ -11,12 +11,34 @@ import { cn } from "@/lib/utils";
  * year of months to tap (a bottom sheet on phones, a small card on
  * computers) — the month twin of Today's day picker. Months after the
  * current one are greyed out. Months are "YYYY-MM"; the page reads them
- * from `?month=`, and the current month is the bare path.
+ * from `?month=`, and the current month is the bare path. `arrows` adds
+ * previous / next month buttons beside the pill; `counts` shows how many
+ * records each month has (e.g. invoices), so empty months are obvious.
  */
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 
-export function MonthPicker({ month, current, path }: { month: string; current: string; path: string }) {
+const shift = (month: string, by: number) => {
+  const d = new Date(`${month}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + by);
+  return d.toISOString().slice(0, 7);
+};
+
+export function MonthPicker({
+  month,
+  current,
+  path,
+  arrows = false,
+  counts,
+  description = "Pick a month to see its sales.",
+}: {
+  month: string;
+  current: string;
+  path: string;
+  arrows?: boolean;
+  counts?: Record<string, number>;
+  description?: string;
+}) {
   const { t, intl } = useAdminI18n();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -31,7 +53,10 @@ export function MonthPicker({ month, current, path }: { month: string; current: 
     startTransition(() => router.push(next === current ? path : `${path}?month=${next}`));
   }
 
-  return (
+  const arrow =
+    "grid h-11 w-11 shrink-0 place-items-center rounded-full bg-black-iron/[0.05] text-black-iron transition-colors hover:bg-black-iron/[0.09] disabled:opacity-30 disabled:hover:bg-black-iron/[0.05]";
+
+  const picker = (
     <Dialog
       open={open}
       onOpenChange={(o) => {
@@ -52,7 +77,7 @@ export function MonthPicker({ month, current, path }: { month: string; current: 
 
       <DialogContent className="bg-white sm:max-w-[380px]">
         <DialogTitle className="px-5 pt-6 text-[20px] font-bold tracking-[-0.02em]">{t("Choose a month")}</DialogTitle>
-        <DialogDescription className="sr-only">{t("Pick a month to see its sales.")}</DialogDescription>
+        <DialogDescription className="sr-only">{t(description)}</DialogDescription>
 
         <div className="px-4 pb-[max(1.25rem,var(--safe-bottom))] pt-4">
           <div className="flex items-center justify-between gap-2 px-1">
@@ -97,7 +122,12 @@ export function MonthPicker({ month, current, path }: { month: string; current: 
                     "disabled:pointer-events-none disabled:bg-transparent disabled:text-black-iron/25",
                   )}
                 >
-                  {fmt(m, { month: "short" })}
+                  <span className="block">{fmt(m, { month: "short" })}</span>
+                  {counts && (
+                    <span className={cn("block text-[11.5px] font-normal tabular-nums", m === month ? "text-white/85" : "text-dark-grey")}>
+                      {counts[m] ? t(counts[m] === 1 ? "{n} invoice" : "{n} invoices", { n: counts[m] }) : "—"}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -113,5 +143,17 @@ export function MonthPicker({ month, current, path }: { month: string; current: 
         </div>
       </DialogContent>
     </Dialog>
+  );
+  if (!arrows) return picker;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button type="button" onClick={() => go(shift(month, -1))} aria-label={t("Previous month")} className={arrow}>
+        <ChevronLeft className="h-5 w-5 rtl:-scale-x-100" />
+      </button>
+      {picker}
+      <button type="button" disabled={month >= current} onClick={() => go(shift(month, 1))} aria-label={t("Next month")} className={arrow}>
+        <ChevronRight className="h-5 w-5 rtl:-scale-x-100" />
+      </button>
+    </span>
   );
 }

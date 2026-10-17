@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChefHat } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { AdminPage } from "@/components/admin/ui";
-import { Button } from "@/components/ui/button";
-import { NewDishRecipeButton } from "@/components/admin/ops/recipe-forms";
+import { DishRecipeStep } from "@/components/admin/ops/dish-recipe-step";
 import { MenuItemForm } from "@/components/admin/menu-item-form";
 import { ModifiersEditor } from "@/components/admin/ordering/modifiers-editor";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { dishRecipeSummary } from "@/lib/ops/recipes";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -15,17 +15,17 @@ export async function generateMetadata() {
   return { title: t("Edit dish") };
 }
 
-export default async function EditMenuItemPage({ params }: { params: Promise<{ id: string }> }) {
-  const [{ id }, { t }] = await Promise.all([params, getAdminI18n()]);
-  const [item, categories] = await Promise.all([
+export default async function EditMenuItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ added?: string }> }) {
+  const [{ id }, { added }, { t }] = await Promise.all([params, searchParams, getAdminI18n()]);
+  const [item, categories, recipe] = await Promise.all([
     prisma.menuItem.findUnique({
       where: { id },
       include: {
         modifierGroups: { orderBy: { order: "asc" }, include: { options: { orderBy: { order: "asc" } } } },
-        recipe: { select: { id: true } },
       },
     }),
     prisma.category.findMany({ orderBy: { order: "asc" }, select: { id: true, name: true } }),
+    dishRecipeSummary(id),
   ]);
   if (!item) notFound();
 
@@ -39,18 +39,9 @@ export default async function EditMenuItemPage({ params }: { params: Promise<{ i
           <span dir="auto">{item.name}</span>
         </span>
       }
-      actions={
-        item.recipe ? (
-          <Button asChild variant="outline" size="md">
-            <Link href={`/admin/ops/recipes/${item.recipe.id}`}>
-              <ChefHat className="h-4 w-4" /> {t("Recipe & food cost")}
-            </Link>
-          </Button>
-        ) : (
-          <NewDishRecipeButton menuItemId={item.id} />
-        )
-      }
     >
+      {/* The dish's recipe (or the step to add one) first: right after creating a dish it is the next thing to do. */}
+      <DishRecipeStep menuItemId={item.id} dishName={item.name} recipe={recipe} justAdded={!!added && !recipe} />
       <MenuItemForm
         categories={categories}
         initial={{

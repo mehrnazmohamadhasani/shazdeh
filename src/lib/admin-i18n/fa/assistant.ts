@@ -23,7 +23,6 @@ export const assistant: Record<string, string> = {
   "Open now": "باز است",
   "Delete conversation": "حذف گفت‌وگو",
   "Delete this conversation?": "این گفت‌وگو حذف شود؟",
-  Keep: "نگه دار",
   "Conversation deleted.": "گفت‌وگو حذف شد.",
   "Couldn't load your conversations.": "گفت‌وگوها بارگیری نشد.",
   "Couldn't open the conversation.": "گفت‌وگو باز نشد.",
@@ -60,8 +59,6 @@ export const assistant: Record<string, string> = {
   "Yes, make this change": "بله، این تغییر را بده",
   "This changes money, a recipe or a big stock difference. Are the numbers above right?":
     "این تغییر روی پول، دستور پخت یا اختلاف بزرگ موجودی اثر دارد. عددهای بالا درست است؟",
-  "Done. You can undo it for a day.": "انجام شد. تا یک روز می‌توانید برگردانید.",
-  "Undone.": "برگردانده شد.",
   "Stock correction": "اصلاح موجودی",
   "Stock count · {n} items": "شمارش موجودی · {n} قلم",
   "Recipe change": "تغییر دستور پخت",
@@ -82,4 +79,12 @@ export const assistant: Record<string, string> = {
   "Invoice total": "جمع فاکتور",
   "The invoice is saved again with this price; the old one stays in the history. Stock value and food cost follow.":
     "فاکتور با این قیمت دوباره ذخیره می‌شود و نسخه‌ی قبلی در سابقه می‌ماند. ارزش موجودی و هزینه‌ی مواد هم به‌روز می‌شوند.",
+  // New recipe card
+  "Per portion (you said the amounts for {n} portions).": "برای یک پرس (مقدارها را برای {n} پرس گفتید).",
+  "Per portion.": "برای یک پرس.",
+  "heard: {words}": "شنیده شد: {words}",
+  "No price yet for: {names}": "هنوز قیمت ندارد: {names}",
+  "Open the recipe to approve it": "باز کردن دستور پخت برای تأیید",
+  "Confirming saves it as a draft. The owner approves it on the recipe screen; until then costs and stock don't change.":
+    "با تأیید، پیش‌نویس ذخیره می‌شود. صاحب رستوران آن را در صفحه‌ی دستور پخت تأیید می‌کند؛ تا آن موقع هزینه و موجودی تغییری نمی‌کند.",
 };

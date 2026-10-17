@@ -1,3 +1,4 @@
+import { freeFoodOnDay } from "./free-food";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_STATUSES } from "@/lib/ordering/admin";
@@ -91,6 +92,8 @@ export async function todaySummary(day: string, now = new Date()) {
     day,
     isToday: day === dubaiToday(now),
     byChannel,
+    // Staff meals, gifts… of that day: a cost with no sale, shown beside the profit, never hidden in it.
+    freeFood: await freeFoodOnDay(day),
     profit: estimateProfit(sales, costs),
     foodCostIncludesVat: settings.foodCostIncludesVat,
     alerts: await alerts(now),

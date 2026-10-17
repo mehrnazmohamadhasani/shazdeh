@@ -64,21 +64,24 @@ export function AssistantChat({
   recent: initialRecent,
   title,
   description,
+  prefill,
 }: {
   role: string;
   recent: ActionCard[];
   title: string;
   description: string;
+  /** Opened to write something (e.g. a dish's "Say it"): a new conversation with this in the box. */
+  prefill?: string;
 }) {
   const { t, dir } = useAdminI18n();
   // The open conversation is known in the browser only; its messages are shown once hydrated and loaded.
   const hydrated = React.useSyncExternalStore(noopSubscribe, () => true, () => false);
-  const [conversationId, setConversationId] = React.useState<string | null>(() => (typeof window === "undefined" ? null : storedId()));
-  const [loading, setLoading] = React.useState(() => typeof window !== "undefined" && !!storedId());
+  const [conversationId, setConversationId] = React.useState<string | null>(() => (typeof window === "undefined" || prefill ? null : storedId()));
+  const [loading, setLoading] = React.useState(() => typeof window !== "undefined" && !prefill && !!storedId());
   const [listOpen, setListOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [chatTitle, setChatTitle] = React.useState<string | null>(null);
-  const [text, setText] = React.useState("");
+  const [text, setText] = React.useState(prefill ?? "");
   const [voiceId, setVoiceId] = React.useState<string | null>(null);
   const [sending, setSending] = React.useState(false);
   const [transcribing, setTranscribing] = React.useState(false);
@@ -113,10 +116,18 @@ export function AssistantChat({
   );
 
   // Back on this screen in the same tab: reopen the conversation that was open.
+  // Opened with something to say: a fresh conversation, the cursor after the words already in the box.
   React.useEffect(() => {
+    if (prefill) {
+      remember(null);
+      const el = box.current;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+      return;
+    }
     const id = storedId();
     if (id) void show(id);
-  }, [show]);
+  }, [show, prefill]);
 
   function startNew() {
     setConversationId(null);

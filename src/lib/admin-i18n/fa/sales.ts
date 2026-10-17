@@ -79,8 +79,6 @@ export const sales: Record<string, string> = {
   "Save sale": "ذخیره‌ی فروش",
   "Sale saved": "فروش ذخیره شد",
   Undo: "برگرداندن",
-  "Remove this sale? The receipt opens again so you can correct and save it.": "این فروش حذف شود؟ رسید دوباره باز می‌شود تا اصلاح و ذخیره کنید.",
-  "Sale removed": "فروش حذف شد",
 
   // Auto-save and stock use
   "Saved automatically": "ذخیره‌ی خودکار",

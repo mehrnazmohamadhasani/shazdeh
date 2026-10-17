@@ -14,10 +14,20 @@ import { dishUse, type ApprovedRecipe, type DishUse } from "./consumption";
  *   Website order   → when it is Ready (or later): the food is cooked.
  *                     A cancellation after that keeps the use — the
  *                     food was made; record it as waste if thrown away.
+ *   Free food       → when it is recorded, as STAFF_MEAL or GIFT
+ *                     movements (no sale); reversed when it is undone.
  */
 
 type Tx = Prisma.TransactionClient;
-type SaleRef = { platformOrderId: string; orderId?: never } | { orderId: string; platformOrderId?: never };
+type SaleRef =
+  | { platformOrderId: string; orderId?: never; freeFoodId?: never }
+  | { orderId: string; platformOrderId?: never; freeFoodId?: never }
+  | { freeFoodId: string; orderId?: never; platformOrderId?: never };
+type UseType = "CONSUMPTION" | "STAFF_MEAL" | "GIFT";
+
+function refWhere(ref: SaleRef) {
+  return ref.platformOrderId ? { platformOrderId: ref.platformOrderId } : ref.orderId ? { orderId: ref.orderId } : { freeFoodId: ref.freeFoodId! };
+}
 export type SaleItem = { menuItemId: string | null; name: string; quantity: number };
 export type Skipped = { name: string; reason: Exclude<DishUse, { ok: true }>["reason"] | "not_matched"; detail?: string };
 
@@ -49,9 +59,14 @@ async function approvedRecipes(tx: Tx) {
  * already used stock (safe to call twice). Returns the dishes it could
  * not use stock for, and why.
  */
-export async function recordSaleUse(tx: Tx, ref: SaleRef, sale: { at: Date; label: string; items: SaleItem[]; actorId: string | null }) {
-  const where = ref.platformOrderId ? { platformOrderId: ref.platformOrderId } : { orderId: ref.orderId };
-  if (await tx.stockMovement.findFirst({ where: { ...where, type: "CONSUMPTION", reversesId: null }, select: { id: true } })) {
+export async function recordSaleUse(
+  tx: Tx,
+  ref: SaleRef,
+  sale: { at: Date; label: string; items: SaleItem[]; actorId: string | null },
+  type: UseType = "CONSUMPTION",
+) {
+  const where = refWhere(ref);
+  if (await tx.stockMovement.findFirst({ where: { ...where, type, reversesId: null }, select: { id: true } })) {
     return { used: 0, skipped: [] as Skipped[] };
   }
   const { byId, byMenuItem } = await approvedRecipes(tx);
@@ -72,7 +87,7 @@ export async function recordSaleUse(tx: Tx, ref: SaleRef, sale: { at: Date; labe
       await tx.stockMovement.create({
         data: {
           ingredientId,
-          type: "CONSUMPTION",
+          type,
           quantity: -amount,
           at: sale.at,
           ...where,
@@ -88,10 +103,11 @@ export async function recordSaleUse(tx: Tx, ref: SaleRef, sale: { at: Date; labe
   return { used, skipped };
 }
 
-/** Puts back what a platform order took (before the order is removed). */
-export async function reverseSaleUse(tx: Tx, platformOrderId: string, note: string, actorId: string | null) {
+/** Puts back what a platform order (or free food) took. */
+export async function reverseSaleUse(tx: Tx, ref: string | SaleRef, note: string, actorId: string | null) {
+  const where = refWhere(typeof ref === "string" ? { platformOrderId: ref } : ref);
   const taken = await tx.stockMovement.findMany({
-    where: { platformOrderId, type: "CONSUMPTION", reversesId: null, reversedBy: null },
+    where: { ...where, type: { in: ["CONSUMPTION", "STAFF_MEAL", "GIFT"] }, reversesId: null, reversedBy: null },
   });
   const now = new Date();
   for (const m of taken) {
@@ -137,7 +153,7 @@ export async function takeStockForWebsiteOrder(orderId: string, status: string) 
 
 /** Per dish of a sale: did it take stock, and if not, why (as things stand now). */
 export async function saleStockStatus(ref: SaleRef, items: SaleItem[]) {
-  const where = ref.platformOrderId ? { platformOrderId: ref.platformOrderId } : { orderId: ref.orderId };
+  const where = refWhere(ref);
   const [moves, recipes] = await Promise.all([
     prisma.stockMovement.findMany({ where: { ...where, type: "CONSUMPTION", reversesId: null }, select: { menuItemId: true } }),
     prisma.$transaction((tx) => approvedRecipes(tx)),

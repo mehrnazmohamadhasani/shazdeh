@@ -75,6 +75,7 @@ model MenuItem {
   orderItems     OrderItem[]
   platformItems  PlatformOrderItem[]
   aliases        MenuItemAlias[]
+  freeFoodItems  FreeFoodItem[]
   stockUses      StockMovement[]
   recipe         Recipe?
   createdAt      DateTime            @default(now())
@@ -508,6 +509,8 @@ enum StockMovementType {
   CONSUMPTION
   WASTE
   STAFF_MEAL
+  /// Food given away: gifts, tastings, compensation to a customer.
+  GIFT
   ADJUSTMENT
   COUNT
 }
@@ -515,7 +518,7 @@ enum StockMovementType {
 /// An uploaded file, kept immutably (private — served only to admins).
 model OpsDocument {
   id               String            @id @default(cuid())
-  /// supplier_invoice (purchases, statements, platform receipts) | recipe
+  /// supplier_invoice (purchases, statements, platform receipts) | recipe | payment_receipt
   kind             String            @default("supplier_invoice")
   status           OpsDocumentStatus @default(PROCESSING)
   sha256           String            @unique // duplicate uploads are caught here
@@ -534,6 +537,8 @@ model OpsDocument {
   uploadedBy       User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   invoice          PurchaseInvoice?  @relation("InvoiceDocument")
   voidedInvoices   PurchaseInvoice[] @relation("VoidedInvoiceDocument")
+  /// Payment receipts: the invoices this proof of payment is for.
+  paidInvoices     PurchaseInvoice[] @relation("PaymentReceipt")
   recipeVersions   RecipeVersion[]
   platformOrder    PlatformOrder?
   /// Voice notes: the assistant changes this note asked for.
@@ -604,36 +609,45 @@ model SupplierItem {
 }
 
 model PurchaseInvoice {
-  id               String         @id @default(cuid())
-  documentId       String?        @unique
-  document         OpsDocument?   @relation("InvoiceDocument", fields: [documentId], references: [id], onDelete: SetNull)
-  supplierId       String
-  supplier         Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  invoiceNo        String?
-  invoiceDate      DateTime
-  paymentMode      String? // cash | card | credit | transfer
-  pricesIncludeVat Boolean        @default(false)
-  subtotalFils     Int?
-  discountFils     Int            @default(0)
-  vatFils          Int?
-  totalFils        Int
+  id                 String         @id @default(cuid())
+  documentId         String?        @unique
+  document           OpsDocument?   @relation("InvoiceDocument", fields: [documentId], references: [id], onDelete: SetNull)
+  supplierId         String
+  supplier           Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  invoiceNo          String?
+  invoiceDate        DateTime
+  paymentMode        String? // cash | card | credit | transfer
+  pricesIncludeVat   Boolean        @default(false)
+  subtotalFils       Int?
+  discountFils       Int            @default(0)
+  vatFils            Int?
+  totalFils          Int
   /// Handwritten hints and other notes read from the paper.
-  notes            String?
+  notes              String?
   /// Credit invoices: when payment is due; null for cash/card.
-  dueDate          DateTime?
-  paidAt           DateTime?
+  dueDate            DateTime?
+  paidAt             DateTime?
   /// Who paid: "Owner", a staff name, "Company card"…
-  paidBy           String?
-  paymentNote      String?
+  paidBy             String?
+  /// Paid with that person's own money: the business owes it back to
+  /// them (Owner cash), unless they took the cash from the business first.
+  paidPersonally     Boolean        @default(false)
+  paymentNote        String?
+  /// Proof of payment (card slip, bank transfer, card-to-card screenshot).
+  /// One transfer may pay several invoices, so a receipt can be shared.
+  paymentReceiptId   String?
+  paymentReceipt     OpsDocument?   @relation("PaymentReceipt", fields: [paymentReceiptId], references: [id], onDelete: SetNull)
+  /// card | bank | card_to_card
+  paymentReceiptKind String?
   /// Undone: stock was reversed and the document went back to review.
-  voidedAt         DateTime?
-  voidReason       String?
-  voidedDocumentId String?
-  voidedDocument   OpsDocument?   @relation("VoidedInvoiceDocument", fields: [voidedDocumentId], references: [id], onDelete: SetNull)
-  createdById      String?
-  lines            PurchaseLine[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  voidedAt           DateTime?
+  voidReason         String?
+  voidedDocumentId   String?
+  voidedDocument     OpsDocument?   @relation("VoidedInvoiceDocument", fields: [voidedDocumentId], references: [id], onDelete: SetNull)
+  createdById        String?
+  lines              PurchaseLine[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   // Not unique in the database: an undone invoice keeps its number and
   // may be saved again. Duplicates among live invoices are checked in code.
@@ -693,6 +707,9 @@ model StockMovement {
   menuItem        MenuItem?         @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   recipeVersionId String?
   recipeVersion   RecipeVersion?    @relation(fields: [recipeVersionId], references: [id], onDelete: SetNull)
+  /// Free food (staff meal, gift…) this movement is part of.
+  freeFoodId      String?
+  freeFood        FreeFood?         @relation(fields: [freeFoodId], references: [id], onDelete: SetNull)
   /// Set on the movement that cancels another (undoing an invoice).
   reversesId      String?           @unique
   reverses        StockMovement?    @relation("Reversal", fields: [reversesId], references: [id], onDelete: Restrict)
@@ -704,6 +721,7 @@ model StockMovement {
   @@index([ingredientId, at])
   @@index([orderId])
   @@index([platformOrderId])
+  @@index([freeFoodId])
 }
 
 /// Shared rate-limit counters (sign-in, orders), so the limits hold
@@ -1087,4 +1105,59 @@ model AssistantMessage {
   createdAt       DateTime              @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// ─── Ops: free food ─────────────────────────────────────────────────────────
+// Dishes that leave the kitchen without a sale: staff meals, gifts (a
+// photographer, workers next door), tastings, and food given to make up
+// for a complaint. They take stock through the approved recipes like a
+// sale, bring no revenue, and keep what they cost at the time.
+
+enum FreeFoodKind {
+  STAFF_MEAL
+  GIFT
+  TASTING
+  COMPENSATION
+}
+
+model FreeFood {
+  id               String          @id @default(cuid())
+  kind             FreeFoodKind
+  /// When the food was given (Dubai day at noon when only a day is known).
+  at               DateTime
+  /// Who got it ("Photographer", "Staff", a customer's name) — optional.
+  recipient        String?
+  reason           String?
+  /// Food cost at the time from approved recipes; null when any dish had none (unknown, never guessed).
+  costFils         Int?
+  /// What the same dishes sell for on the menu (VAT included), at the time.
+  menuValueFils    Int
+  /// manual | chat | voice
+  via              String          @default("manual")
+  /// The voice note it came from, if spoken.
+  sourceDocumentId String?
+  createdById      String?
+  createdAt        DateTime        @default(now())
+  /// Undone: its stock was put back.
+  voidedAt         DateTime?
+  items            FreeFoodItem[]
+  stockUses        StockMovement[]
+
+  @@index([at])
+  @@index([kind, at])
+}
+
+model FreeFoodItem {
+  id            String    @id @default(cuid())
+  freeFoodId    String
+  freeFood      FreeFood  @relation(fields: [freeFoodId], references: [id], onDelete: Cascade)
+  menuItemId    String?
+  menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  name          String
+  quantity      Int
+  /// Cost of one portion at the time (approved recipe × latest prices); null when unknown.
+  unitCostFils  Int?
+  menuPriceFils Int
+
+  @@index([freeFoodId])
 }

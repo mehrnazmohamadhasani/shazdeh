@@ -19,7 +19,8 @@ async function send(url: string, method: "POST" | "PATCH", body?: unknown) {
   return json;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+/** Today in Dubai (UTC+4). */
+const today = () => new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
 
 /** Cash taken from the business account to pay for purchases. */
 export function WithdrawalForm({ people }: { people: string[] }) {
@@ -76,6 +77,50 @@ export function WithdrawalForm({ people }: { people: string[] }) {
   );
 }
 
+/**
+ * The business pays a person back what it owes them: recorded as money
+ * they took from the business account, today, which settles the balance.
+ */
+export function PayBackButton({ person, amountFils }: { person: string; amountFils: number }) {
+  const { t, money } = useAdminI18n();
+  const router = useRouter();
+  const [asking, setAsking] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  if (!asking) {
+    return (
+      <Button size="sm" variant="outline" onClick={() => setAsking(true)}>
+        {t("Paid back")}
+      </Button>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2 text-[13px]">
+      <span dir="auto">{t("Paid {amount} back to {name} today?", { amount: money(amountFils), name: person })}</span>
+      <Button
+        size="sm"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await send("/api/admin/ops/cash", "POST", { person, amount: amountFils / 100, day: today(), note: "Paid back" });
+            toast.success(t("Saved"));
+            router.refresh();
+          } catch (err) {
+            toast.error(t(messageFromUnknown(err, "Could not save")));
+            setBusy(false);
+          }
+        }}
+      >
+        {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+        {t("Save")}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+        {t("Cancel")}
+      </Button>
+    </span>
+  );
+}
+
 export function VoidWithdrawalButton({ id }: { id: string }) {
   const { t } = useAdminI18n();
   const router = useRouter();
@@ -86,11 +131,11 @@ export function VoidWithdrawalButton({ id }: { id: string }) {
       variant="ghost"
       disabled={busy}
       onClick={async () => {
-        if (!window.confirm(t("Remove this withdrawal? Use this only for a mistake."))) return;
+        if (!window.confirm(t("Delete this withdrawal? Use this only for a mistake."))) return;
         setBusy(true);
         try {
           await send(`/api/admin/ops/cash/${id}/void`, "POST");
-          toast.success(t("Removed"));
+          toast.success(t("Deleted"));
           router.refresh();
         } catch (err) {
           toast.error(t(messageFromUnknown(err, "Could not save")));
@@ -98,7 +143,7 @@ export function VoidWithdrawalButton({ id }: { id: string }) {
         }
       }}
     >
-      {t("Remove")}
+      {t("Delete")}
     </Button>
   );
 }

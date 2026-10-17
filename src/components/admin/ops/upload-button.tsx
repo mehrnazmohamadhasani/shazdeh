@@ -95,10 +95,12 @@ export function useDocumentUpload() {
     return { id: body.id, duplicate: false };
   }
 
-  async function send(kind: DocumentKind, picked: File[]) {
+  /** `openQuery` is added to the page a single upload opens (e.g. "?dish=…" so a recipe goes to that dish). */
+  async function send(kind: DocumentKind, picked: File[], openQuery = "") {
     const recipe = kind === "recipe";
     const sale = kind === "platform_order";
-    const openPath = (id: string) => (recipe ? `/admin/ops/recipes/import/${id}` : sale ? `/admin/ops/sales/receipts/${id}` : `/admin/ops/invoices/${id}`);
+    const openPath = (id: string) =>
+      (recipe ? `/admin/ops/recipes/import/${id}` : sale ? `/admin/ops/sales/receipts/${id}` : `/admin/ops/invoices/${id}`) + openQuery;
     setProgress({ done: 0, total: picked.length });
     let files: File[];
     try {
@@ -156,10 +158,14 @@ export function UploadButton({
   label,
   kind = "supplier_invoice",
   variant = "primary",
+  openQuery,
+  multiple = true,
 }: {
   label?: string;
   kind?: DocumentKind;
   variant?: "primary" | "outline";
+  openQuery?: string;
+  multiple?: boolean;
 }) {
   const { t } = useAdminI18n();
   const input = React.useRef<HTMLInputElement>(null);
@@ -170,14 +176,14 @@ export function UploadButton({
       <input
         ref={input}
         type="file"
-        multiple
+        multiple={multiple}
         accept="image/*,application/pdf"
         className="sr-only"
         tabIndex={-1}
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (files.length) void send(kind, files);
+          if (files.length) void send(kind, files, openQuery);
         }}
       />
       <Button size="md" variant={variant} disabled={busy} onClick={() => input.current?.click()}>

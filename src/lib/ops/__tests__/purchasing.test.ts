@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { costLines, grossLines } from "../costing";
-import { cashBalances } from "../cash-balance";
+import { cashBalances, cashByMonth } from "../cash-balance";
 import { aiCostMicroUsd, aiPrices, dubaiMonth, dubaiMonthStart } from "../ai-price";
 import { vatRow, type VatInvoice } from "../vat-rows";
 import { roleHome, roleMayOpen } from "../../roles";
@@ -55,6 +55,22 @@ test("owner cash: withdrawals against presented invoices, per person", () => {
   assert.deepEqual(owner, { person: "Owner", withdrawnFils: 250000, presentedFils: 143688, balanceFils: 106312 });
   assert.equal(rows.find((r) => r.person === "Reza")!.balanceFils, -2500); // the business owes Reza
   assert.equal(rows[0].person, "Owner"); // largest gap first
+});
+
+test("owner cash by month: what was owed at each month end", () => {
+  const at = (iso: string) => new Date(iso);
+  const months = cashByMonth(
+    // 30 Sep 22:00 UTC is already 1 Oct in Dubai.
+    [{ person: "Owner", amountFils: 30000, at: at("2026-09-30T22:00:00Z") }],
+    [
+      { person: "owner", amountFils: 50000, at: at("2026-09-10T08:00:00Z") },
+      { person: "Owner ", amountFils: 10000, at: at("2026-10-05T08:00:00Z") },
+    ],
+  ).get("owner")!;
+  assert.deepEqual(months, [
+    { month: "2026-10", withdrawnFils: 30000, presentedFils: 10000, endBalanceFils: -30000 },
+    { month: "2026-09", withdrawnFils: 0, presentedFils: 50000, endBalanceFils: -50000 },
+  ]);
 });
 
 test("AI cost and the Dubai month", () => {

@@ -47,6 +47,19 @@ export const toolArgs = {
     changes: z.array(z.object({ item: name, quantity: z.number().min(0).max(1_000_000).nullable(), unit: zUnit })).min(1).max(20),
     note: z.string().max(300).nullable(),
   }),
+  write_recipe: z.object({
+    dish: name,
+    portions: z.number().int().min(1).max(200).nullable(),
+    lines: z.array(z.object({ item: name, quantity: z.number().positive().max(1_000_000), unit: zUnit })).min(1).max(40),
+    note: z.string().max(300).nullable(),
+  }),
+  record_free_food: z.object({
+    kind: z.enum(["STAFF_MEAL", "GIFT", "TASTING", "COMPENSATION"]),
+    items: z.array(z.object({ dish: name, quantity: z.number().int().min(1).max(50) })).min(1).max(20),
+    recipient: z.string().trim().max(80).nullable(),
+    reason: z.string().trim().max(200).nullable(),
+    day,
+  }),
   fix_invoice_price: z.object({
     lineId: z.string().max(40).nullable(),
     item: name.nullable(),
@@ -165,6 +178,41 @@ export const TOOLS: Record<ToolName, Definition> = {
         }),
       },
       note: nullable("Why, or null."),
+    }),
+  },
+  write_recipe: {
+    roles: MONEY,
+    write: true,
+    description:
+      "Propose a NEW recipe for a menu dish that has no recipe yet: every ingredient or prep with its amount, as the person said or dictated it. Amounts are for `portions` portions (null = one portion) and are divided per portion. Each name is matched to the ingredient list (nothing new is created); names that don't match come back to ask about. Saved as a draft that the owner approves on the recipe screen. For a dish that already has an approved recipe use change_recipe.",
+    parameters: obj({
+      dish: str("Menu dish name, in any language."),
+      portions: nullable("How many portions the amounts are for, or null for one portion.", "integer"),
+      lines: {
+        type: "array",
+        items: obj({
+          item: str("Ingredient or prep name, as said."),
+          quantity: { type: "number", description: "Amount, above 0." },
+          unit,
+        }),
+      },
+      note: nullable("Anything else said about the recipe, or null."),
+    }),
+  },
+  record_free_food: {
+    roles: PURCHASING,
+    write: true,
+    description:
+      "Propose recording cooked DISHES from the menu that left without a sale: STAFF_MEAL (the team ate them), GIFT (given away: photographer, neighbours, workers), TASTING (tried to check or show a dish), COMPENSATION (given to make up for a complaint). Takes stock by the approved recipes and keeps the cost. For raw ingredients the staff used (bread, rice, a drink) use record_staff_meal instead.",
+    parameters: obj({
+      kind: { type: "string", enum: ["STAFF_MEAL", "GIFT", "TASTING", "COMPENSATION"], description: "What kind of free food." },
+      items: {
+        type: "array",
+        items: obj({ dish: str("Menu dish name, in any language."), quantity: { type: "integer", description: "Portions, 1 or more." } }),
+      },
+      recipient: nullable("Who got it (\"photographer\", \"staff lunch\"), or null."),
+      reason: nullable("Why, in the person's words, or null."),
+      day: nullable("YYYY-MM-DD, or null for today."),
     }),
   },
   fix_invoice_price: {

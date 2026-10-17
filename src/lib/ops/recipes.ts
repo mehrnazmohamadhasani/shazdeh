@@ -121,6 +121,20 @@ export async function previewRecipeCost(recipeId: string, lines: CostLine[]) {
   return { before, after };
 }
 
+/**
+ * What one portion of a new dish recipe (`lines`) would cost now. With a
+ * line that can't be priced the cost is null — never a sum that is too
+ * low — and `missing` names what has no price or approved recipe.
+ */
+export async function previewNewRecipeCost(lines: CostLine[]) {
+  const { ctx } = await loadCostContext();
+  const cost = costVersion({ status: "APPROVED", yieldQuantity: 1, lines }, ctx, []);
+  const missing = cost.issues.flatMap((i) => ("name" in i ? [i.name] : []));
+  const complete = !cost.issues.some((i) => i.kind !== "draft");
+  // Saved as a draft, so never "verified" (that needs an approved version), even with every price known.
+  return { perPortionFils: complete ? cost.perUnitFils : null, verified: false, missing: [...new Set(missing)] };
+}
+
 // ─── Reading ────────────────────────────────────────────────────────────────
 
 /** Every recipe with its current cost, plus the menu items that have none yet. */
@@ -159,6 +173,26 @@ export async function listRecipes() {
     // A dish recipe whose menu item was removed still shows, so nothing is lost.
     orphanDishes: rows.filter((r) => r.kind === "DISH" && !menuItems.some((m) => m.id === r.menuItemId)),
     preps: rows.filter((r) => r.kind === "PREP").sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+/** A dish's recipe at a glance (its page's recipe step): approved or not, and its cost; null when it has none. */
+export async function dishRecipeSummary(menuItemId: string) {
+  const recipe = await prisma.recipe.findUnique({ where: { menuItemId }, select: { id: true, menuItem: { select: { price: true } } } });
+  if (!recipe) return null;
+  const { ctx } = await loadCostContext();
+  const current = ctx.recipes.get(recipe.id)!;
+  const version = current.approved ?? current.draft;
+  const costed = version && version.lines.length ? costVersion(version, ctx, [recipe.id]) : null;
+  // A line with no price makes the sum too low: show it as unknown, never as a smaller number.
+  const cost = costed && !costed.issues.some((i) => i.kind !== "draft") ? costed : null;
+  return {
+    id: recipe.id,
+    hasApproved: !!current.approved,
+    hasDraft: !!current.draft,
+    perUnitFils: cost?.perUnitFils ?? null,
+    verified: cost?.verified ?? false,
+    foodCostPct: cost && recipe.menuItem ? dishMargin(cost.perUnitFils, recipe.menuItem.price).foodCostPct : null,
   };
 }
 
@@ -405,7 +439,7 @@ export async function discardDraft(id: string, actor: Actor, via = "manual") {
 }
 
 /** Only a recipe that was never approved and isn't used anywhere can be deleted. */
-export async function deleteRecipe(id: string, actor: Actor) {
+export async function deleteRecipe(id: string, actor: Actor, via = "manual") {
   return prisma.$transaction(async (tx) => {
     await lockRecipe(tx, id);
     const recipe = await tx.recipe.findUniqueOrThrow({ where: { id }, include: { versions: { include: { lines: true } }, _count: { select: { usedIn: true } } } });
@@ -418,6 +452,7 @@ export async function deleteRecipe(id: string, actor: Actor) {
         action: "recipe.delete",
         entity: "Recipe",
         entityId: id,
+        via,
         before: { name: recipe.name, kind: recipe.kind, lines: linesSnapshot(recipe.versions.flatMap((v) => v.lines)) },
       },
     });

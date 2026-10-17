@@ -3,14 +3,15 @@ import type { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { addMovement, recordCount } from "../catalog";
 import { OpsError, editInvoice, saveDocument } from "../documents";
-import { approveDraftTx, discardDraft, previewRecipeCost, writeDraft, type DraftLineInput } from "../recipes";
+import { approveDraftTx, deleteRecipe, discardDraft, previewNewRecipeCost, previewRecipeCost, writeDraft, type DraftLineInput } from "../recipes";
 import { dishMargin } from "../recipe-cost";
 import type { SaveInvoiceInput } from "../save-schema";
 import { itemRef, lastPrices, onHand, pick, valueOf, type Catalog } from "./catalog";
 import { bigCountDifference, checkDay, findByName, toStockUnit, type Named } from "./match";
 import { fixUnitPrice } from "./invoice-fix";
 import type { toolArgs } from "./definitions";
-import type { CountPreview, InvoicePreview, Preview, RecipePreview, StockPreview, WriteTool } from "./types";
+import { priceFreeFood, recordFreeFood, voidFreeFood } from "../free-food";
+import type { CountPreview, FreeFoodPreview, InvoicePreview, NewRecipePreview, Preview, RecipePreview, StockPreview, WriteTool } from "./types";
 
 /*
  * The assistant's changes, in three steps that never mix:
@@ -39,7 +40,25 @@ export type StoredInput =
       lines: DraftLineInput[];
       changes: RecipePreview["changes"];
     }
-  | { tool: "fix_invoice_price"; invoiceId: string; lineId: string; unitPriceFils: number };
+  | {
+      tool: "write_recipe";
+      menuItemId: string;
+      /** The dish's recipe if it exists already (an empty one); null: created on confirm. */
+      recipeId: string | null;
+      portions: number;
+      note: string | null;
+      lines: DraftLineInput[];
+      rows: NewRecipePreview["rows"];
+    }
+  | { tool: "fix_invoice_price"; invoiceId: string; lineId: string; unitPriceFils: number }
+  | {
+      tool: "record_free_food";
+      kind: FreeFoodPreview["type"];
+      day: string;
+      recipient: string | null;
+      reason: string | null;
+      items: { menuItemId: string; quantity: number }[];
+    };
 
 const UNIT_WORD = { G: "grams", ML: "millilitres", PCS: "pieces" } as const;
 
@@ -82,8 +101,26 @@ export async function build(tool: WriteTool, raw: unknown, catalog: Catalog, act
     }
     case "change_recipe":
       return buildRecipe(raw as Args<"change_recipe">, catalog, actor);
+    case "write_recipe":
+      return buildNewRecipe(raw as Args<"write_recipe">, catalog);
     case "fix_invoice_price":
       return buildInvoiceFix(raw as Args<"fix_invoice_price">, catalog, today);
+    case "record_free_food": {
+      const args = raw as Args<"record_free_food">;
+      const portions = new Map<string, number>();
+      for (const i of args.items) {
+        const dish = pick("Dish", i.dish, catalog.menuItems);
+        portions.set(dish.id, (portions.get(dish.id) ?? 0) + i.quantity);
+      }
+      return {
+        tool,
+        kind: args.kind,
+        day: day(args.day, today),
+        recipient: args.recipient?.trim() || null,
+        reason: args.reason?.trim() || null,
+        items: [...portions].map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
+      };
+    }
   }
 }
 
@@ -100,17 +137,7 @@ async function buildRecipe(args: Args<"change_recipe">, catalog: Catalog, actor:
   }
 
   // What a change may name: an ingredient, or a prep (not the recipe itself).
-  const prepRows = await prisma.recipe.findMany({
-    where: { kind: "PREP", id: { not: entry.id } },
-    select: { id: true, versions: { where: { status: { in: ["APPROVED", "DRAFT"] } }, select: { yieldUnit: true }, take: 1 } },
-  });
-  type Source = Named & { kind: "ingredient" | "prep"; unit: "G" | "ML" | "PCS" };
-  const sources: Source[] = [
-    ...catalog.ingredients.map((i): Source => ({ ...i, kind: "ingredient" })),
-    ...catalog.recipes
-      .filter((r) => r.kind === "PREP" && prepRows.some((p) => p.id === r.id))
-      .map((r): Source => ({ ...r, kind: "prep", unit: prepRows.find((p) => p.id === r.id)!.versions[0]?.yieldUnit ?? "G" })),
-  ];
+  const sources = await recipeSources(catalog, entry.id);
 
   const lines: DraftLineInput[] = approved.lines.map((l) => ({ ingredientId: l.ingredientId, subRecipeId: l.subRecipeId, quantity: l.quantity, wastePct: l.wastePct, note: l.note }));
   const changes: RecipePreview["changes"] = [];
@@ -135,6 +162,87 @@ async function buildRecipe(args: Args<"change_recipe">, catalog: Catalog, actor:
   }
   if (lines.length === 0) throw new OpsError("A recipe needs at least one ingredient.");
   return { tool: "change_recipe", recipeId: entry.id, fromVersionId: approved.id, approve: actor.role === "ADMIN", note: args.note?.trim() || null, lines, changes };
+}
+
+/** Ingredients and preps a recipe line may name, each with the unit it is measured in. */
+async function recipeSources(catalog: Catalog, exceptRecipeId: string | null) {
+  const prepRows = await prisma.recipe.findMany({
+    where: { kind: "PREP", ...(exceptRecipeId ? { id: { not: exceptRecipeId } } : {}) },
+    select: { id: true, versions: { where: { status: { in: ["APPROVED", "DRAFT"] } }, select: { yieldUnit: true }, take: 1 } },
+  });
+  type Source = Named & { kind: "ingredient" | "prep"; unit: "G" | "ML" | "PCS" };
+  return [
+    ...catalog.ingredients.map((i): Source => ({ ...i, kind: "ingredient" })),
+    ...catalog.recipes
+      .filter((r) => r.kind === "PREP" && prepRows.some((p) => p.id === r.id))
+      .map((r): Source => ({ ...r, kind: "prep", unit: prepRows.find((p) => p.id === r.id)!.versions[0]?.yieldUnit ?? "G" })),
+  ];
+}
+
+/** A dish's recipe may be written here only while it has none, or only an empty draft. */
+async function openDishRecipe(menuItemId: string, dishName: string) {
+  const existing = await prisma.recipe.findUnique({
+    where: { menuItemId },
+    select: { id: true, versions: { where: { status: { in: ["APPROVED", "DRAFT"] } }, select: { status: true, _count: { select: { lines: true } } } } },
+  });
+  if (existing?.versions.some((v) => v.status === "APPROVED")) {
+    throw new OpsError(`${dishName} already has an approved recipe. To change its amounts, ask for a recipe change instead.`, 409);
+  }
+  if (existing?.versions.some((v) => v._count.lines > 0)) {
+    throw new OpsError(`${dishName} already has a draft recipe with ingredients. Open it on the recipe screen to finish it, or discard it there first.`, 409);
+  }
+  return existing?.id ?? null;
+}
+
+/**
+ * A new dish recipe said or typed in one go. Every line must match the
+ * ingredient list (or a prep): all the names that don't are returned
+ * together, with the closest options, so the person can answer at once.
+ */
+async function buildNewRecipe(args: Args<"write_recipe">, catalog: Catalog): Promise<StoredInput> {
+  const dish = pick("Dish", args.dish, catalog.menuItems);
+  const recipeId = await openDishRecipe(dish.id, dish.name);
+  const sources = await recipeSources(catalog, recipeId);
+  const portions = args.portions ?? 1;
+  const unmatched: { said: string; problem: "not_found" | "ambiguous"; options: string[] }[] = [];
+  const merged = new Map<string, { source: (typeof sources)[number]; quantity: number; said: string[] }>();
+  for (const l of args.lines) {
+    const hit = findByName(l.item, sources);
+    if (!hit.ok) {
+      unmatched.push({ said: l.item, problem: hit.reason, options: (hit.reason === "ambiguous" ? hit.candidates : hit.suggestions).map((c) => c.name) });
+      continue;
+    }
+    const perPortion = amountIn(hit.item, l.quantity, l.unit) / portions;
+    const key = `${hit.item.kind}:${hit.item.id}`;
+    const row = merged.get(key);
+    if (row) {
+      row.quantity += perPortion;
+      row.said.push(l.item);
+    } else merged.set(key, { source: hit.item, quantity: perPortion, said: [l.item] });
+  }
+  if (unmatched.length) {
+    throw new OpsError(
+      `These aren't on the ingredient list as said: ${unmatched.map((u) => `"${u.said}"`).join(", ")}. Ask which ingredient each one is, offering the options; if it is new, it must be added on the Stock screen first.`,
+      409,
+      { unmatched },
+    );
+  }
+  const rows = [...merged.values()];
+  return {
+    tool: "write_recipe",
+    menuItemId: dish.id,
+    recipeId,
+    portions,
+    note: args.note?.trim() || null,
+    lines: rows.map((r) => ({
+      ingredientId: r.source.kind === "ingredient" ? r.source.id : null,
+      subRecipeId: r.source.kind === "prep" ? r.source.id : null,
+      quantity: r.quantity,
+      wastePct: 0,
+      note: null,
+    })),
+    rows: rows.map((r) => ({ said: r.said.join(", "), item: { name: r.source.name, nameFa: r.source.nameFa }, unit: r.source.unit, quantity: r.quantity })),
+  };
 }
 
 const invoiceLineSelect = {
@@ -227,8 +335,42 @@ export async function preview(input: StoredInput): Promise<{ preview: Preview; s
     }
     case "change_recipe":
       return { preview: await previewRecipe(input), sensitive: true };
+    case "write_recipe": {
+      // Checked again on confirm: someone may have written the recipe meanwhile.
+      const dish = await prisma.menuItem.findUnique({ where: { id: input.menuItemId }, select: { id: true, name: true, nameFa: true, price: true } });
+      if (!dish) throw new OpsError("That dish is no longer on the menu.", 404);
+      if ((await openDishRecipe(dish.id, dish.name)) !== input.recipeId) throw new OpsError(`${dish.name} changed since this was suggested. Ask again.`, 409);
+      const cost = await previewNewRecipeCost(input.lines);
+      const p: NewRecipePreview = {
+        kind: "new_recipe",
+        dish: { id: dish.id, name: dish.name, nameFa: dish.nameFa },
+        portions: input.portions,
+        rows: input.rows,
+        cost: { perPortionFils: cost.perPortionFils, verified: cost.verified, missingPrices: cost.missing },
+        menuPriceFils: Math.round(dish.price * 100),
+        foodCostPct: cost.perPortionFils == null ? null : dishMargin(cost.perPortionFils, dish.price).foodCostPct,
+        note: input.note,
+      };
+      // Only a draft: costs, stock and profit don't change until the owner approves it.
+      return { preview: p, sensitive: false };
+    }
     case "fix_invoice_price":
       return { preview: await previewInvoiceFix(input), sensitive: true };
+    case "record_free_food": {
+      const priced = await priceFreeFood(input.items);
+      const p: FreeFoodPreview = {
+        kind: "free_food",
+        type: input.kind,
+        day: input.day,
+        recipient: input.recipient,
+        reason: input.reason,
+        lines: priced.lines.map((l) => ({ name: l.name, nameFa: l.nameFa, quantity: l.quantity, unitCostFils: l.unitCostFils, menuPriceFils: l.menuPriceFils })),
+        costFils: priced.costFils,
+        menuValueFils: priced.menuValueFils,
+      };
+      // Undoable in one tap and no money changes hands: one confirmation is enough.
+      return { preview: p, sensitive: false };
+    }
   }
 }
 
@@ -303,8 +445,9 @@ async function previewInvoiceFix(input: Extract<StoredInput, { tool: "fix_invoic
 
 export type ApplyResult =
   | { movementIds: string[] }
-  | { recipeId: string; versionId: string; previousVersionId: string | null; approved: boolean }
-  | { invoiceId: string; previousInvoiceId: string; documentId: string; restore: SaveInvoiceInput };
+  | { recipeId: string; versionId: string; previousVersionId: string | null; approved: boolean; created?: boolean }
+  | { invoiceId: string; previousInvoiceId: string; documentId: string; restore: SaveInvoiceInput }
+  | { freeFoodId: string };
 
 const SPOKEN = { G: "g", ML: "ml", PCS: "pcs" } as const;
 const aed = (fils: number | null) => (fils == null ? null : fils / 100);
@@ -383,6 +526,29 @@ export async function apply(input: StoredInput, actor: Actor, via: string, sourc
         return { recipeId: input.recipeId, versionId: done.versionId, previousVersionId: done.previousVersionId, approved: true };
       });
     }
+    case "write_recipe":
+      return prisma.$transaction(async (tx) => {
+        let recipeId = input.recipeId;
+        const created = !recipeId;
+        if (!recipeId) {
+          const dish = await tx.menuItem.findUniqueOrThrow({ where: { id: input.menuItemId }, select: { name: true, nameFa: true } });
+          const clash = await tx.recipe.findFirst({ where: { name: { equals: dish.name, mode: "insensitive" } }, select: { menuItemId: true } });
+          if (clash) throw new OpsError(`A recipe called "${dish.name}" already exists. Ask again.`, 409);
+          const recipe = await tx.recipe.create({ data: { kind: "DISH", name: dish.name, nameFa: dish.nameFa, menuItemId: input.menuItemId } });
+          await tx.auditLog.create({
+            data: { actor: actor.email, action: "recipe.create", entity: "Recipe", entityId: recipe.id, via, after: { kind: "DISH", name: dish.name, menuItemId: input.menuItemId } },
+          });
+          recipeId = recipe.id;
+        }
+        const draft = await writeDraft(
+          tx,
+          recipeId,
+          { yieldQuantity: 1, yieldUnit: "PCS", note: input.note ?? (input.portions > 1 ? `Said for ${input.portions} portions` : null), lines: input.lines },
+          actor,
+          { documentId: sourceDocumentId, via },
+        );
+        return { recipeId, versionId: draft.versionId, previousVersionId: null, approved: false, created };
+      });
     case "fix_invoice_price": {
       const r = await resaveInvoice(
         input.invoiceId,
@@ -405,7 +571,19 @@ export async function apply(input: StoredInput, actor: Actor, via: string, sourc
       );
       return { invoiceId: r.invoiceId, previousInvoiceId: input.invoiceId, documentId: r.documentId, restore: r.before };
     }
+    case "record_free_food": {
+      const r = await recordFreeFood(
+        { kind: input.kind, day: input.day, items: input.items, recipient: input.recipient, reason: input.reason },
+        actor,
+        { via, sourceDocumentId },
+      );
+      return { freeFoodId: r.id };
+    }
   }
+}
+
+async function saveEmptyDraft(recipeId: string, actor: Actor, via: string) {
+  await prisma.$transaction((tx) => writeDraft(tx, recipeId, { yieldQuantity: 1, yieldUnit: "PCS", note: null, lines: [] }, actor, { documentId: null, via }));
 }
 
 /** Takes an applied change back. Nothing is deleted: the ledger gets opposite entries, recipes a new version. */
@@ -429,6 +607,12 @@ export async function undo(tool: WriteTool, result: ApplyResult, actor: Actor, v
     const versions = await prisma.recipeVersion.findMany({ where: { recipeId: result.recipeId, status: { in: ["APPROVED", "DRAFT"] } }, select: { id: true, status: true } });
     if (!result.approved) {
       if (!versions.some((v) => v.id === result.versionId && v.status === "DRAFT")) throw new OpsError("That draft was already approved or discarded.", 409);
+      // A recipe written here from nothing goes away; an empty one it filled is emptied again.
+      if (tool === "write_recipe") {
+        if (result.created) await deleteRecipe(result.recipeId, actor, via);
+        else await saveEmptyDraft(result.recipeId, actor, via);
+        return;
+      }
       await discardDraft(result.recipeId, actor, via);
       return;
     }
@@ -453,6 +637,10 @@ export async function undo(tool: WriteTool, result: ApplyResult, actor: Actor, v
       );
       await approveDraftTx(tx, result.recipeId, actor, via);
     });
+    return;
+  }
+  if ("freeFoodId" in result) {
+    await voidFreeFood(result.freeFoodId, actor, via);
     return;
   }
   await resaveInvoice(result.invoiceId, () => result.restore, actor, via);

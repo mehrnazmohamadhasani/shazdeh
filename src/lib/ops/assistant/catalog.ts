@@ -13,14 +13,17 @@ import type { ItemRef } from "./types";
 export type IngredientEntry = Named & { unit: "G" | "ML" | "PCS"; lowStockAt: number | null };
 export type RecipeEntry = Named & { kind: "DISH" | "PREP"; menuItemId: string | null; menuPriceAed: number | null };
 export type SupplierEntry = Named;
+export type MenuEntry = Named;
 
 export async function loadCatalog() {
-  const [ingredients, recipes, suppliers, aliases, supplierItems] = await Promise.all([
+  const [ingredients, recipes, suppliers, aliases, supplierItems, menuItems, menuAliases] = await Promise.all([
     prisma.ingredient.findMany({ select: { id: true, name: true, nameFa: true, unit: true, lowStockAt: true } }),
     prisma.recipe.findMany({ select: { id: true, name: true, nameFa: true, kind: true, menuItemId: true, menuItem: { select: { name: true, nameFa: true, price: true } } } }),
     prisma.supplier.findMany({ select: { id: true, name: true } }),
     prisma.recipeNameAlias.findMany({ select: { rawName: true, ingredientId: true, recipeId: true } }),
     prisma.supplierItem.findMany({ select: { rawName: true, ingredientId: true } }),
+    prisma.menuItem.findMany({ where: { isActive: true }, select: { id: true, name: true, nameFa: true } }),
+    prisma.menuItemAlias.findMany({ select: { rawName: true, menuItemId: true } }),
   ]);
   const aliasesOf = (pick: (a: { ingredientId: string | null; recipeId: string | null }) => string | null, id: string) =>
     aliases.filter((a) => pick(a) === id).map((a) => a.rawName);
@@ -43,6 +46,8 @@ export async function loadCatalog() {
       }),
     ),
     suppliers: suppliers.map((s): SupplierEntry => ({ ...s, nameFa: null })),
+    // Menu dishes, with the names platforms print for them (learned from receipts).
+    menuItems: menuItems.map((m): MenuEntry => ({ ...m, aliases: menuAliases.filter((a) => a.menuItemId === m.id).map((a) => a.rawName) })),
   };
 }
 

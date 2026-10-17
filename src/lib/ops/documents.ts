@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { canReadAgain } from "./document-state";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -105,9 +105,10 @@ async function reopenDocument(
 
 /** "Read again" from a document's page. Saved documents and ones waiting for review are left alone. */
 export async function readAgain(id: string, actor: { email: string }) {
-  const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { id: true, status: true, kind: true, updatedAt: true } });
+  const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { id: true, status: true, kind: true, updatedAt: true, mimeType: true } });
   if (!doc) throw new OpsError("Document not found.", 404);
   if (doc.status === "SAVED") throw new OpsError("Already saved.", 409);
+  if (doc.mimeType === MANUAL_MIME) throw new OpsError("This invoice was typed in — there is no photo to read.");
   // Waiting for review: reading again replaces the reading (as before), no reopening needed.
   if (doc.status !== "NEEDS_REVIEW") {
     if (!canReadAgain(doc)) throw new OpsError("Still reading — refresh in a moment.", 409);
@@ -176,10 +177,11 @@ async function autoSaveInvoice(id: string, reading: Extraction, suggestions: Sug
   }
 }
 
+/** Documents still to check (reading, waiting for review, or failed); saved ones are listed as invoices. */
 export async function listDocuments() {
   return prisma.opsDocument.findMany({
     // Recipe photos and platform receipts have their own lists.
-    where: { kind: "supplier_invoice" },
+    where: { kind: "supplier_invoice", status: { in: ["PROCESSING", "NEEDS_REVIEW", "FAILED"] } },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
@@ -187,6 +189,7 @@ export async function listDocuments() {
       status: true,
       autoSaved: true,
       createdAt: true,
+      mimeType: true,
       originalName: true,
       extraction: true,
       error: true,
@@ -213,7 +216,7 @@ export async function getDocument(id: string) {
       voidedInvoices: { orderBy: { voidedAt: "desc" }, take: 1, select: { voidedAt: true, voidReason: true } },
       invoice: {
         include: {
-          supplier: { select: { name: true } },
+          supplier: { select: { name: true, trn: true, phone: true, paymentTermsDays: true } },
           lines: { include: { ingredient: { select: { name: true, unit: true } } } },
         },
       },
@@ -299,6 +302,17 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
         ingredientIds.push(ingredient.id);
       }
 
+      // Saved again after an edit: keep how it was paid (payer, own money,
+      // receipt, and a credit invoice's payment) when the method is unchanged.
+      const before = await tx.purchaseInvoice.findFirst({
+        where: { voidedDocumentId: id },
+        orderBy: { voidedAt: "desc" },
+        select: { paymentMode: true, paidAt: true, paidBy: true, paidPersonally: true, paymentNote: true, paymentReceiptId: true, paymentReceiptKind: true },
+      });
+      const kept = before?.paidAt && before.paymentMode === input.paymentMode ? before : null;
+      const paidAt = input.paymentMode && !credit ? at : (kept?.paidAt ?? null);
+      const paidBy = (input.paymentMode && !credit ? input.paidBy : null) ?? kept?.paidBy ?? null;
+
       const invoice = await tx.purchaseInvoice.create({
         data: {
           documentId: id,
@@ -313,9 +327,14 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
           totalFils: toFils(input.total),
           notes: input.notes,
           dueDate,
-          // Cash, card and transfers are paid on the spot; credit waits in payables.
-          paidAt: input.paymentMode && !credit ? at : null,
-          paidBy: input.paymentMode && !credit ? input.paidBy : null,
+          // Cash, card and transfers are paid on the spot; credit waits until marked paid.
+          paidAt,
+          paidBy,
+          // A name on a cash or card payment: paid from their pocket (Owner cash).
+          paidPersonally: kept ? kept.paidPersonally : !!paidBy && (input.paymentMode === "cash" || input.paymentMode === "card"),
+          paymentNote: kept?.paymentNote ?? null,
+          paymentReceiptId: kept?.paymentReceiptId ?? null,
+          paymentReceiptKind: kept?.paymentReceiptKind ?? null,
           createdById: actor.id,
         },
       });
@@ -533,38 +552,6 @@ export async function editInvoice(invoiceId: string, actor: { id: string; email:
   return { documentId: inv.document.id };
 }
 
-/** Record payment of a credit invoice. */
-export async function markInvoicePaid(
-  invoiceId: string,
-  input: { paidOn: string; paidBy: string | null; note: string | null },
-  actor: { email: string },
-) {
-  const invoice = await prisma.purchaseInvoice.findUnique({ where: { id: invoiceId }, select: { paidAt: true, voidedAt: true } });
-  if (!invoice) throw new OpsError("Invoice not found.", 404);
-  if (invoice.voidedAt) throw new OpsError("This invoice was undone.", 409);
-  if (invoice.paidAt) throw new OpsError("Already marked as paid.", 409);
-  const paidAt = dubaiDate(input.paidOn);
-  await prisma.$transaction(async (tx) => {
-    // Conditional update: of two clicks at the same moment, only one
-    // marks it paid (and writes the audit entry); the other gets a 409.
-    const { count } = await tx.purchaseInvoice.updateMany({
-      where: { id: invoiceId, paidAt: null, voidedAt: null },
-      data: { paidAt, paidBy: input.paidBy, paymentNote: input.note },
-    });
-    if (count === 0) throw new OpsError("Already marked as paid.", 409);
-    await tx.auditLog.create({
-      data: {
-        actor: actor.email,
-        action: "purchase_invoice.pay",
-        entity: "PurchaseInvoice",
-        entityId: invoiceId,
-        before: { paidAt: null },
-        after: { paidAt: paidAt.toISOString(), paidBy: input.paidBy, note: input.note },
-      },
-    });
-  });
-}
-
 export async function discardDocument(id: string, actor: { email: string }) {
   const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { status: true } });
   if (!doc) throw new OpsError("Document not found.", 404);
@@ -616,4 +603,209 @@ export async function stockSummary() {
         : null,
     };
   });
+}
+
+// ─── Invoices list, payment, manual entry ───────────────────────────────────
+
+/** A document typed in by hand instead of photographed: no file, the same review and save. */
+export const MANUAL_MIME = "application/x-shazdeh-manual";
+
+/**
+ * Saved invoices (not undone), newest invoice date first, with what the
+ * Invoices screen shows: supplier and phone, payment method and whether
+ * it is paid. `unpaid` keeps only the ones not paid yet; `from`/`to`
+ * keep one stretch of invoice dates (a month).
+ */
+export async function listInvoices(opts: { unpaid?: boolean; from?: Date; to?: Date } = {}) {
+  return prisma.purchaseInvoice.findMany({
+    where: {
+      voidedAt: null,
+      ...(opts.unpaid ? { paidAt: null } : {}),
+      ...(opts.from || opts.to ? { invoiceDate: { ...(opts.from ? { gte: opts.from } : {}), ...(opts.to ? { lt: opts.to } : {}) } } : {}),
+    },
+    orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }],
+    take: 500,
+    select: {
+      id: true,
+      documentId: true,
+      invoiceNo: true,
+      invoiceDate: true,
+      totalFils: true,
+      paymentMode: true,
+      paidAt: true,
+      paidBy: true,
+      paidPersonally: true,
+      paymentReceiptId: true,
+      paymentReceiptKind: true,
+      dueDate: true,
+      createdAt: true,
+      supplier: { select: { id: true, name: true, phone: true } },
+      document: { select: { mimeType: true, autoSaved: true } },
+    },
+  });
+}
+
+/** How many saved invoices each month has ("2026-10" → 12, Dubai months) — for the month picker. */
+export async function invoiceMonthCounts() {
+  const rows = await prisma.purchaseInvoice.findMany({ where: { voidedAt: null }, select: { invoiceDate: true } });
+  const counts: Record<string, number> = {};
+  for (const r of rows) {
+    const m = new Date(r.invoiceDate.getTime() + 4 * 3_600_000).toISOString().slice(0, 7);
+    counts[m] = (counts[m] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export const PAYMENT_METHODS = ["cash", "card", "transfer", "credit"] as const;
+/** Proof of payment: a card slip, a bank transfer, or a card-to-card screenshot. */
+export const RECEIPT_KINDS = ["card", "bank", "card_to_card"] as const;
+
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+export type ReceiptFile = { data: Buffer; mimeType: string; name: string | null };
+
+/** Stores a payment receipt once; the same photo again (one transfer for two invoices) reuses it. */
+async function storeReceipt(tx: Tx, file: ReceiptFile, actorId: string) {
+  const sha256 = `receipt-${createHash("sha256").update(file.data).digest("hex")}`;
+  const existing = await tx.opsDocument.findUnique({ where: { sha256 }, select: { id: true } });
+  if (existing) return existing.id;
+  const doc = await tx.opsDocument.create({
+    data: {
+      kind: "payment_receipt",
+      status: "SAVED",
+      sha256,
+      mimeType: file.mimeType,
+      sizeBytes: file.data.length,
+      data: new Uint8Array(file.data),
+      originalName: file.name,
+      uploadedById: actorId,
+    },
+    select: { id: true },
+  });
+  return doc.id;
+}
+
+/** Deletes a receipt no invoice points to any more (one still in an invoice's history is kept). */
+async function dropReceiptIfUnused(tx: Tx, id: string) {
+  if ((await tx.purchaseInvoice.count({ where: { paymentReceiptId: id } })) === 0) {
+    await tx.opsDocument.deleteMany({ where: { id, kind: "payment_receipt" } });
+  }
+}
+
+/**
+ * Sets how an invoice is paid and whether it is paid — the Payment box on
+ * the Invoices screen. "credit" (on account) keeps a due date from the
+ * supplier's terms; paid or not is a separate tick for every method. A
+ * payment made with someone's own money counts in Owner cash as owed to
+ * them; a receipt photo can be kept as proof.
+ */
+export async function setInvoicePayment(
+  invoiceId: string,
+  input: {
+    method: (typeof PAYMENT_METHODS)[number];
+    paid: boolean;
+    paidOn: string | null;
+    paidBy: string | null;
+    personal: boolean;
+    receiptKind: (typeof RECEIPT_KINDS)[number] | null;
+    receipt: ReceiptFile | null;
+    removeReceipt: boolean;
+  },
+  actor: { id: string; email: string },
+) {
+  if (input.paid && input.personal && !input.paidBy) throw new OpsError("Write who paid with their own money.");
+  return prisma.$transaction(async (tx) => {
+    const inv = await tx.purchaseInvoice.findUnique({
+      where: { id: invoiceId },
+      select: {
+        invoiceDate: true,
+        voidedAt: true,
+        paymentMode: true,
+        paidAt: true,
+        paidBy: true,
+        paidPersonally: true,
+        dueDate: true,
+        paymentReceiptId: true,
+        paymentReceiptKind: true,
+        supplier: { select: { paymentTermsDays: true } },
+      },
+    });
+    if (!inv) throw new OpsError("Invoice not found.", 404);
+    if (inv.voidedAt) throw new OpsError("This invoice is being edited; save it first.", 409);
+    const paidAt = input.paid ? (input.paidOn ? dubaiDate(input.paidOn) : inv.paidAt ?? inv.invoiceDate) : null;
+    const dueDate =
+      input.method === "credit"
+        ? (inv.dueDate ?? (inv.supplier.paymentTermsDays != null ? new Date(inv.invoiceDate.getTime() + inv.supplier.paymentTermsDays * DAY_MS) : null))
+        : null;
+    // Not paid: no payer and no receipt. Otherwise a new photo replaces the old one.
+    let receiptId = input.paid && !input.removeReceipt ? inv.paymentReceiptId : null;
+    if (input.paid && input.receipt) receiptId = await storeReceipt(tx, input.receipt, actor.id);
+    const receiptKind = receiptId ? (input.receiptKind ?? inv.paymentReceiptKind ?? "card") : null;
+    const after = {
+      paymentMode: input.method,
+      paidAt,
+      paidBy: input.paid ? input.paidBy : null,
+      paidPersonally: input.paid && input.personal,
+      paymentReceiptId: receiptId,
+      paymentReceiptKind: receiptKind,
+    };
+    await tx.purchaseInvoice.update({ where: { id: invoiceId }, data: { ...after, dueDate } });
+    if (inv.paymentReceiptId && inv.paymentReceiptId !== receiptId) await dropReceiptIfUnused(tx, inv.paymentReceiptId);
+    await tx.auditLog.create({
+      data: {
+        actor: actor.email,
+        action: "purchase_invoice.payment",
+        entity: "PurchaseInvoice",
+        entityId: invoiceId,
+        before: {
+          paymentMode: inv.paymentMode,
+          paidAt: inv.paidAt?.toISOString() ?? null,
+          paidBy: inv.paidBy,
+          paidPersonally: inv.paidPersonally,
+          paymentReceiptId: inv.paymentReceiptId,
+          paymentReceiptKind: inv.paymentReceiptKind,
+        },
+        after: { ...after, paidAt: paidAt?.toISOString() ?? null },
+      },
+    });
+  });
+}
+
+/** Starts an invoice typed in by hand: an empty reading on the usual review screen. */
+export async function startManualInvoice(actor: { id: string; email: string }) {
+  const today = new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
+  const reading: Extraction = {
+    documentType: "supplier_invoice",
+    handwritten: false,
+    supplier: { name: null, trn: null, phone: null },
+    invoiceNumber: null,
+    invoiceDate: today,
+    paymentMode: null,
+    currency: "AED",
+    pricesIncludeVat: false,
+    lines: [],
+    subtotal: null,
+    discount: null,
+    vat: null,
+    total: 0,
+    notes: null,
+    confidence: 1,
+  };
+  const suggestions: Suggestions = { supplierId: null, supplierName: null, lines: [] };
+  const doc = await prisma.opsDocument.create({
+    data: {
+      kind: "supplier_invoice",
+      status: "NEEDS_REVIEW",
+      // No file: a unique marker keeps the dedupe hash out of the way.
+      sha256: `manual-${randomUUID()}`,
+      mimeType: MANUAL_MIME,
+      sizeBytes: 0,
+      data: new Uint8Array(),
+      originalName: null,
+      extraction: { reading, suggestions } as unknown as Prisma.InputJsonValue,
+      uploadedById: actor.id,
+    },
+    select: { id: true },
+  });
+  await prisma.auditLog.create({ data: { actor: actor.email, action: "document.manual", entity: "OpsDocument", entityId: doc.id } });
+  return doc.id;
 }

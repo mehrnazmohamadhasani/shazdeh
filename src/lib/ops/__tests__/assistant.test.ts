@@ -5,6 +5,7 @@ import { fixUnitPrice, type FixInvoice } from "../assistant/invoice-fix";
 import { mayUse, openAiTools, toolArgs, toolsFor } from "../assistant/definitions";
 import { secondsCostMicroUsd, voiceCostMicroUsd, voicePrices } from "../ai-price";
 import { conversationTitle, moneyForModel, pricePerBigUnit, replyLanguage } from "../assistant/model-format";
+import { freeFoodTotals, summariseFreeFood } from "../free-food-shared";
 
 /*
  * The voice and chat assistant (M4): names said in Persian, English or
@@ -159,6 +160,21 @@ test("tool arguments are checked before anything runs", () => {
   assert.ok(toolArgs.change_recipe.safeParse({ recipe: "Ghormeh", changes: [{ item: "beef", quantity: null, unit: "g" }], note: null }).success);
 });
 
+test("a dictated recipe: owner and manager only, every line with an amount and unit", () => {
+  assert.ok(toolsFor("ADMIN").includes("write_recipe") && toolsFor("EDITOR").includes("write_recipe"));
+  assert.ok(!mayUse("PURCHASER", "write_recipe"));
+  const ok = { dish: "قرمه سبزی", portions: 10, lines: [{ item: "lamb", quantity: 1.2, unit: "kg" }, { item: "سبزی", quantity: 800, unit: "g" }], note: null };
+  assert.ok(toolArgs.write_recipe.safeParse(ok).success);
+  assert.ok(toolArgs.write_recipe.safeParse({ ...ok, portions: null }).success);
+  assert.ok(!toolArgs.write_recipe.safeParse({ ...ok, lines: [] }).success, "no lines");
+  assert.ok(!toolArgs.write_recipe.safeParse({ ...ok, lines: [{ item: "lamb", quantity: 0, unit: "g" }] }).success, "zero amount");
+  assert.ok(!toolArgs.write_recipe.safeParse({ ...ok, lines: [{ item: "lamb", quantity: 2, unit: "handful" }] }).success, "no weight");
+  assert.ok(!toolArgs.write_recipe.safeParse({ ...ok, portions: 0 }).success, "zero portions");
+  // The model's strict schema asks for the same fields the server checks.
+  const schema = openAiTools("ADMIN").find((t) => t.name === "write_recipe")!.parameters as { required: string[] };
+  assert.deepEqual([...schema.required].sort(), Object.keys(toolArgs.write_recipe.shape).sort());
+});
+
 test("speech-to-text is priced at its own rates", () => {
   const p = voicePrices({});
   assert.deepEqual(p, { inputPerMTok: 6, outputPerMTok: 10, textInputPerMTok: 2.5 });
@@ -191,4 +207,25 @@ test("a conversation is named after its first message, on one line", () => {
   const long = conversationTitle("x".repeat(100));
   assert.equal(long.length, 60);
   assert.ok(long.endsWith("…"));
+});
+
+test("free food: the cost is unknown as soon as one dish has none, never counted as zero", () => {
+  assert.deepEqual(
+    freeFoodTotals([
+      { quantity: 2, unitCostFils: 1_850, menuPriceFils: 12_800 },
+      { quantity: 1, unitCostFils: 600, menuPriceFils: 3_600 },
+    ]),
+    { costFils: 4_300, menuValueFils: 29_200, portions: 3 },
+  );
+  assert.equal(freeFoodTotals([{ quantity: 2, unitCostFils: 1_850, menuPriceFils: 12_800 }, { quantity: 1, unitCostFils: null, menuPriceFils: 9_800 }]).costFils, null);
+  const s = summariseFreeFood([
+    { kind: "STAFF_MEAL", costFils: 3_000, menuValueFils: 20_000, portions: 4 },
+    { kind: "GIFT", costFils: null, menuValueFils: 9_800, portions: 1 },
+    { kind: "STAFF_MEAL", costFils: 1_000, menuValueFils: 5_000, portions: 1 },
+  ]);
+  assert.deepEqual(s.byKind.map((k) => [k.kind, k.portions, k.costFils]), [["STAFF_MEAL", 5, 4_000], ["GIFT", 1, null]]);
+  assert.equal(s.knownCostFils, 4_000);
+  assert.equal(s.unknownRecords, 1);
+  assert.ok(toolsFor("PURCHASER").includes("record_free_food"));
+  assert.ok(!toolsFor("STAFF").includes("record_free_food"));
 });

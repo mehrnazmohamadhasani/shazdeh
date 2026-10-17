@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 import { CMS_ROLES } from "@/lib/api";
 import { dubaiToday, pickDay, todaySummary, type TodaySummary } from "@/lib/ops/today";
 import type { ProfitGap } from "@/lib/ops/profit";
+import { FREE_FOOD_LABEL } from "@/lib/ops/free-food-shared";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import type { AdminI18n } from "@/lib/admin-i18n";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,7 @@ function SalesCard({ summary, i18n }: { summary: TodaySummary; i18n: AdminI18n }
 function ProfitCard({ summary, i18n }: { summary: TodaySummary; i18n: AdminI18n }) {
   const { t, money } = i18n;
   const { covered, salesFils, orders, gaps } = summary.profit;
+  const free = summary.freeFood;
   const unknown = orders > 0 && covered.orders === 0;
   const complete = orders > 0 && covered.orders === orders;
   return (
@@ -115,6 +117,28 @@ function ProfitCard({ summary, i18n }: { summary: TodaySummary; i18n: AdminI18n 
           <Line label={t("Food cost (approved recipes)")} value={`− ${money(covered.foodCostFils)}`} />
           <Line label={t("Platform fees (fee rules)")} value={`− ${money(covered.feesFils)}`} />
         </dl>
+      )}
+
+      {/* Staff meals, gifts… a cost with no sale: shown next to the profit, never hidden in it. */}
+      {free.portions > 0 && (
+        <div className="border-t border-black-iron/[0.06] px-5 py-3.5 text-[14px] md:px-6">
+          <Link href="/admin/ops/free-food" className="flex items-center justify-between gap-3 hover:underline">
+            <span className="text-dark-grey">{t("Free food (no sale)")}</span>
+            <span className="tabular-nums">
+              {free.unknownRecords === free.byKind.reduce((n, k) => n + k.records, 0) ? t("Food cost not known yet") : `− ${money(free.knownCostFils)}`}
+            </span>
+          </Link>
+          <p className="mt-0.5 text-[12.5px] text-dark-grey">
+            {free.byKind.map((k) => `${t(FREE_FOOD_LABEL[k.kind])} ${k.portions}`).join(" · ")}
+            {free.unknownRecords > 0 && ` · ${t("some costs unknown")}`}
+          </p>
+          {complete && free.unknownRecords === 0 && (
+            <div className="mt-2 flex items-center justify-between gap-3 font-semibold">
+              <span>{t("Profit after free food")}</span>
+              <span className="tabular-nums">{money(covered.profitFils - free.knownCostFils)}</span>
+            </div>
+          )}
+        </div>
       )}
 
       {gaps.length > 0 && (
@@ -207,14 +231,14 @@ function AlertsCard({ alerts: a, i18n }: { alerts: TodaySummary["alerts"]; i18n:
   if (a.ai.level === "reached")
     alerts.push({ href: "/admin/ops/settings", label: t("AI limit reached — photos are not read"), note: t("{spent} of {cap} this month", { spent: usd(a.ai.spentUsd), cap: usd(a.ai.capUsd) }), tone: "bad" });
   if (a.credit.overdue.count)
-    alerts.push({ href: "/admin/ops/payables", label: t("Credit invoices overdue"), value: money(a.credit.overdue.fils), note: invoices(a.credit.overdue.count), tone: "bad" });
+    alerts.push({ href: "/admin/ops/invoices?show=unpaid", label: t("Credit invoices overdue"), value: money(a.credit.overdue.fils), note: invoices(a.credit.overdue.count), tone: "bad" });
   if (a.stock.negative.length)
     alerts.push({ href: "/admin/ops/stock", label: t("Stock below zero — count needed"), value: String(a.stock.negative.length), note: list(a.stock.negative), tone: "bad" });
   if (a.receiptsToCheck) alerts.push({ href: "/admin/ops/sales", label: t("Platform receipts to check"), value: String(a.receiptsToCheck), tone: "accent" });
   if (a.invoicesToCheck) alerts.push({ href: "/admin/ops/invoices", label: t("Invoices to check"), value: String(a.invoicesToCheck), tone: "accent" });
   if (a.recipePhotosToCheck) alerts.push({ href: "/admin/ops/recipes", label: t("Recipe photos to check"), value: String(a.recipePhotosToCheck), tone: "accent" });
   if (a.credit.soon.count)
-    alerts.push({ href: "/admin/ops/payables", label: t("Credit invoices due in 3 days"), value: money(a.credit.soon.fils), note: invoices(a.credit.soon.count), tone: "warn" });
+    alerts.push({ href: "/admin/ops/invoices?show=unpaid", label: t("Credit invoices due in 3 days"), value: money(a.credit.soon.fils), note: invoices(a.credit.soon.count), tone: "warn" });
   if (a.stock.low.length)
     alerts.push({
       href: "/admin/ops/stock",

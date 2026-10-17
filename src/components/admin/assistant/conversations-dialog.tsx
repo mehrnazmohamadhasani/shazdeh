@@ -117,7 +117,7 @@ export function ConversationsDialog({
                         onClick={() => setAsking(null)}
                         className="h-10 rounded-full px-4 text-[13px] text-dark-grey hover:bg-black-iron/[0.05]"
                       >
-                        {t("Keep")}
+                        {t("Cancel")}
                       </button>
                     </div>
                   ) : (

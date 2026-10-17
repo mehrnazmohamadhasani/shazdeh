@@ -94,12 +94,15 @@ export function NewDishRecipeButton({ menuItemId }: { menuItemId: string }) {
 export function NewRecipeDialog({
   dishes,
   kind: initialKind = "DISH",
+  onlyKind = false,
   label,
   variant = "primary",
 }: {
   /** Menu dishes that have no recipe yet. */
   dishes: { id: string; name: string; nameFa: string | null }[];
   kind?: "DISH" | "PREP";
+  /** Only `kind`, no dish / prep choice (the Recipes screen's "New prep"). */
+  onlyKind?: boolean;
   label?: string;
   variant?: "primary" | "outline";
 }) {
@@ -141,8 +144,9 @@ export function NewRecipeDialog({
             });
           }}
         >
-          <DialogTitle className="text-[22px] font-bold text-black-iron">{t("New recipe")}</DialogTitle>
+          <DialogTitle className="text-[22px] font-bold text-black-iron">{onlyKind && kind === "PREP" ? t("New prep") : t("New recipe")}</DialogTitle>
           <DialogDescription className="sr-only">{t("A dish or a prep")}</DialogDescription>
+          {!onlyKind && (
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("Kind")}>
             {(["DISH", "PREP"] as const).map((k) => (
               <button
@@ -161,6 +165,7 @@ export function NewRecipeDialog({
               </button>
             ))}
           </div>
+          )}
           {kind === "DISH" && (
             <Field label={t("Which dish?")}>
               <Select value={menuItemId} onChange={(e) => setMenuItemId(e.target.value)}>

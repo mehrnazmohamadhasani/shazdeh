@@ -77,12 +77,15 @@ export function InvoiceReview({
   suggestions,
   suppliers,
   ingredients,
+  manual = false,
 }: {
   documentId: string;
   reading: Extraction;
   suggestions: Suggestions;
   suppliers: KnownSupplier[];
   ingredients: KnownIngredient[];
+  /** Typed in by hand: there is no photo to read again. */
+  manual?: boolean;
 }) {
   const { t, locale } = useAdminI18n();
   const router = useRouter();
@@ -532,9 +535,11 @@ export function InvoiceReview({
           <StatusPill tone="good">{t("Numbers add up")}</StatusPill>
         )}
         <div className="ms-auto flex gap-1">
-          <Button variant="ghost" size="sm" onClick={readAgain} disabled={!!busy}>
-            {busy === "read" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} {t("Read again")}
-          </Button>
+          {!manual && (
+            <Button variant="ghost" size="sm" onClick={readAgain} disabled={!!busy}>
+              {busy === "read" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} {t("Read again")}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={discard} disabled={!!busy} className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]">
             {t("Discard")}
           </Button>
