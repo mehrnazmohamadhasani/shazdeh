@@ -17,9 +17,10 @@ export async function generateMetadata() {
   return { title: t("Recipe photo") };
 }
 
-export default async function RecipeImportPage({ params }: { params: Promise<{ id: string }> }) {
-  const [{ t, intl }, { id }] = await Promise.all([getAdminI18n(), params]);
-  const data = await getRecipeImport(id);
+export default async function RecipeImportPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ dish?: string }> }) {
+  const [{ t, intl }, { id }, { dish }] = await Promise.all([getAdminI18n(), params, searchParams]);
+  // Added from a dish's page: the recipe is for that dish.
+  const data = await getRecipeImport(id, dish?.slice(0, 40) ?? null);
   if (!data) notFound();
   const { doc, reading } = data;
   const fileUrl = `/api/admin/ops/documents/${doc.id}/file`;

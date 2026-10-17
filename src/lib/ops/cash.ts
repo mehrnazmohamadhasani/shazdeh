@@ -1,34 +1,32 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { OpsError, dubaiDate } from "./documents";
-import { cashBalances } from "./cash-balance";
+import { cashBalances, cashByMonth, personKey } from "./cash-balance";
 
 /*
- * Owner cash. The owner (or a staff member) pays suppliers in cash or by
- * card, takes the money back from the business account, and must present
- * the invoices. Withdrawals are recorded here; the invoices are the
- * cash/card purchase invoices whose "Paid by" is that person. The
- * balance shows cash still waiting for invoices, or money owed to them.
+ * Owner cash. The owner (or a staff member) pays suppliers with their own
+ * money or with cash taken from the business account, and must present
+ * the invoices. Withdrawals (money taken, or paid back to them) are
+ * recorded here; the invoices are the ones marked "paid with own money"
+ * by that person. The balance shows cash still waiting for invoices, or
+ * money the business owes them — also month by month.
  */
 
 type Actor = { id: string; email: string };
-
-/** Invoices paid on the spot by a person (not credit invoices paid later from the business account). */
-const PRESENTED_MODES = ["cash", "card"];
 
 export async function ownerCash() {
   const [withdrawals, invoices] = await Promise.all([
     prisma.cashWithdrawal.findMany({ where: { voidedAt: null }, orderBy: { at: "desc" } }),
     prisma.purchaseInvoice.findMany({
-      where: { voidedAt: null, paidBy: { not: null }, paymentMode: { in: PRESENTED_MODES } },
-      orderBy: { invoiceDate: "desc" },
-      select: { id: true, documentId: true, invoiceNo: true, invoiceDate: true, totalFils: true, paidBy: true, supplier: { select: { name: true } } },
+      where: { voidedAt: null, paidPersonally: true, paidBy: { not: null }, paidAt: { not: null } },
+      orderBy: { paidAt: "desc" },
+      select: { id: true, documentId: true, invoiceNo: true, invoiceDate: true, paidAt: true, totalFils: true, paidBy: true, supplier: { select: { name: true } } },
     }),
   ]);
-  const people = cashBalances(
-    withdrawals.map((w) => ({ person: w.person, amountFils: w.amountFils })),
-    invoices.map((i) => ({ person: i.paidBy!, amountFils: i.totalFils })),
-  );
+  const taken = withdrawals.map((w) => ({ person: w.person, amountFils: w.amountFils, at: w.at }));
+  const paid = invoices.map((i) => ({ person: i.paidBy!, amountFils: i.totalFils, at: i.paidAt! }));
+  const months = cashByMonth(taken, paid);
+  const people = cashBalances(taken, paid).map((p) => ({ ...p, months: months.get(personKey(p.person)) ?? [] }));
   return { people, withdrawals: withdrawals.slice(0, 50), invoices: invoices.slice(0, 50) };
 }
 

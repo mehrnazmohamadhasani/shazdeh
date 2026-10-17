@@ -13,7 +13,8 @@ export async function generateMetadata() {
 }
 
 /** The chat renders the page frame itself: its header buttons (conversations, new) act on the chat. */
-export default async function AssistantPage() {
+export default async function AssistantPage({ searchParams }: { searchParams: Promise<{ say?: string }> }) {
+  const { say } = await searchParams;
   const user = await requireAdmin();
   if (!(ASSISTANT_ROLES as readonly string[]).includes(user.role)) redirect(roleHome(user.role));
   const { t } = await getAdminI18n();
@@ -24,6 +25,7 @@ export default async function AssistantPage() {
       recent={recent}
       title={t("Assistant")}
       description={t("Ask about stock, costs and sales, or tell it what happened — by voice or by typing.")}
+      prefill={say?.slice(0, 200) || undefined}
     />
   );
 }

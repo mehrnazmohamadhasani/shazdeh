@@ -44,6 +44,20 @@ export type RecipePreview = {
   note: string | null;
 };
 
+/** A new dish recipe, dictated: each line as said and what it matched; saved as a draft. */
+export type NewRecipePreview = {
+  kind: "new_recipe";
+  dish: { id: string; name: string; nameFa: string | null };
+  /** The amounts were said for this many portions; `rows` are per portion. */
+  portions: number;
+  rows: { said: string; item: { name: string; nameFa: string | null }; unit: "G" | "ML" | "PCS"; quantity: number }[];
+  /** Per portion; null when an ingredient has no price yet (named in `missingPrices`). */
+  cost: { perPortionFils: Fils; verified: boolean; missingPrices: string[] };
+  menuPriceFils: Fils;
+  foodCostPct: number | null;
+  note: string | null;
+};
+
 export type InvoicePreview = {
   kind: "invoice";
   invoice: { id: string; supplier: string; invoiceNo: string | null; day: string };
@@ -53,9 +67,21 @@ export type InvoicePreview = {
   total: { beforeFils: number; afterFils: number };
 };
 
-export type Preview = StockPreview | CountPreview | RecipePreview | InvoicePreview;
+export type FreeFoodPreview = {
+  kind: "free_food";
+  type: "STAFF_MEAL" | "GIFT" | "TASTING" | "COMPENSATION";
+  day: string;
+  recipient: string | null;
+  reason: string | null;
+  lines: { name: string; nameFa: string | null; quantity: number; unitCostFils: Fils; menuPriceFils: number }[];
+  /** Null when any dish has no cost from an approved recipe. */
+  costFils: Fils;
+  menuValueFils: number;
+};
 
-export const WRITE_TOOLS = ["record_waste", "record_staff_meal", "adjust_stock", "stock_count", "change_recipe", "fix_invoice_price"] as const;
+export type Preview = StockPreview | CountPreview | RecipePreview | NewRecipePreview | InvoicePreview | FreeFoodPreview;
+
+export const WRITE_TOOLS = ["record_waste", "record_staff_meal", "adjust_stock", "stock_count", "change_recipe", "write_recipe", "fix_invoice_price", "record_free_food"] as const;
 export type WriteTool = (typeof WRITE_TOOLS)[number];
 
 export type ActionStatus = "PROPOSED" | "APPLIED" | "CANCELLED" | "UNDONE";

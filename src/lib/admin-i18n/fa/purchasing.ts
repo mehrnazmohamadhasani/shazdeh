@@ -2,26 +2,32 @@
 export const purchasing: Record<string, string> = {
   // Owner cash
   "Owner cash": "نقدِ صاحب رستوران",
-  "Cash taken from the business account for purchases, against the cash and card invoices presented. Invoices count when their “Paid by” is the same name.":
-    "پولی که برای خرید از حساب رستوران برداشته شده، در برابر فاکتورهای نقدی و کارتیِ ارائه‌شده. فاکتوری حساب می‌شود که «پرداخت‌کننده»اش همین اسم باشد.",
+  "Invoices paid with someone's own money, against cash they took from the business account (or were paid back). Set “Their own” in an invoice's Payment box; the name must match.":
+    "فاکتورهایی که کسی با پول خودش پرداخته، در برابر پولی که از حساب رستوران برداشته (یا به او برگردانده شده). در کادر پرداختِ فاکتور «پول خودش» را بزنید؛ اسم باید یکی باشد.",
   "Balance by person": "مانده برای هر نفر",
   "Nothing yet": "هنوز چیزی ثبت نشده",
-  "Add a withdrawal below, and write the same name in “Paid by” when saving a cash invoice.":
-    "برداشت را پایین ثبت کنید و موقع ذخیره‌ی فاکتور نقدی، همین اسم را در «پرداخت‌کننده» بنویسید.",
+  "When someone pays an invoice with their own money, open its Payment box and choose “Their own”.":
+    "وقتی کسی فاکتوری را با پول خودش می‌پردازد، کادر پرداختِ آن فاکتور را باز کنید و «پول خودش» را بزنید.",
   "Taken {taken} · invoices {presented}": "برداشت {taken} · فاکتور {presented}",
   "{amount} still needs invoices": "{amount} هنوز فاکتور ندارد",
   "Business owes {amount}": "رستوران {amount} بدهکار است",
   Settled: "تسویه",
-  "Add a withdrawal": "ثبت برداشت",
+  "Money taken or paid back": "برداشت یا بازپرداخت",
+  Month: "ماه",
+  "Paid with own money": "پرداخت با پول خودش",
+  "Taken / paid back": "برداشت / بازپرداخت",
+  "At month end": "آخر ماه",
+  "Paid back": "بازپرداخت شد",
+  "Paid {amount} back to {name} today?": "امروز {amount} به {name} برگردانده شد؟",
   Withdrawals: "برداشت‌ها",
   "No withdrawals yet": "هنوز برداشتی ثبت نشده",
-  "Invoices presented": "فاکتورهای ارائه‌شده",
-  "No cash or card invoices with “Paid by” yet": "هنوز فاکتور نقدی یا کارتی با «پرداخت‌کننده» نیست",
+  "Invoices paid with own money": "فاکتورهای پرداخت‌شده با پول خودِ افراد",
+  "No invoices paid with own money yet": "هنوز فاکتوری با پول شخصی پرداخت نشده",
   "Enter the amount taken.": "مبلغ برداشت را وارد کنید.",
   "Withdrawal saved": "برداشت ذخیره شد",
   "Taken by": "برداشت‌کننده",
   "e.g. ATM, bank transfer ref": "مثلاً خودپرداز، شماره‌ی حواله",
-  "Remove this withdrawal? Use this only for a mistake.": "این برداشت حذف شود؟ فقط برای ثبت اشتباه.",
+  "Delete this withdrawal? Use this only for a mistake.": "این برداشت حذف شود؟ فقط برای ثبت اشتباه.",
   Removed: "حذف شد",
 
   // Kitchen settings

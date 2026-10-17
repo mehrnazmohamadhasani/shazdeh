@@ -34,7 +34,8 @@ function weeks(month: string, firstDay: number) {
   return Array.from({ length: days.length / 7 }, (_, i) => days.slice(i * 7, i * 7 + 7));
 }
 
-export function DayPicker({ day, today }: { day: string; today: string }) {
+/** `path`: the screen it moves on (Today by default); the day goes in ?day=, today means no parameter. */
+export function DayPicker({ day, today, path = "/admin" }: { day: string; today: string; path?: string }) {
   const { t, intl, locale } = useAdminI18n();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -47,7 +48,7 @@ export function DayPicker({ day, today }: { day: string; today: string }) {
   function go(next: string) {
     setOpen(false);
     if (next === day) return;
-    startTransition(() => router.push(next === today ? "/admin" : `/admin?day=${next}`));
+    startTransition(() => router.push(next === today ? path : `${path}?day=${next}`));
   }
 
   const label = day === today ? t("Today") : fmt(day, { weekday: "short", day: "numeric", month: "short", year: day.slice(0, 4) === today.slice(0, 4) ? undefined : "numeric" });

@@ -15,9 +15,14 @@ export async function generateMetadata() {
   return { title: t("Stock") };
 }
 
-export default async function StockPage() {
+export default async function StockPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { t, locale, intl } = await getAdminI18n();
-  const [rows, settings] = await Promise.all([stockSummary(), getOpsSettings()]);
+  const { show } = await searchParams;
+  const [all, settings] = await Promise.all([stockSummary(), getOpsSettings()]);
+  // What we have by default; ingredients at zero (or below — needs a count) only when asked.
+  const showAll = show === "all";
+  const inStock = all.filter((r) => r.onHand > 0);
+  const rows = showAll ? all : inStock;
   return (
     <AdminPage
       title={t("Stock")}
@@ -39,12 +44,32 @@ export default async function StockPage() {
       }
     >
       <Card bodyClassName="p-0">
-        {rows.length > 8 && (
-          <div className="border-b border-black-iron/[0.06] p-3 md:px-6">
-            <TableFilter target="stock-rows" placeholder={t("Search ingredients")} className="max-w-sm" />
+        {all.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-black-iron/[0.06] p-3 md:px-6">
+            <span className="flex gap-2">
+              {[
+                { on: !showAll, href: "/admin/ops/stock", label: t("In stock ({n})", { n: inStock.length }) },
+                { on: showAll, href: "/admin/ops/stock?show=all", label: t("All ingredients ({n})", { n: all.length }) },
+              ].map((tab) => (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={
+                    tab.on
+                      ? "inline-flex h-9 items-center rounded-full bg-black-iron px-4 text-[13.5px] font-medium text-warm-white"
+                      : "inline-flex h-9 items-center rounded-full bg-black-iron/[0.05] px-4 text-[13.5px] font-medium text-black-iron hover:bg-black-iron/[0.09]"
+                  }
+                >
+                  {tab.label}
+                </Link>
+              ))}
+            </span>
+            {rows.length > 8 && <TableFilter target="stock-rows" placeholder={t("Search ingredients")} className="max-w-sm flex-1" />}
           </div>
         )}
-        {rows.length === 0 ? (
+        {all.length > 0 && rows.length === 0 ? (
+          <EmptyState title={t("Nothing in stock")} description={t("Every ingredient is at zero. Add an invoice, or see all ingredients.")} />
+        ) : rows.length === 0 ? (
           <EmptyState
             title={t("No stock yet")}
             description={t("Starting out? Enter what is in the kitchen today as the opening stock, then add this month's invoices.")}

@@ -141,6 +141,8 @@ export async function dayInfo(args: Args<"today_summary">, todayDay: string) {
     salesByChannel: s.byChannel.map((c) => ({ channel: c.name, orders: c.orders, foodSalesFils: c.foodSalesFils, hasFeeRule: c.hasFeeRule })),
     profitEstimate: s.profit,
     foodCostIncludesVat: s.foodCostIncludesVat,
+    // Staff meals, gifts, tastings, compensation that day: cost with no sale (not in profitEstimate).
+    freeFood: { byKind: s.freeFood.byKind, knownCostFils: s.freeFood.knownCostFils, recordsWithUnknownCost: s.freeFood.unknownRecords },
     alerts: {
       ordersWaiting: s.alerts.ordersWaiting,
       invoicesToCheck: s.alerts.invoicesToCheck,

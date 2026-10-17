@@ -1,19 +1,22 @@
 "use client";
 import * as React from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowRight, Check, Loader2, Mic, Undo2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Loader2, Mic, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { amountText, UNIT } from "@/components/admin/ops/format";
 import { messageFromUnknown } from "@/lib/error-message";
 import { cn } from "@/lib/utils";
-import type { ActionCard, CountPreview, InvoicePreview, Preview, RecipePreview, StockPreview } from "@/lib/ops/assistant/types";
+import type { ActionCard, CountPreview, FreeFoodPreview, InvoicePreview, NewRecipePreview, Preview, RecipePreview, StockPreview } from "@/lib/ops/assistant/types";
+import { FREE_FOOD_LABEL } from "@/lib/ops/free-food-shared";
 
 /*
  * One change the assistant suggested: what it would do (before → after),
  * then Confirm or Cancel. Sensitive changes (money, recipes, big count
- * differences) ask a second time. Applied changes can be undone for a day.
+ * differences) ask a second time. An applied change can be deleted for a
+ * day (the stock, recipe or invoice goes back to how it was).
  */
 
 type I18n = ReturnType<typeof useAdminI18n>;
@@ -158,6 +161,70 @@ function RecipeBody({ p, i18n }: { p: RecipePreview; i18n: I18n }) {
   );
 }
 
+function NewRecipeBody({ p, i18n, applied }: { p: NewRecipePreview; i18n: I18n; applied: boolean }) {
+  const { t, locale, money, number } = i18n;
+  return (
+    <>
+      <p className="text-[12.5px] text-dark-grey">
+        {p.portions > 1 ? t("Per portion (you said the amounts for {n} portions).", { n: p.portions }) : t("Per portion.")}
+      </p>
+      <ul className="mt-1 divide-y divide-black-iron/[0.06]">
+        {p.rows.map((r, i) => {
+          const name = nameOf(r.item, locale);
+          // Show what was said when it matched under another name, so a wrong match is easy to spot.
+          const heard = r.said.toLowerCase() !== r.item.name.toLowerCase() && r.said !== r.item.nameFa ? r.said : null;
+          return (
+            <li key={i} className="flex items-start justify-between gap-3 py-2 text-[14px]">
+              <span className="min-w-0">
+                <span className="font-medium">{name}</span>
+                {heard && (
+                  <span dir="auto" className="block text-[12px] text-dark-grey">
+                    {t("heard: {words}", { words: heard })}
+                  </span>
+                )}
+              </span>
+              <bdi dir="ltr" className="shrink-0 font-semibold tabular-nums">
+                {amountText(r.quantity, UNIT[r.unit], locale)}
+              </bdi>
+            </li>
+          );
+        })}
+      </ul>
+      <Row label={t("Cost per portion")}>
+        {p.cost.perPortionFils == null ? (
+          <>
+            {t("Unknown")}
+            {p.cost.missingPrices.length > 0 && (
+              <span className="block text-[12px] text-dark-grey">{t("No price yet for: {names}", { names: p.cost.missingPrices.join(", ") })}</span>
+            )}
+          </>
+        ) : (
+          <>
+            <bdi dir="ltr" className="font-semibold">
+              {money(Math.round(p.cost.perPortionFils))}
+            </bdi>
+            <span className="block text-[12px] text-dark-grey">{p.cost.verified ? t("verified prices") : t("estimated")}</span>
+          </>
+        )}
+      </Row>
+      {p.foodCostPct != null && <Row label={t("Food cost")}>{`${number(p.foodCostPct, { max: 1 })}%`}</Row>}
+      {p.note && <Row label={t("Note")}>{p.note}</Row>}
+      {applied ? (
+        <Link
+          href={`/admin/menu-items/${p.dish.id}#recipe`}
+          className="mt-2 inline-flex min-h-10 items-center gap-1.5 text-[13.5px] font-medium text-terracotta-ink underline-offset-4 hover:underline"
+        >
+          {t("Open the recipe to approve it")} <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+        </Link>
+      ) : (
+        <p className="mt-2 rounded-[10px] bg-black-iron/[0.03] px-3 py-2 text-[12.5px] text-dark-grey">
+          {t("Confirming saves it as a draft. The owner approves it on the recipe screen; until then costs and stock don't change.")}
+        </p>
+      )}
+    </>
+  );
+}
+
 function InvoiceBody({ p, i18n }: { p: InvoicePreview; i18n: I18n }) {
   const { t, money, locale } = i18n;
   return (
@@ -185,6 +252,40 @@ function InvoiceBody({ p, i18n }: { p: InvoicePreview; i18n: I18n }) {
   );
 }
 
+function FreeFoodBody({ p, i18n }: { p: FreeFoodPreview; i18n: I18n }) {
+  const { t, money, locale } = i18n;
+  return (
+    <>
+      <ul className="divide-y divide-black-iron/[0.06]">
+        {p.lines.map((l, i) => (
+          <li key={i} className="flex items-start justify-between gap-3 py-2 text-[14px]">
+            <span className="font-medium">
+              {l.quantity}× {nameOf(l, locale)}
+            </span>
+            <span className="text-end text-dark-grey">{l.unitCostFils == null ? t("Food cost not known yet") : money(l.unitCostFils * l.quantity)}</span>
+          </li>
+        ))}
+      </ul>
+      <Row label={t("Food cost")}>
+        {p.costFils == null ? (
+          t("Not known yet — needs an approved recipe with ingredient prices")
+        ) : (
+          <>
+            <bdi dir="ltr">{money(p.costFils)}</bdi> · {t("estimated")}
+          </>
+        )}
+      </Row>
+      <Row label={t("On the menu")}>{money(p.menuValueFils)}</Row>
+      {p.recipient && <Row label={p.type === "STAFF_MEAL" ? t("Who ate") : t("Given to")}>{p.recipient}</Row>}
+      {p.reason && <Row label={t("Why")}>{p.reason}</Row>}
+      <Row label={t("Day")}>{i18n.date(`${p.day}T12:00:00+04:00`, { day: "numeric", month: "short" })}</Row>
+      <p className="mt-2 rounded-[10px] bg-black-iron/[0.03] px-3 py-2 text-[12.5px] text-dark-grey">
+        {t("Confirming takes the ingredients out of stock by the recipes. No sale is recorded.")}
+      </p>
+    </>
+  );
+}
+
 function title(p: Preview, i18n: I18n) {
   const { t, locale } = i18n;
   switch (p.kind) {
@@ -194,8 +295,12 @@ function title(p: Preview, i18n: I18n) {
       return t("Stock count · {n} items", { n: p.rows.length });
     case "recipe":
       return `${t("Recipe change")} · ${nameOf(p.recipe, locale)}`;
+    case "new_recipe":
+      return `${t("New recipe")} · ${nameOf(p.dish, locale)}`;
     case "invoice":
       return t("Invoice price correction");
+    case "free_food":
+      return `${t("Free food")} · ${t(FREE_FOOD_LABEL[p.type])}`;
   }
 }
 
@@ -217,8 +322,8 @@ export function ActionCardView({ card, onChange }: { card: ActionCard; onChange:
       if (!res.ok) throw body;
       onChange(body.action);
       setAsking(false);
-      if (kind === "confirm") toast.success(t("Done. You can undo it for a day."));
-      if (kind === "undo") toast.success(t("Undone."));
+      if (kind === "confirm") toast.success(t("Saved. You can delete this change for a day."));
+      if (kind === "undo") toast.success(t("Change deleted."));
     } catch (e) {
       toast.error(t(messageFromUnknown(e, "Something went wrong")));
     } finally {
@@ -233,7 +338,7 @@ export function ActionCardView({ card, onChange }: { card: ActionCard; onChange:
         <Check className="h-3 w-3" /> {t("Done")}
       </StatusPill>
     ) : card.status === "UNDONE" ? (
-      <StatusPill>{t("Undone")}</StatusPill>
+      <StatusPill>{t("Deleted")}</StatusPill>
     ) : card.status === "CANCELLED" ? (
       <StatusPill>{t("Cancelled")}</StatusPill>
     ) : card.sensitive ? (
@@ -265,7 +370,9 @@ export function ActionCardView({ card, onChange }: { card: ActionCard; onChange:
       {p.kind === "stock" && <StockBody p={p} i18n={i18n} />}
       {p.kind === "count" && <CountBody p={p} i18n={i18n} />}
       {p.kind === "recipe" && <RecipeBody p={p} i18n={i18n} />}
+      {p.kind === "new_recipe" && <NewRecipeBody p={p} i18n={i18n} applied={card.status === "APPLIED"} />}
       {p.kind === "invoice" && <InvoiceBody p={p} i18n={i18n} />}
+      {p.kind === "free_food" && <FreeFoodBody p={p} i18n={i18n} />}
 
       {card.status === "PROPOSED" && !asking && (
         <div className="mt-3 flex gap-2">
@@ -299,8 +406,8 @@ export function ActionCardView({ card, onChange }: { card: ActionCard; onChange:
       {card.status === "APPLIED" && card.canUndo && (
         <div className="mt-3">
           <Button size="sm" variant="outline" disabled={!!busy} onClick={() => act("undo")}>
-            {busy === "undo" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
-            {t("Undo")}
+            {busy === "undo" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {t("Delete this change")}
           </Button>
         </div>
       )}

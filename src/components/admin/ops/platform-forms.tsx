@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, Info, Loader2, Plus, ReceiptText, Trash2, Undo2, XCircle } from "lucide-react";
+import { AlertTriangle, Info, Loader2, Plus, ReceiptText, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, Field, IconButton, Select, StatusPill, TextInput } from "@/components/admin/ui";
 import { messageFromUnknown } from "@/lib/error-message";
@@ -417,11 +417,11 @@ export function UndoSaleButton({ orderId }: { orderId: string }) {
       variant="outline"
       disabled={busy}
       onClick={async () => {
-        if (!window.confirm(t("Remove this sale? The receipt opens again so you can correct and save it."))) return;
+        if (!window.confirm(t("Delete this sale? The receipt opens again so you can edit and save it."))) return;
         setBusy(true);
         try {
           await send(`/api/admin/ops/platform-orders/${orderId}/undo`);
-          toast.success(t("Sale removed"));
+          toast.success(t("Sale deleted"));
           router.refresh();
         } catch (e) {
           toast.error(t(messageFromUnknown(e, "Could not save")));
@@ -429,8 +429,8 @@ export function UndoSaleButton({ orderId }: { orderId: string }) {
         }
       }}
     >
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
-      {t("Undo")}
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+      {t("Delete")}
     </Button>
   );
 }

@@ -81,9 +81,10 @@ export type LineMatch = { type: "ingredient" | "prep"; id: string; via: "learned
 
 /**
  * The import screen's data: the reading, what each line most likely is
- * (a learned alias first, then the same name), and the likeliest recipe.
+ * (a learned alias first, then the same name), and the likeliest recipe —
+ * or, when the photo was added from a dish's page (`forDish`), that dish.
  */
-export async function getRecipeImport(id: string) {
+export async function getRecipeImport(id: string, forDish?: string | null) {
   const doc = await prisma.opsDocument.findUnique({
     where: { id },
     select: {
@@ -139,6 +140,10 @@ export async function getRecipeImport(id: string) {
         : []),
     ].sort((a, b) => b.s - a.s);
     if (pool[0]?.s) target = pool[0].t;
+  }
+  if (forDish && menuItems.some((m) => m.id === forDish)) {
+    const own = recipes.find((r) => r.menuItemId === forDish);
+    target = own ? { type: "recipe", id: own.id } : { type: "dish", menuItemId: forDish };
   }
 
   return {

@@ -165,4 +165,22 @@ export const recipes: Record<string, string> = {
   "Which dish?": "کدام غذا؟",
   "A new dish, not on the menu yet": "غذای جدید، هنوز در منو نیست",
   "Create and add ingredients": "ساختن و افزودن مواد",
+  // The recipe step on a dish's page
+  Approved: "تأییدشده",
+  "Draft — waiting for approval": "پیش‌نویس؛ در انتظار تأیید",
+  "Changes waiting for approval": "تغییرات در انتظار تأیید",
+  "Open recipe": "باز کردن دستور پخت",
+  "Recipe for {dish}:": "دستور پخت {dish}:",
+  "Dish saved.": "غذا ذخیره شد.",
+  "Next: add its recipe": "قدم بعد: دستور پختش را اضافه کنید",
+  "This dish has no recipe yet": "این غذا هنوز دستور پخت ندارد",
+  "The recipe sets the food cost, takes the ingredients out of stock with every sale, and shows the profit. Choose how to add it:":
+    "دستور پخت هزینه‌ی مواد را مشخص می‌کند، با هر فروش مواد را از انبار کم می‌کند و سود را نشان می‌دهد. روش افزودنش را انتخاب کنید:",
+  "Type it": "تایپ کنید",
+  "Pick each ingredient and its amount per portion.": "هر ماده و مقدارش برای یک پرس را انتخاب کنید.",
+  "Photo or PDF": "عکس یا PDF",
+  "AI reads the recipe sheet; you check each line before it is saved.": "هوش مصنوعی برگه‌ی دستور پخت را می‌خواند؛ شما پیش از ذخیره هر خط را بررسی می‌کنید.",
+  "Say it": "بگویید",
+  "Tell the assistant, e.g. “120 g lamb, 80 g herbs, 150 g rice”.": "به دستیار بگویید، مثلاً «۱۲۰ گرم گوشت، ۸۰ گرم سبزی، ۱۵۰ گرم برنج».",
+  "Every way saves a draft. The owner approves it as the kitchen standard.": "هر سه روش پیش‌نویس ذخیره می‌کنند. صاحب رستوران آن را به‌عنوان استاندارد آشپزخانه تأیید می‌کند.",
 };

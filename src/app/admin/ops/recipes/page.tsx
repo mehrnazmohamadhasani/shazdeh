@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { NewDishRecipeButton, NewRecipeDialog } from "@/components/admin/ops/recipe-forms";
+import { NewRecipeDialog } from "@/components/admin/ops/recipe-forms";
 import { UNIT, unitPrice } from "@/components/admin/ops/format";
 import { issueText } from "@/components/admin/ops/recipe-issues";
 import { listRecipes } from "@/lib/ops/recipes";
@@ -24,7 +24,6 @@ export default async function RecipesPage() {
   const done = dishes.filter((d) => d.recipe?.hasApproved).length;
   const name = (r: { name: string; nameFa: string | null }) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
 
-  const withoutRecipe = dishes.filter((d) => !d.recipe).map((d) => d.menuItem);
   // Big enough to hit with a wet thumb; opens the recipe straight in its editor.
   const edit = (id: string) => (
     <Link
@@ -51,7 +50,13 @@ export default async function RecipesPage() {
       description={t("Grams per portion for every dish. The cost follows the latest invoice prices; only approved recipes count as the kitchen standard.")}
       actions={
         <>
-          <NewRecipeDialog dishes={withoutRecipe} variant="outline" />
+          {/* A dish's recipe starts on the dish: add the dish to the menu first, then its recipe. */}
+          <Link
+            href="/admin/menu-items/new"
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-black-iron/20 px-5 text-[13px] font-medium uppercase tracking-[0.12em] text-black-iron hover:border-terracotta hover:text-terracotta-ink"
+          >
+            <Plus className="h-4 w-4" /> {t("New dish")}
+          </Link>
           <UploadButton kind="recipe" label={t("Read recipe from photo")} />
         </>
       }
@@ -102,13 +107,9 @@ export default async function RecipesPage() {
               {dishes.map(({ menuItem, recipe }) => (
                 <tr key={menuItem.id} data-search={`${menuItem.name} ${menuItem.nameFa ?? ""} ${menuItem.category.name}`} className="hover:bg-black-iron/[0.02]">
                   <td className="px-5 py-3 md:px-6">
-                    {recipe ? (
-                      <Link href={`/admin/ops/recipes/${recipe.id}`} dir="auto" className="font-medium hover:underline">
-                        {name(menuItem)}
-                      </Link>
-                    ) : (
-                      <span dir="auto" className="font-medium">{name(menuItem)}</span>
-                    )}
+                    <Link href={recipe ? `/admin/ops/recipes/${recipe.id}` : `/admin/menu-items/${menuItem.id}#recipe`} dir="auto" className="font-medium hover:underline">
+                      {name(menuItem)}
+                    </Link>
                     <span className="ms-2 text-[12px] text-dark-grey">{menuItem.category.name}</span>
                   </td>
                   <td className="px-3 py-3 text-end tabular-nums text-dark-grey max-sm:hidden">{price(menuItem.price)}</td>
@@ -123,7 +124,13 @@ export default async function RecipesPage() {
                         {edit(recipe.id)}
                       </span>
                     ) : (
-                      <NewDishRecipeButton menuItemId={menuItem.id} />
+                      // On the dish's page: type it, a photo or PDF, or say it to the assistant.
+                      <Link
+                        href={`/admin/menu-items/${menuItem.id}#recipe`}
+                        className="inline-flex h-10 items-center gap-1.5 rounded-full border border-terracotta/40 px-3.5 text-[13px] font-medium text-terracotta-ink hover:bg-terracotta/[0.06]"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> {t("Add recipe")}
+                      </Link>
                     )}
                   </td>
                 </tr>
@@ -171,7 +178,7 @@ export default async function RecipesPage() {
           </ul>
         )}
         <div className="p-5 md:p-6">
-          <NewRecipeDialog dishes={withoutRecipe} kind="PREP" label={t("New prep")} variant="outline" />
+          <NewRecipeDialog dishes={[]} kind="PREP" onlyKind label={t("New prep")} variant="outline" />
         </div>
       </Card>
     </AdminPage>

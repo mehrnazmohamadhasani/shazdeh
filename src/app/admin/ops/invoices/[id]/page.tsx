@@ -1,13 +1,14 @@
 /* eslint-disable @next/next/no-img-element -- private document served by an authenticated route, not next/image */
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Paperclip, Phone } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { DOC_STATUS } from "@/components/admin/ops/status";
 import { InvoiceReview } from "@/components/admin/ops/invoice-review";
-import { DiscardButton, EditInvoiceButton, MarkPaidButton, RetryRead } from "@/components/admin/ops/document-actions";
+import { DiscardButton, EditInvoiceButton, InvoicePayment, RetryRead, type PaymentMethod } from "@/components/admin/ops/document-actions";
+import { RECEIPT_LABEL, type ReceiptKind } from "@/components/admin/ops/payment-labels";
 import { ReadAsSaleButton } from "@/components/admin/ops/platform-forms";
-import { EDIT_REASON, getDocument, parseStoredReading } from "@/lib/ops/documents";
+import { EDIT_REASON, MANUAL_MIME, getDocument, parseStoredReading } from "@/lib/ops/documents";
 import { reconcileStatement } from "@/lib/ops/catalog";
 import { toFils } from "@/lib/ordering/money";
 import { prisma } from "@/lib/prisma";
@@ -34,7 +35,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const fileUrl = `/api/admin/ops/documents/${doc.id}/file`;
   const status = DOC_STATUS[doc.status];
 
-  const original = (
+  const manual = doc.mimeType === MANUAL_MIME;
+  // A typed-in invoice has no photo: the form gets the whole page.
+  const original = manual ? null : (
     <Card
       title={t("Original")}
       actions={
@@ -67,7 +70,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   if (doc.status === "SAVED" && doc.invoice) {
     const inv = doc.invoice;
     const netTotal = inv.lines.reduce((sum, l) => sum + (l.netFils ?? 0), 0);
-    const overdue = !inv.paidAt && inv.dueDate && inv.dueDate < new Date();
     body = (
       <div className="space-y-5">
         <Card
@@ -123,27 +125,69 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             </p>}
         </Card>
 
-        <Card title={t("Payment")}>
-          {inv.paidAt ? (
-            <p className="text-[14px]">
-              <StatusPill tone="good">{t("Paid")}</StatusPill> <span className="ms-2">{date(inv.paidAt)}</span>
-              {inv.paidBy && <span className="text-dark-grey"> · {t("by {name}", { name: inv.paidBy })}</span>}
-              {inv.paymentMode && <span className="text-dark-grey"> · {t(inv.paymentMode)}</span>}
-              {inv.paymentNote && <span dir="auto" className="block mt-1 text-[13px] text-dark-grey">{inv.paymentNote}</span>}
-            </p>
-          ) : inv.paymentMode === "credit" ? (
-            <div className="space-y-3">
-              <p className="text-[14px]">
-                <StatusPill tone={overdue ? "bad" : "warn"}>{overdue ? t("Overdue") : t("Unpaid")}</StatusPill>
-                <span className="ms-2">{inv.dueDate ? t("Due {date}", { date: date(inv.dueDate) }) : t("No due date")}</span>
+        <Card title={t("Supplier")}>
+          <div className="space-y-1.5 text-[14px]">
+            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} dir="auto" className="font-medium hover:underline">
+              {inv.supplier.name}
+            </Link>
+            {inv.supplier.phone ? (
+              <p>
+                <a href={`tel:${inv.supplier.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="inline-flex items-center gap-1.5 text-terracotta-ink hover:underline">
+                  <Phone className="h-3.5 w-3.5" /> {inv.supplier.phone}
+                </a>
               </p>
-              {canPay && <MarkPaidButton invoiceId={inv.id} />}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-[14px] text-dark-grey">{t("Payment not recorded.")}</p>
-              {canPay && <MarkPaidButton invoiceId={inv.id} />}
-            </div>
+            ) : (
+              <p className="text-dark-grey">{t("No phone saved")}</p>
+            )}
+            {inv.supplier.trn && <p className="text-dark-grey">{t("TRN {trn}", { trn: inv.supplier.trn })}</p>}
+            {inv.supplier.paymentTermsDays != null && <p className="text-dark-grey">{t("Pays within {n} days", { n: inv.supplier.paymentTermsDays })}</p>}
+          </div>
+        </Card>
+
+        <Card title={t("Payment")}>
+          <div className="space-y-2 text-[14px]">
+            <p className="text-dark-grey">
+              {inv.paidAt
+                ? `${t("Paid {date}", { date: date(inv.paidAt) })}${inv.paidBy ? ` · ${t("by {name}", { name: inv.paidBy })}` : ""}`
+                : inv.paymentMode
+                  ? t("Not paid yet")
+                  : t("Payment not recorded.")}
+            </p>
+            <InvoicePayment
+              invoiceId={inv.id}
+              method={(inv.paymentMode as PaymentMethod | null) ?? null}
+              paidAt={inv.paidAt?.toISOString() ?? null}
+              paidBy={inv.paidBy}
+              personal={inv.paidPersonally}
+              receiptId={inv.paymentReceiptId}
+              receiptKind={(inv.paymentReceiptKind as ReceiptKind | null) ?? null}
+              dueDate={inv.dueDate?.toISOString() ?? null}
+              canEdit={canPay}
+            />
+          </div>
+          {inv.paidAt && inv.paidPersonally && inv.paidBy && (
+            <p className="mt-2 text-[13px] text-dark-grey">
+              {t("Paid with {name}'s own money — the business owes it back.", { name: inv.paidBy })}{" "}
+              <Link href="/admin/ops/cash" className="font-medium text-terracotta-ink underline-offset-4 hover:underline">
+                {t("Owner cash")}
+              </Link>
+            </p>
+          )}
+          {inv.paymentReceiptId && (
+            <a
+              href={`/api/admin/ops/documents/${inv.paymentReceiptId}/file`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-terracotta-ink underline-offset-4 hover:underline"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              {t(RECEIPT_LABEL[(inv.paymentReceiptKind as ReceiptKind | null) ?? "card"])}
+            </a>
+          )}
+          {inv.paymentNote && (
+            <p dir="auto" className="mt-1 text-[13px] text-dark-grey">
+              {inv.paymentNote}
+            </p>
           )}
         </Card>
 
@@ -257,6 +301,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           suggestions={stored.suggestions}
           suppliers={suppliers}
           ingredients={ingredients.map((i) => ({ ...i, unit: UNIT[i.unit] }))}
+          manual={manual}
         />
       </>
     );
@@ -287,17 +332,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <Link href="/admin/ops/invoices" aria-label={t("Back to invoices")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
-          <span dir="auto">{stored?.reading.supplier.name ?? doc.invoice?.supplier.name ?? t("Invoice")}</span>
+          <span dir="auto">{stored?.reading.supplier.name ?? doc.invoice?.supplier.name ?? (manual ? t("New invoice") : t("Invoice"))}</span>
           <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
           {doc.status === "SAVED" && doc.autoSaved && <StatusPill tone="accent">{t("Saved automatically")}</StatusPill>}
         </span>
       }
       className="max-w-[1400px]"
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-        <div className="lg:sticky lg:top-6">{original}</div>
-        <div className="min-w-0">{body}</div>
-      </div>
+      {original ? (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+          <div className="lg:sticky lg:top-6">{original}</div>
+          <div className="min-w-0">{body}</div>
+        </div>
+      ) : (
+        body
+      )}
     </AdminPage>
   );
 }
