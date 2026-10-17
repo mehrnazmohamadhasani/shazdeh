@@ -3,8 +3,8 @@ export const sales: Record<string, string> = {
   // Navigation and pages
   Sales: "فروش",
   "Channels & fees": "کانال‌ها و کارمزدها",
-  "Website orders and delivery-platform orders. Photograph each platform receipt; AI reads it and you confirm.":
-    "سفارش‌های سایت و پلتفرم‌های تحویل. از هر رسید پلتفرم عکس بگیرید؛ هوش مصنوعی آن را می‌خواند و شما تأیید می‌کنید.",
+  "Website, WhatsApp and phone orders, and delivery-platform orders. Photograph each platform receipt; AI reads it and you confirm.":
+    "سفارش‌های سایت، WhatsApp و تلفنی، و سفارش‌های پلتفرم‌های ارسال غذا. از هر رسید پلتفرم عکس بگیرید؛ هوش مصنوعی آن را می‌خواند و شما تأیید می‌کنید.",
   "Add platform receipt": "افزودن رسید پلتفرم",
   "Receipts to check": "رسیدهای منتظر بررسی",
   "Platform receipts to check": "رسیدهای پلتفرم منتظر بررسی",

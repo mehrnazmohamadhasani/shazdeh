@@ -6,7 +6,7 @@ import { aiSpendThisMonth } from "./ai-usage";
 import { estimateFees } from "./platform";
 import { aiLevel, creditDue, estimateProfit, lowStock, type ProfitSale } from "./profit";
 import { approvedDishCosts } from "./recipes";
-import { ruleOn } from "./sales";
+import { SOURCE_CHANNEL, ruleOn } from "./sales";
 import { getOpsSettings } from "./settings";
 
 /*
@@ -42,7 +42,7 @@ export async function todaySummary(day: string, now = new Date()) {
     prisma.channelFeeRule.findMany(),
     prisma.order.findMany({
       where: { placedAt: { gte: start, lt: end }, status: { in: [...COUNTED] } },
-      select: { subtotalFils: true, discountFils: true, items: { select: { menuItemId: true, name: true, quantity: true } } },
+      select: { source: true, subtotalFils: true, discountFils: true, items: { select: { menuItemId: true, name: true, quantity: true } } },
     }),
     prisma.platformOrder.findMany({
       where: { businessDate: new Date(`${day}T00:00:00Z`) },
@@ -52,10 +52,10 @@ export async function todaySummary(day: string, now = new Date()) {
     approvedDishCosts(end < now ? end : now),
   ]);
 
-  const direct = channels.find((c) => c.kind === "DIRECT");
   const sales: ProfitSale[] = [
+    // Website, WhatsApp and phone orders each count under their own direct channel.
     ...websiteOrders.map((o) => ({
-      channel: direct?.code ?? "direct",
+      channel: SOURCE_CHANNEL[o.source],
       foodSalesFils: o.subtotalFils - o.discountFils,
       items: o.items,
       feesFils: 0,

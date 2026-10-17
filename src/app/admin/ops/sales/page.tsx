@@ -1,4 +1,3 @@
-import * as React from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { AdminPage, Card, EmptyState, StatusPill } from "@/components/admin/ui";
@@ -9,8 +8,6 @@ import { day } from "@/components/admin/ops/format";
 import { parseStoredPlatform } from "@/lib/ops/platform-import";
 import { monthRange, salesOverview } from "@/lib/ops/sales";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
-
-const SOURCE_LABEL = { WEBSITE: "Website", WHATSAPP: "WhatsApp", PHONE: "Phone call" } as const;
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -28,7 +25,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   return (
     <AdminPage
       title={t("Sales")}
-      description={t("Website orders and delivery-platform orders. Photograph each platform receipt; AI reads it and you confirm.")}
+      description={t("Website, WhatsApp and phone orders, and delivery-platform orders. Photograph each platform receipt; AI reads it and you confirm.")}
       actions={<UploadButton kind="platform_order" label={t("Add platform receipt")} />}
     >
       {pending.length > 0 && (
@@ -81,34 +78,22 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
               </thead>
               <tbody className="divide-y divide-black-iron/[0.06]">
                 {active.map((c) => (
-                  <React.Fragment key={c.code}>
-                    <tr>
-                      <td className="px-5 py-3 font-medium md:px-6">{c.name}</td>
-                      <td className="px-3 py-3 text-end tabular-nums">{c.orders}</td>
-                      <td className="px-3 py-3 text-end tabular-nums">{money(c.foodSalesFils)}</td>
-                      <td className="px-3 py-3 text-end tabular-nums">
-                        {c.feesFils != null ? (
-                          money(c.feesFils)
-                        ) : (
-                          <Link href="/admin/ops/channels" className="text-cinnamon-bark underline-offset-4 hover:underline">
-                            {t("Unknown — add fee terms")}
-                          </Link>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-end tabular-nums md:px-6">{c.feesFils != null ? money(c.foodSalesFils - c.feesFils) : "—"}</td>
-                    </tr>
-                    {/* Direct orders by where they came from, once anything came other than through the website. */}
-                    {c.sources?.some((x) => x.source !== "WEBSITE") &&
-                      c.sources.map((x) => (
-                        <tr key={x.source} className="text-[13px] text-dark-grey">
-                          <td className="py-2 pe-3 ps-9 md:ps-10">{t(SOURCE_LABEL[x.source])}</td>
-                          <td className="px-3 py-2 text-end tabular-nums">{x.orders}</td>
-                          <td className="px-3 py-2 text-end tabular-nums">{money(x.foodSalesFils)}</td>
-                          <td colSpan={2} />
-                        </tr>
-                      ))}
-                  </React.Fragment>
-                ))}
+                  <tr key={c.code}>
+                    <td className="px-5 py-3 font-medium md:px-6">{t(c.name)}</td>
+                    <td className="px-3 py-3 text-end tabular-nums">{c.orders}</td>
+                    <td className="px-3 py-3 text-end tabular-nums">{money(c.foodSalesFils)}</td>
+                    <td className="px-3 py-3 text-end tabular-nums">
+                      {c.feesFils != null ? (
+                        money(c.feesFils)
+                      ) : (
+                        <Link href="/admin/ops/channels" className="text-cinnamon-bark underline-offset-4 hover:underline">
+                          {t("Unknown — add fee terms")}
+                        </Link>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-end tabular-nums md:px-6">{c.feesFils != null ? money(c.foodSalesFils - c.feesFils) : "—"}</td>
+                  </tr>
+                  ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-black-iron/[0.1] font-semibold">

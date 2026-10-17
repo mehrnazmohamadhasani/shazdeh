@@ -37,6 +37,13 @@ export function monthRange(month?: string | null) {
   return { start, end, key };
 }
 
+/**
+ * The direct channel each order source belongs to: website orders to the
+ * website, WhatsApp and phone orders to their own channels (migration
+ * 20261017100000_direct_channels). Direct channels have no platform fee.
+ */
+export const SOURCE_CHANNEL = { WEBSITE: "direct", WHATSAPP: "whatsapp", PHONE: "phone" } as const;
+
 export async function salesOverview(month?: string | null) {
   const { start, end, key } = monthRange(month);
   const [channels, rules, platformOrders, direct, pending] = await Promise.all([
@@ -47,7 +54,7 @@ export async function salesOverview(month?: string | null) {
       orderBy: { placedAt: "desc" },
       include: { channel: { select: { code: true, name: true } }, items: { select: { quantity: true } }, document: { select: { autoSaved: true } } },
     }),
-    // Direct orders, split by where they came from (website, WhatsApp, phone).
+    // Direct orders by source: each source is its own channel.
     prisma.order.groupBy({
       by: ["source"],
       where: { placedAt: { gte: start, lt: end }, status: { in: [...COUNTED] } },
@@ -63,21 +70,16 @@ export async function salesOverview(month?: string | null) {
 
   const byChannel = channels.map((c) => {
     if (c.kind === "DIRECT") {
-      const sources = (["WEBSITE", "WHATSAPP", "PHONE"] as const)
-        .map((source) => {
-          const g = direct.find((d) => d.source === source);
-          return { source, orders: g?._count ?? 0, foodSalesFils: (g?._sum.subtotalFils ?? 0) - (g?._sum.discountFils ?? 0) };
-        })
-        .filter((x) => x.orders > 0);
-      const orders = sources.reduce((n, x) => n + x.orders, 0);
+      // Each direct channel counts the orders of its own source (website, WhatsApp, phone).
+      const g = direct.find((d) => SOURCE_CHANNEL[d.source] === c.code);
+      const orders = g?._count ?? 0;
       return {
         code: c.code,
         name: c.name,
         orders,
-        foodSalesFils: sources.reduce((n, x) => n + x.foodSalesFils, 0),
+        foodSalesFils: (g?._sum.subtotalFils ?? 0) - (g?._sum.discountFils ?? 0),
         feesFils: 0 as number | null,
         feesKnownFor: orders,
-        sources,
       };
     }
     const mine = platformOrders.filter((o) => o.channelId === c.id);
