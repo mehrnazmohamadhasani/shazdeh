@@ -102,7 +102,10 @@ export const recipes: Record<string, string> = {
   "This prep is used in other recipes. Remove it from them first.": "این آماده‌سازی در دستور پخت‌های دیگر استفاده شده. اول از آن‌ها حذفش کنید.",
   "This prep is used in {names}. Remove it from them first.": "این آماده‌سازی در {names} استفاده شده. اول از آن‌ها حذفش کنید.",
   "Older versions of {names} used this prep, so it is kept for their history.": "نسخه‌های قبلی {names} از این آماده‌سازی استفاده کرده‌اند، پس برای سابقه‌ی آن‌ها نگه داشته می‌شود.",
-  "Only the owner can delete an approved prep.": "فقط مالک می‌تواند آماده‌سازی تأییدشده را حذف کند.",
+  "Only the owner can delete an approved recipe.": "فقط مالک می‌تواند دستور پخت تأییدشده را حذف کند.",
+  "Delete the recipe for {name}? The dish stays on the menu. This can't be undone.": "دستور پخت {name} حذف شود؟ خود غذا در منو می‌ماند. این کار برگشت‌پذیر نیست.",
+  "Sales so far keep their stock records. New sales of this dish won't take stock until it has a recipe again.": "فروش‌های قبلی سابقه‌ی انبارشان را نگه می‌دارند. فروش‌های تازه‌ی این غذا تا دستور پخت جدید نداشته باشد از انبار کم نمی‌کنند.",
+  "Throw away this new recipe? Nothing in it has been saved.": "این دستور پخت جدید دور ریخته شود؟ هنوز چیزی در آن ذخیره نشده.",
 
   // Deleting and cancelling
   "Delete prep": "حذف آماده‌سازی",

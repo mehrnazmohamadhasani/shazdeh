@@ -36,6 +36,9 @@ export default async function RecipesPage() {
   );
 
   type Row = (typeof preps)[number];
+  // An approved recipe is the owner's to delete, like approving it.
+  const remove = (r: Row, kind: "DISH" | "PREP") =>
+    !r.hasApproved || user.role === "ADMIN" ? <DeleteRecipeButton recipeId={r.id} name={r.name} kind={kind} compact /> : null;
   const status = (r: Row) =>
     r.verified ? (
       <StatusPill tone="good">{t("Verified")}</StatusPill>
@@ -123,6 +126,7 @@ export default async function RecipesPage() {
                       <span className="inline-flex items-center gap-2">
                         {status(recipe)}
                         {edit(recipe.id)}
+                        {remove(recipe, "DISH")}
                       </span>
                     ) : (
                       // On the dish's page: type it, a photo or PDF, or say it to the assistant.
@@ -148,6 +152,7 @@ export default async function RecipesPage() {
                     <span className="inline-flex items-center gap-2">
                       {status(r)}
                       {edit(r.id)}
+                      {remove(r, "DISH")}
                     </span>
                   </td>
                 </tr>
@@ -174,8 +179,7 @@ export default async function RecipesPage() {
                 </span>
                 {status(p)}
                 {edit(p.id)}
-                {/* An approved prep is the owner's to delete, like approving it. */}
-                {(!p.hasApproved || user.role === "ADMIN") && <DeleteRecipeButton recipeId={p.id} name={p.name} kind="PREP" compact />}
+                {remove(p, "PREP")}
               </li>
             ))}
           </ul>

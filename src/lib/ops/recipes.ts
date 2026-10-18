@@ -441,8 +441,9 @@ export async function discardDraft(id: string, actor: Actor, via = "manual") {
 /**
  * Deletes a recipe with all its versions. One used inside another recipe
  * (even an old version of it) can't go: the error names those recipes.
- * An approved prep is the owner's call (`allowApproved`); an approved dish
- * is kept. The assistant's undo only ever deletes a draft it wrote.
+ * An approved one is the owner's call (`allowApproved`); a dish's past
+ * sales keep their stock movements. The assistant's undo only ever
+ * deletes a draft it wrote.
  */
 export async function deleteRecipe(id: string, actor: Actor, via = "manual", opts: { allowApproved?: boolean } = {}) {
   return prisma.$transaction(async (tx) => {
@@ -451,10 +452,9 @@ export async function deleteRecipe(id: string, actor: Actor, via = "manual", opt
       where: { id },
       include: { versions: { include: { lines: true } }, usedIn: { select: { version: { select: { status: true, recipe: { select: { name: true } } } } } } },
     });
-    if (recipe.versions.some((v) => v.status !== "DRAFT")) {
-      // A dish's approved versions are what its sales took stock by; a prep's are not linked to any sale.
-      if (recipe.kind === "DISH") throw new OpsError("An approved recipe is kept for history and can't be deleted.", 409);
-      if (!opts.allowApproved) throw new OpsError("Only the owner can delete an approved prep.", 403);
+    // Sales already recorded keep their stock movements (only their link to the version is cleared).
+    if (!opts.allowApproved && recipe.versions.some((v) => v.status !== "DRAFT")) {
+      throw new OpsError("Only the owner can delete an approved recipe.", 403);
     }
     const names = (current: boolean) =>
       [...new Set(recipe.usedIn.filter((u) => (u.version.status !== "RETIRED") === current).map((u) => u.version.recipe.name))].sort();

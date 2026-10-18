@@ -240,7 +240,7 @@ export function DraftEditor({
   canApprove: boolean;
   /** Editing the approved version: saving starts a new draft. */
   startsNewVersion: boolean;
-  /** Name and Persian name, edited and saved with the rest (preps). */
+  /** Name and Persian name, edited and saved with the rest. */
   details?: { name: string; nameFa: string | null };
   /** Just created, nothing saved in it yet: Cancel deletes it again. */
   isNew?: boolean;
@@ -357,7 +357,7 @@ export function DraftEditor({
   // Cancel: throw away what is on screen and leave the editor.
   const cancel = () => {
     if (isNew) {
-      if (!window.confirm(t("Throw away this new prep? Nothing in it has been saved."))) return;
+      if (!window.confirm(kind === "PREP" ? t("Throw away this new prep? Nothing in it has been saved.") : t("Throw away this new recipe? Nothing in it has been saved."))) return;
       return run(async () => {
         await send(`/api/admin/ops/recipes/${recipeId}`, "DELETE");
         router.push("/admin/ops/recipes");
@@ -650,38 +650,7 @@ export function RecipeSheet({ lines, kind, yieldQuantity, yieldUnit }: { lines: 
   );
 }
 
-// ─── Details and removal ────────────────────────────────────────────────────
-
-export function RecipeDetailsForm({ recipe }: { recipe: { id: string; name: string; nameFa: string | null } }) {
-  const { t } = useAdminI18n();
-  const router = useRouter();
-  const { busy, run } = useBusy();
-  const [name, setName] = React.useState(recipe.name);
-  const [nameFa, setNameFa] = React.useState(recipe.nameFa ?? "");
-  return (
-    <form
-      className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void run(async () => {
-          await send(`/api/admin/ops/recipes/${recipe.id}`, "PATCH", { name, nameFa });
-          toast.success(t("Saved"));
-          router.refresh();
-        });
-      }}
-    >
-      <Field label={t("Name")} required>
-        <TextInput dir="auto" required value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Field label={t("Persian name")}>
-        <TextInput lang="fa" dir="rtl" value={nameFa} onChange={(e) => setNameFa(e.target.value)} />
-      </Field>
-      <Button type="submit" variant="outline" size="md" disabled={busy}>
-        {t("Save")}
-      </Button>
-    </form>
-  );
-}
+// ─── Removal ────────────────────────────────────────────────────
 
 export function DiscardDraftButton({ recipeId }: { recipeId: string }) {
   const { t } = useAdminI18n();
@@ -723,7 +692,8 @@ export function DeleteRecipeButton({
   const [busy, setBusy] = React.useState(false);
   const label = kind === "PREP" ? t("Delete prep") : t("Delete recipe");
   async function remove() {
-    if (!window.confirm(t("Delete {name}? This can't be undone.", { name }))) return;
+    const ask = kind === "PREP" ? t("Delete {name}? This can't be undone.", { name }) : t("Delete the recipe for {name}? The dish stays on the menu. This can't be undone.", { name });
+    if (!window.confirm(ask)) return;
     setBusy(true);
     try {
       await send(`/api/admin/ops/recipes/${recipeId}`, "DELETE");

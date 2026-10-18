@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { DeleteRecipeButton, DiscardDraftButton, DraftEditor, RecipeDetailsForm, RecipeSheet, type SheetLine } from "@/components/admin/ops/recipe-forms";
+import { DeleteRecipeButton, DiscardDraftButton, DraftEditor, RecipeSheet, type SheetLine } from "@/components/admin/ops/recipe-forms";
 import { UNIT, unitPrice } from "@/components/admin/ops/format";
 import { issueText } from "@/components/admin/ops/recipe-issues";
 import { getRecipe } from "@/lib/ops/recipes";
@@ -26,7 +26,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   const editHref = `/admin/ops/recipes/${recipe.id}?edit=1#edit`;
   const kind = recipe.kind;
   // Drafts can go by any editor; an approved recipe only by the owner (as with approving).
-  const canDelete = (!approved && !history.length) || (kind === "PREP" && user.role === "ADMIN");
+  const canDelete = (!approved && !history.length) || user.role === "ADMIN";
   const name = (r: { name: string; nameFa?: string | null }) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
 
   const sheetLines = (v: NonNullable<typeof approved>): SheetLine[] =>
@@ -173,8 +173,8 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
               menuPriceAed={recipe.menuItem?.price ?? null}
               canApprove={user.role === "ADMIN"}
               startsNewVersion={!draft && !!approved}
-              details={kind === "PREP" ? { name: recipe.name, nameFa: recipe.nameFa } : undefined}
-              isNew={kind === "PREP" && !approved && !history.length && !draft?.version.lines.length && !draft?.version.method}
+              details={{ name: recipe.name, nameFa: recipe.nameFa }}
+              isNew={!approved && !history.length && !draft?.version.lines.length && !draft?.version.method}
             />
             {user.role !== "ADMIN" && <p className="mt-3 text-[12.5px] text-dark-grey">{t("Only the owner can approve a recipe.")}</p>}
           </Card>
@@ -213,17 +213,15 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
         </Card>
       )}
 
-      {/* A prep's name is edited with the rest of it, in the editor. */}
-      {(kind === "DISH" || canDelete) && (
-        <Card title={t("Details")}>
-          {kind === "DISH" && <RecipeDetailsForm recipe={{ id: recipe.id, name: recipe.name, nameFa: recipe.nameFa }} />}
-          {canDelete && (
-            <div className={kind === "DISH" ? "mt-5 border-t border-black-iron/[0.06] pt-5" : undefined}>
-              <DeleteRecipeButton recipeId={recipe.id} name={recipe.name} kind={kind} />
-              {kind === "PREP" && usedIn.length > 0 && (
-                <p className="mt-2 text-[12.5px] text-dark-grey">{t("Remove it from the recipes under “Used in” before deleting it.")}</p>
-              )}
-            </div>
+      {/* The name is edited with the rest of the recipe, in the editor. */}
+      {canDelete && (
+        <Card title={t("Delete")}>
+          {kind === "DISH" && approved && (
+            <p className="mb-3 text-[13px] text-dark-grey">{t("Sales so far keep their stock records. New sales of this dish won't take stock until it has a recipe again.")}</p>
+          )}
+          <DeleteRecipeButton recipeId={recipe.id} name={recipe.name} kind={kind} />
+          {kind === "PREP" && usedIn.length > 0 && (
+            <p className="mt-2 text-[12.5px] text-dark-grey">{t("Remove it from the recipes under “Used in” before deleting it.")}</p>
           )}
         </Card>
       )}
