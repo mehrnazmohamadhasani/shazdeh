@@ -671,7 +671,9 @@ export function DeleteUnusedIngredientsButton({ names }: { names: string[] }) {
         setBusy(true);
         try {
           const json = await remove("/api/admin/ops/ingredients/unused");
+          const skipped = (json.skipped as string[] | undefined) ?? [];
           toast.success(t("{n} ingredients deleted", { n: (json.deleted as string[]).length }));
+          if (skipped.length) toast.message(t("Kept because they are in use now: {names}", { names: skipped.join(", ") }));
           router.refresh();
         } catch (e) {
           toast.error(t(messageFromUnknown(e, "Could not delete")));

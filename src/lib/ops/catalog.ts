@@ -283,14 +283,23 @@ export async function deleteIngredient(id: string, actor: Actor, via = "manual")
   return prisma.$transaction((tx) => deleteOne(tx, id, actor, via));
 }
 
-/** Deletes every ingredient nothing uses, checked again one by one. */
+/**
+ * Deletes every ingredient nothing uses, each in its own transaction (one
+ * for all of them runs past the transaction time limit on the hosted
+ * database). One that got used meanwhile is skipped and reported.
+ */
 export async function deleteUnusedIngredients(actor: Actor, via = "manual") {
-  const ids = (await unusedIngredients()).map((i) => i.id);
-  return prisma.$transaction(async (tx) => {
-    const names: string[] = [];
-    for (const id of ids) names.push(await deleteOne(tx, id, actor, via));
-    return { deleted: names };
-  });
+  const deleted: string[] = [];
+  const skipped: string[] = [];
+  for (const { id, name } of await unusedIngredients()) {
+    try {
+      deleted.push(await deleteIngredient(id, actor, via));
+    } catch (e) {
+      if (!(e instanceof OpsError)) throw e;
+      skipped.push(name);
+    }
+  }
+  return { deleted, skipped };
 }
 
 // ─── Manual stock movements ─────────────────────────────────────────────────

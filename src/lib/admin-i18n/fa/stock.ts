@@ -188,4 +188,5 @@ export const stock: Record<string, string> = {
   "Delete unused ({n})": "حذف بی‌استفاده‌ها ({n})",
   "Delete {n} ingredients nothing uses any more? {names}. This can't be undone.": "{n} ماده‌ای که دیگر استفاده نمی‌شوند حذف شوند؟ {names}. این کار برگشت‌پذیر نیست.",
   "{n} ingredients deleted": "{n} ماده حذف شد",
+  "Kept because they are in use now: {names}": "این‌ها نگه داشته شدند چون الان استفاده می‌شوند: {names}",
 };
