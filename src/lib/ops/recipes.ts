@@ -438,13 +438,35 @@ export async function discardDraft(id: string, actor: Actor, via = "manual") {
   });
 }
 
-/** Only a recipe that was never approved and isn't used anywhere can be deleted. */
-export async function deleteRecipe(id: string, actor: Actor, via = "manual") {
+/**
+ * Deletes a recipe with all its versions. One used inside another recipe
+ * (even an old version of it) can't go: the error names those recipes.
+ * An approved prep is the owner's call (`allowApproved`); an approved dish
+ * is kept. The assistant's undo only ever deletes a draft it wrote.
+ */
+export async function deleteRecipe(id: string, actor: Actor, via = "manual", opts: { allowApproved?: boolean } = {}) {
   return prisma.$transaction(async (tx) => {
     await lockRecipe(tx, id);
-    const recipe = await tx.recipe.findUniqueOrThrow({ where: { id }, include: { versions: { include: { lines: true } }, _count: { select: { usedIn: true } } } });
-    if (recipe.versions.some((v) => v.status !== "DRAFT")) throw new OpsError("An approved recipe is kept for history and can't be deleted.", 409);
-    if (recipe._count.usedIn > 0) throw new OpsError("This prep is used in other recipes. Remove it from them first.", 409);
+    const recipe = await tx.recipe.findUniqueOrThrow({
+      where: { id },
+      include: { versions: { include: { lines: true } }, usedIn: { select: { version: { select: { status: true, recipe: { select: { name: true } } } } } } },
+    });
+    if (recipe.versions.some((v) => v.status !== "DRAFT")) {
+      // A dish's approved versions are what its sales took stock by; a prep's are not linked to any sale.
+      if (recipe.kind === "DISH") throw new OpsError("An approved recipe is kept for history and can't be deleted.", 409);
+      if (!opts.allowApproved) throw new OpsError("Only the owner can delete an approved prep.", 403);
+    }
+    const names = (current: boolean) =>
+      [...new Set(recipe.usedIn.filter((u) => (u.version.status !== "RETIRED") === current).map((u) => u.version.recipe.name))].sort();
+    const usedIn = names(true);
+    if (usedIn.length > 0) {
+      throw new OpsError(`This prep is used in ${usedIn.join(", ")}. Remove it from them first.`, 409, { usedIn });
+    }
+    // Only old versions use it: deleting would rewrite what those dishes were.
+    const usedBefore = names(false);
+    if (usedBefore.length > 0) {
+      throw new OpsError(`Older versions of ${usedBefore.join(", ")} used this prep, so it is kept for their history.`, 409, { usedBefore });
+    }
     await tx.recipe.delete({ where: { id } });
     await tx.auditLog.create({
       data: {
@@ -453,7 +475,12 @@ export async function deleteRecipe(id: string, actor: Actor, via = "manual") {
         entity: "Recipe",
         entityId: id,
         via,
-        before: { name: recipe.name, kind: recipe.kind, lines: linesSnapshot(recipe.versions.flatMap((v) => v.lines)) },
+        before: {
+          name: recipe.name,
+          nameFa: recipe.nameFa,
+          kind: recipe.kind,
+          versions: recipe.versions.map((v) => ({ number: v.number, status: v.status, yieldQuantity: v.yieldQuantity, yieldUnit: v.yieldUnit, lines: linesSnapshot(v.lines) })),
+        },
       },
     });
   });

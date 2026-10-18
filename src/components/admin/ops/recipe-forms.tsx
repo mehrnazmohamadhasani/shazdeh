@@ -197,7 +197,10 @@ export function NewRecipeDialog({
               </Select>
             </Field>
           )}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="md" onClick={() => setOpen(false)}>
+              {t("Cancel")}
+            </Button>
             <Button type="submit" size="md" disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {t("Create and add ingredients")}
             </Button>
@@ -220,6 +223,8 @@ export function DraftEditor({
   menuPriceAed,
   canApprove,
   startsNewVersion,
+  details,
+  isNew = false,
 }: {
   recipeId: string;
   kind: "DISH" | "PREP";
@@ -235,6 +240,10 @@ export function DraftEditor({
   canApprove: boolean;
   /** Editing the approved version: saving starts a new draft. */
   startsNewVersion: boolean;
+  /** Name and Persian name, edited and saved with the rest (preps). */
+  details?: { name: string; nameFa: string | null };
+  /** Just created, nothing saved in it yet: Cancel deletes it again. */
+  isNew?: boolean;
 }) {
   const { t, locale, money, number } = useAdminI18n();
   const router = useRouter();
@@ -257,6 +266,19 @@ export function DraftEditor({
   const [note, setNote] = React.useState(initial.note ?? "");
   const [method, setMethod] = React.useState(initial.method ?? "");
   const [dirty, setDirty] = React.useState(false);
+  const [name, setName] = React.useState(details?.name ?? "");
+  const [nameFa, setNameFa] = React.useState(details?.nameFa ?? "");
+  // Compared with what is saved, so it clears itself once a save comes back.
+  const detailsDirty = !!details && (name.trim() !== details.name || (nameFa.trim() || null) !== (details.nameFa ?? null));
+  const changed = dirty || detailsDirty;
+
+  // Leaving the page with unsaved changes asks first.
+  React.useEffect(() => {
+    if (!changed) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [changed]);
   // Ingredients created here (not bought yet) join the list without a reload.
   const [ingredients, setIngredients] = React.useState(options.ingredients);
   const [adding, setAdding] = React.useState<{ rowKey: number; name: string; nameFa: string; unit: Unit } | null>(null);
@@ -311,8 +333,16 @@ export function DraftEditor({
 
   const save = (approve: boolean) =>
     run(async () => {
-      await send(`/api/admin/ops/recipes/${recipeId}/draft`, "PUT", payload());
-      if (approve) {
+      if (details && !name.trim()) throw { error: "Enter a name." };
+      // Check the lines before renaming, so a bad line doesn't leave half a save.
+      const body = dirty || approve ? payload() : null;
+      if (detailsDirty) await send(`/api/admin/ops/recipes/${recipeId}`, "PATCH", { name: name.trim(), nameFa: nameFa.trim() || null });
+      if (body) await send(`/api/admin/ops/recipes/${recipeId}/draft`, "PUT", body);
+      if (!body) {
+        toast.success(t("Saved"));
+        // Only the name changed on the approved recipe: nothing left to edit.
+        if (startsNewVersion) router.replace(`/admin/ops/recipes/${recipeId}`);
+      } else if (approve) {
         await send(`/api/admin/ops/recipes/${recipeId}/approve`, "POST");
         toast.success(t("Approved — this is now the kitchen standard"));
         // Back to reading the recipe; "Edit recipe" opens the editor again.
@@ -324,8 +354,35 @@ export function DraftEditor({
       router.refresh();
     });
 
+  // Cancel: throw away what is on screen and leave the editor.
+  const cancel = () => {
+    if (isNew) {
+      if (!window.confirm(t("Throw away this new prep? Nothing in it has been saved."))) return;
+      return run(async () => {
+        await send(`/api/admin/ops/recipes/${recipeId}`, "DELETE");
+        router.push("/admin/ops/recipes");
+      });
+    }
+    if (changed && !window.confirm(t("Throw away your changes?"))) return;
+    setDirty(false);
+    setName(details?.name ?? "");
+    setNameFa(details?.nameFa ?? "");
+    router.push(startsNewVersion ? `/admin/ops/recipes/${recipeId}` : "/admin/ops/recipes");
+  };
+
   return (
     <div className="space-y-5">
+      {details && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t("Name")} required>
+            <TextInput dir="auto" required value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label={t("Persian name")}>
+            <TextInput lang="fa" dir="rtl" value={nameFa} onChange={(e) => setNameFa(e.target.value)} />
+          </Field>
+        </div>
+      )}
+
       {startsNewVersion && (
         <p className="rounded-[12px] bg-saffron-orange/[0.12] px-4 py-3 text-[13px] text-cinnamon-bark">
           {t("Changes are saved as a new draft. The approved recipe stays the kitchen standard until the draft is approved.")}
@@ -505,8 +562,11 @@ export function DraftEditor({
           {missing > 0 && <p className="text-cinnamon-bark">{t("{n} lines have no price yet — the cost is an estimate.", { n: missing })}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="md" disabled={busy || !dirty} onClick={() => save(false)}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {t("Save draft")}
+          <Button type="button" variant="ghost" size="md" disabled={busy} onClick={cancel}>
+            {t("Cancel")}
+          </Button>
+          <Button type="button" variant="outline" size="md" disabled={busy || !changed} onClick={() => save(false)}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {dirty || !detailsDirty ? t("Save draft") : t("Save")}
           </Button>
           {/* With no draft and no edits there is nothing new to approve. */}
           {canApprove && (dirty || !startsNewVersion) && (
@@ -646,25 +706,50 @@ export function DiscardDraftButton({ recipeId }: { recipeId: string }) {
   );
 }
 
-export function DeleteRecipeButton({ recipeId }: { recipeId: string }) {
+export function DeleteRecipeButton({
+  recipeId,
+  name,
+  kind = "DISH",
+  compact = false,
+}: {
+  recipeId: string;
+  name: string;
+  kind?: "DISH" | "PREP";
+  /** An icon in a list row instead of a full button; stays on the list after. */
+  compact?: boolean;
+}) {
   const { t } = useAdminI18n();
   const router = useRouter();
-  const { busy, run } = useBusy();
-  return (
-    <Button
-      variant="destructive"
-      size="sm"
-      disabled={busy}
-      onClick={() => {
-        if (!window.confirm(t("Delete this recipe?"))) return;
-        void run(async () => {
-          await send(`/api/admin/ops/recipes/${recipeId}`, "DELETE");
-          toast.success(t("Recipe deleted"));
-          router.push("/admin/ops/recipes");
-        });
-      }}
-    >
-      <Trash2 className="h-4 w-4" /> {t("Delete recipe")}
+  const [busy, setBusy] = React.useState(false);
+  const label = kind === "PREP" ? t("Delete prep") : t("Delete recipe");
+  async function remove() {
+    if (!window.confirm(t("Delete {name}? This can't be undone.", { name }))) return;
+    setBusy(true);
+    try {
+      await send(`/api/admin/ops/recipes/${recipeId}`, "DELETE");
+      toast.success(kind === "PREP" ? t("Prep deleted") : t("Recipe deleted"));
+      if (compact) router.refresh();
+      else router.push("/admin/ops/recipes");
+    } catch (e) {
+      // The server names the recipes that still use it; say it in the panel's language.
+      const body = (e ?? {}) as { usedIn?: string[]; usedBefore?: string[] };
+      const message = body.usedIn?.length
+        ? t("This prep is used in {names}. Remove it from them first.", { names: body.usedIn.join(", ") })
+        : body.usedBefore?.length
+          ? t("Older versions of {names} used this prep, so it is kept for their history.", { names: body.usedBefore.join(", ") })
+          : t(messageFromUnknown(e, "Could not delete"));
+      toast.error(message, { duration: 8000 });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return compact ? (
+    <IconButton label={label} danger disabled={busy} onClick={remove}>
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+    </IconButton>
+  ) : (
+    <Button variant="destructive" size="sm" disabled={busy} onClick={remove}>
+      <Trash2 className="h-4 w-4" /> {label}
     </Button>
   );
 }

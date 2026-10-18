@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { NewRecipeDialog } from "@/components/admin/ops/recipe-forms";
+import { DeleteRecipeButton, NewRecipeDialog } from "@/components/admin/ops/recipe-forms";
 import { UNIT, unitPrice } from "@/components/admin/ops/format";
 import { issueText } from "@/components/admin/ops/recipe-issues";
 import { listRecipes } from "@/lib/ops/recipes";
@@ -11,6 +11,7 @@ import { TableFilter } from "@/components/admin/table-filter";
 import { DOC_STATUS } from "@/components/admin/ops/status";
 import { day } from "@/components/admin/ops/format";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -19,7 +20,7 @@ export async function generateMetadata() {
 }
 
 export default async function RecipesPage() {
-  const { t, locale, money, number, price, intl } = await getAdminI18n();
+  const [{ t, locale, money, number, price, intl }, user] = await Promise.all([getAdminI18n(), requireAdmin()]);
   const [{ dishes, orphanDishes, preps }, photos] = await Promise.all([listRecipes(), listRecipeDocuments()]);
   const done = dishes.filter((d) => d.recipe?.hasApproved).length;
   const name = (r: { name: string; nameFa: string | null }) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
@@ -173,6 +174,8 @@ export default async function RecipesPage() {
                 </span>
                 {status(p)}
                 {edit(p.id)}
+                {/* An approved prep is the owner's to delete, like approving it. */}
+                {(!p.hasApproved || user.role === "ADMIN") && <DeleteRecipeButton recipeId={p.id} name={p.name} kind="PREP" compact />}
               </li>
             ))}
           </ul>

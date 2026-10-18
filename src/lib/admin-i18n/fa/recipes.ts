@@ -100,6 +100,18 @@ export const recipes: Record<string, string> = {
   "This is the only version — delete the recipe instead.": "این تنها نسخه است — به‌جای آن دستور پخت را حذف کنید.",
   "An approved recipe is kept for history and can't be deleted.": "دستور پخت تأییدشده برای سابقه نگه داشته می‌شود و حذف نمی‌شود.",
   "This prep is used in other recipes. Remove it from them first.": "این آماده‌سازی در دستور پخت‌های دیگر استفاده شده. اول از آن‌ها حذفش کنید.",
+  "This prep is used in {names}. Remove it from them first.": "این آماده‌سازی در {names} استفاده شده. اول از آن‌ها حذفش کنید.",
+  "Older versions of {names} used this prep, so it is kept for their history.": "نسخه‌های قبلی {names} از این آماده‌سازی استفاده کرده‌اند، پس برای سابقه‌ی آن‌ها نگه داشته می‌شود.",
+  "Only the owner can delete an approved prep.": "فقط مالک می‌تواند آماده‌سازی تأییدشده را حذف کند.",
+
+  // Deleting and cancelling
+  "Delete prep": "حذف آماده‌سازی",
+  "Delete {name}? This can't be undone.": "{name} حذف شود؟ این کار برگشت‌پذیر نیست.",
+  "Prep deleted": "آماده‌سازی حذف شد",
+  "Could not delete": "حذف نشد",
+  "Remove it from the recipes under “Used in” before deleting it.": "قبل از حذف، آن را از دستور پخت‌های بخش «استفاده‌شده در» بردارید.",
+  "Throw away your changes?": "تغییرات ذخیره‌نشده دور ریخته شود؟",
+  "Throw away this new prep? Nothing in it has been saved.": "این آماده‌سازی جدید دور ریخته شود؟ هنوز چیزی در آن ذخیره نشده.",
   "Enter an amount for every line": "برای هر ردیف مقدار وارد کنید",
   "Enter how much one batch makes": "بازده هر دیگ را وارد کنید",
 

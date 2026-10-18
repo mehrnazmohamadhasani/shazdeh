@@ -25,6 +25,8 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   const editing = !!draft || !approved || query.edit === "1";
   const editHref = `/admin/ops/recipes/${recipe.id}?edit=1#edit`;
   const kind = recipe.kind;
+  // Drafts can go by any editor; an approved recipe only by the owner (as with approving).
+  const canDelete = (!approved && !history.length) || (kind === "PREP" && user.role === "ADMIN");
   const name = (r: { name: string; nameFa?: string | null }) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
 
   const sheetLines = (v: NonNullable<typeof approved>): SheetLine[] =>
@@ -138,13 +140,8 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
             }
             description={draft ? t("Not used by the kitchen until it is approved.") : undefined}
             actions={
-              draft && approved ? (
-                <DiscardDraftButton recipeId={recipe.id} />
-              ) : !draft && approved ? (
-                <Button asChild variant="ghost" size="sm">
-                  <Link href={`/admin/ops/recipes/${recipe.id}`}>{t("Cancel")}</Link>
-                </Button>
-              ) : undefined
+              // Cancel (unsaved changes) is at the bottom of the editor.
+              draft && approved ? <DiscardDraftButton recipeId={recipe.id} /> : undefined
             }
           >
             {draft?.version.sourceDocumentId && (
@@ -176,6 +173,8 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
               menuPriceAed={recipe.menuItem?.price ?? null}
               canApprove={user.role === "ADMIN"}
               startsNewVersion={!draft && !!approved}
+              details={kind === "PREP" ? { name: recipe.name, nameFa: recipe.nameFa } : undefined}
+              isNew={kind === "PREP" && !approved && !history.length && !draft?.version.lines.length && !draft?.version.method}
             />
             {user.role !== "ADMIN" && <p className="mt-3 text-[12.5px] text-dark-grey">{t("Only the owner can approve a recipe.")}</p>}
           </Card>
@@ -214,14 +213,20 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
         </Card>
       )}
 
-      <Card title={t("Details")}>
-        <RecipeDetailsForm recipe={{ id: recipe.id, name: recipe.name, nameFa: recipe.nameFa }} />
-        {!approved && !history.length && (
-          <div className="mt-5 border-t border-black-iron/[0.06] pt-5">
-            <DeleteRecipeButton recipeId={recipe.id} />
-          </div>
-        )}
-      </Card>
+      {/* A prep's name is edited with the rest of it, in the editor. */}
+      {(kind === "DISH" || canDelete) && (
+        <Card title={t("Details")}>
+          {kind === "DISH" && <RecipeDetailsForm recipe={{ id: recipe.id, name: recipe.name, nameFa: recipe.nameFa }} />}
+          {canDelete && (
+            <div className={kind === "DISH" ? "mt-5 border-t border-black-iron/[0.06] pt-5" : undefined}>
+              <DeleteRecipeButton recipeId={recipe.id} name={recipe.name} kind={kind} />
+              {kind === "PREP" && usedIn.length > 0 && (
+                <p className="mt-2 text-[12.5px] text-dark-grey">{t("Remove it from the recipes under “Used in” before deleting it.")}</p>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
     </AdminPage>
   );
 }
