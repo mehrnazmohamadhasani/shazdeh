@@ -47,7 +47,8 @@ export async function propose(
   const input = await build(tool, args, ctx.catalog, ctx.user, ctx.today);
   const { preview: p, sensitive } = await preview(input);
   const row = await prisma.assistantAction.create({
-    data: { userId: ctx.user.id, tool, via: ctx.via, sensitive, input: json(input), preview: json(p), sourceDocumentId: ctx.sourceDocumentId },
+    // The tool the input turned into (a change to a dish with no recipe is its first recipe).
+    data: { userId: ctx.user.id, tool: input.tool, via: ctx.via, sensitive, input: json(input), preview: json(p), sourceDocumentId: ctx.sourceDocumentId },
   });
   return toCard(row, ctx.user);
 }

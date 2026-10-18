@@ -7,7 +7,7 @@ import { approveDraftTx, deleteRecipe, discardDraft, previewNewRecipeCost, previ
 import { dishMargin } from "../recipe-cost";
 import type { SaveInvoiceInput } from "../save-schema";
 import { itemRef, lastPrices, onHand, pick, valueOf, type Catalog } from "./catalog";
-import { bigCountDifference, checkDay, findByName, toStockUnit, type Named } from "./match";
+import { bigCountDifference, checkDay, findByName, normalizeText, toStockUnit, type Named } from "./match";
 import { fixUnitPrice } from "./invoice-fix";
 import type { toolArgs } from "./definitions";
 import { priceFreeFood, recordFreeFood, voidFreeFood } from "../free-food";
@@ -125,6 +125,8 @@ export async function build(tool: WriteTool, raw: unknown, catalog: Catalog, act
 }
 
 async function buildRecipe(args: Args<"change_recipe">, catalog: Catalog, actor: Actor): Promise<StoredInput> {
+  const first = await asFirstRecipe(args, catalog);
+  if (first) return first;
   const entry = pick("Recipe", args.recipe, catalog.recipes);
   const versions = await prisma.recipeVersion.findMany({
     where: { recipeId: entry.id, status: { in: ["APPROVED", "DRAFT"] } },
@@ -162,6 +164,29 @@ async function buildRecipe(args: Args<"change_recipe">, catalog: Catalog, actor:
   }
   if (lines.length === 0) throw new OpsError("A recipe needs at least one ingredient.");
   return { tool: "change_recipe", recipeId: entry.id, fromVersionId: approved.id, approve: actor.role === "ADMIN", note: args.note?.trim() || null, lines, changes };
+}
+
+/**
+ * "Add 5 g salt to test2" for a menu dish with no recipe yet (or only an
+ * empty draft): there is nothing to change, so it becomes the dish's first
+ * recipe (write_recipe). A recipe with exactly the name said still wins,
+ * so a prep or dish with a recipe is changed as before. Null: not this case.
+ */
+async function asFirstRecipe(args: Args<"change_recipe">, catalog: Catalog): Promise<StoredInput | null> {
+  const dish = findByName(args.recipe, catalog.menuItems);
+  if (!dish.ok) return null;
+  const said = normalizeText(args.recipe);
+  if (catalog.recipes.some((r) => r.menuItemId !== dish.item.id && normalizeText(r.name) === said)) return null;
+  const existing = await prisma.recipe.findUnique({
+    where: { menuItemId: dish.item.id },
+    select: { versions: { where: { status: { in: ["APPROVED", "DRAFT"] } }, select: { status: true, _count: { select: { lines: true } } } } },
+  });
+  if (existing?.versions.some((v) => v.status === "APPROVED" || v._count.lines > 0)) return null;
+  const lines = args.changes.map((c) => {
+    if (!c.quantity) throw new OpsError(`${dish.item.name} has no recipe yet, so there is nothing to remove. Ask for the amounts of its ingredients.`);
+    return { item: c.item, quantity: c.quantity, unit: c.unit };
+  });
+  return buildNewRecipe({ dish: dish.item.id, portions: null, lines, note: args.note }, catalog);
 }
 
 /** Ingredients and preps a recipe line may name, each with the unit it is measured in. */
