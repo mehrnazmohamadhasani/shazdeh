@@ -6,6 +6,10 @@ import { UploadButton } from "@/components/admin/ops/upload-button";
 import { TableFilter } from "@/components/admin/table-filter";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { stockSummary } from "@/lib/ops/documents";
+import { unusedIngredients } from "@/lib/ops/catalog";
+import { DeleteUnusedIngredientsButton } from "@/components/admin/ops/forms";
+import { CMS_ROLES } from "@/lib/api";
+import { requireAdmin } from "@/lib/auth";
 import { getOpsSettings } from "@/lib/ops/settings";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 
@@ -18,7 +22,7 @@ export async function generateMetadata() {
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { t, locale, intl } = await getAdminI18n();
   const { show } = await searchParams;
-  const [all, settings] = await Promise.all([stockSummary(), getOpsSettings()]);
+  const [all, settings, unused, user] = await Promise.all([stockSummary(), getOpsSettings(), unusedIngredients(), requireAdmin()]);
   // What we have by default; ingredients at zero (or below — needs a count) only when asked.
   const showAll = show === "all";
   const inStock = all.filter((r) => r.onHand > 0);
@@ -65,6 +69,12 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
               ))}
             </span>
             {rows.length > 8 && <TableFilter target="stock-rows" placeholder={t("Search ingredients")} className="max-w-sm flex-1" />}
+            {/* Left over from undone invoices, or never used: one tap to clear them (same roles as merging). */}
+            {showAll && unused.length > 0 && CMS_ROLES.includes(user.role) && (
+              <span className="ms-auto">
+                <DeleteUnusedIngredientsButton names={unused.map((u) => u.name)} />
+              </span>
+            )}
           </div>
         )}
         {all.length > 0 && rows.length === 0 ? (

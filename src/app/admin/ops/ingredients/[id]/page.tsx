@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
+import { DeleteIngredientButton, IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
-import { getIngredient } from "@/lib/ops/catalog";
+import { getIngredient, ingredientKeptReason } from "@/lib/ops/catalog";
+import { CMS_ROLES } from "@/lib/api";
+import { requireAdmin } from "@/lib/auth";
 import { chosenCost, getOpsSettings } from "@/lib/ops/settings";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
@@ -29,7 +31,7 @@ const MOVEMENT_LABEL: Record<string, string> = {
 export default async function IngredientPage({ params }: { params: Promise<{ id: string }> }) {
   const { t, locale, intl } = await getAdminI18n();
   const { id } = await params;
-  const [ingredient, settings] = await Promise.all([getIngredient(id), getOpsSettings()]);
+  const [ingredient, settings, kept, user] = await Promise.all([getIngredient(id), getOpsSettings(), ingredientKeptReason(id), requireAdmin()]);
   if (!ingredient) notFound();
   const unit = UNIT[ingredient.unit];
   const sameUnit = await prisma.ingredient.findMany({
@@ -173,6 +175,13 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
       >
         <MergeForm url={`/api/admin/ops/ingredients/${ingredient.id}/merge`} options={sameUnit} noun="ingredient" redirectTo="/admin/ops/ingredients/{id}" />
       </Card>
+
+      {/* Same roles as merging. */}
+      {CMS_ROLES.includes(user.role) && (
+        <Card title={t("Delete")}>
+          <DeleteIngredientButton id={ingredient.id} name={ingredient.name} kept={kept} />
+        </Card>
+      )}
     </AdminPage>
   );
 }

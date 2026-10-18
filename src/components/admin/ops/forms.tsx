@@ -598,3 +598,89 @@ export function OpeningStockForm({
     </form>
   );
 }
+
+// ─── Deleting unused ingredients ────────────────────────────────────────────
+
+type Kept = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "history" };
+
+/** Why an ingredient has to stay, in the panel's language. */
+export function useKeptText() {
+  const { t } = useAdminI18n();
+  return (kept: Kept) =>
+    kept.code === "recipes"
+      ? t("It is used in {names}. Remove it from those recipes first.", { names: kept.names.join(", ") })
+      : kept.code === "invoice"
+        ? t("It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.")
+        : t("It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.");
+}
+
+async function remove(url: string) {
+  const res = await fetch(url, { method: "DELETE" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw json;
+  return json as Record<string, unknown>;
+}
+
+/** On an ingredient's page; disabled with the reason while something still uses it. */
+export function DeleteIngredientButton({ id, name, kept }: { id: string; name: string; kept: Kept | null }) {
+  const { t } = useAdminI18n();
+  const keptText = useKeptText();
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <div className="space-y-2">
+      <Button
+        variant="destructive"
+        size="sm"
+        disabled={busy || !!kept}
+        onClick={async () => {
+          if (!window.confirm(t("Delete {name}? This can't be undone.", { name }))) return;
+          setBusy(true);
+          try {
+            await remove(`/api/admin/ops/ingredients/${id}`);
+            toast.success(t("Ingredient deleted"));
+            router.push("/admin/ops/stock?show=all");
+            router.refresh();
+          } catch (e) {
+            const body = (e ?? {}) as { kept?: Kept };
+            toast.error(body.kept ? keptText(body.kept) : t(messageFromUnknown(e, "Could not delete")), { duration: 8000 });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} {t("Delete ingredient")}
+      </Button>
+      <p className="text-[12.5px] text-dark-grey">{kept ? keptText(kept) : t("Nothing uses it any more, so it can be deleted.")}</p>
+    </div>
+  );
+}
+
+/** On the Stock screen: removes every ingredient nothing uses, e.g. left over from undone invoices. */
+export function DeleteUnusedIngredientsButton({ names }: { names: string[] }) {
+  const { t } = useAdminI18n();
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={busy}
+      onClick={async () => {
+        if (!window.confirm(t("Delete {n} ingredients nothing uses any more? {names}. This can't be undone.", { n: names.length, names: names.join(", ") }))) return;
+        setBusy(true);
+        try {
+          const json = await remove("/api/admin/ops/ingredients/unused");
+          toast.success(t("{n} ingredients deleted", { n: (json.deleted as string[]).length }));
+          router.refresh();
+        } catch (e) {
+          toast.error(t(messageFromUnknown(e, "Could not delete")));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} {t("Delete unused ({n})", { n: names.length })}
+    </Button>
+  );
+}
