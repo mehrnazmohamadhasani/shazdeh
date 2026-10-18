@@ -216,7 +216,7 @@ export async function mergeIngredients(fromId: string, intoId: string, actor: Ac
 // ─── Deleting unused ingredients ────────────────────────────────────────────
 
 /** Why an ingredient has to stay, or null when it can be deleted. */
-export type KeptReason = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "history" };
+export type KeptReason = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "sales" } | { code: "owner" } | { code: "history" };
 
 const usageSelect = {
   id: true,
@@ -224,45 +224,82 @@ const usageSelect = {
   recipeLines: { select: { version: { select: { recipe: { select: { name: true } } } } } },
   // Lines of undone invoices don't count: the invoice keeps them, without the link.
   purchaseLines: { where: { invoice: { voidedAt: null } }, select: { id: true }, take: 1 },
-  movements: { select: { id: true, reversesId: true, reversedBy: { select: { id: true } } } },
+  movements: {
+    select: {
+      id: true,
+      type: true,
+      quantity: true,
+      at: true,
+      note: true,
+      orderId: true,
+      platformOrderId: true,
+      freeFoodId: true,
+      reversesId: true,
+      reversedBy: { select: { id: true } },
+    },
+  },
 } as const;
 
-type Usage = { recipeLines: { version: { recipe: { name: string } } }[]; purchaseLines: unknown[]; movements: { reversesId: string | null; reversedBy: unknown }[] };
+type Movement = {
+  type: string;
+  quantity: number;
+  at: Date;
+  note: string | null;
+  orderId: string | null;
+  platformOrderId: string | null;
+  freeFoodId: string | null;
+  reversesId: string | null;
+  reversedBy: unknown;
+};
+type Usage = { recipeLines: { version: { recipe: { name: string } } }[]; purchaseLines: unknown[]; movements: Movement[] };
 
-function keptReason(i: Usage): KeptReason | null {
+/** Entries that aren't a "bought, then the invoice was undone" pair. */
+const realEntries = (ms: Movement[]) => ms.filter((m) => !m.reversesId && !m.reversedBy);
+
+/**
+ * Anyone may delete an ingredient with no real stock entries. The owner may
+ * also delete one whose manual entries (waste, corrections, counts) add up
+ * to zero — never one a sale or free food took stock from.
+ */
+function keptReason(i: Usage, owner: boolean): KeptReason | null {
   if (i.recipeLines.length) return { code: "recipes", names: [...new Set(i.recipeLines.map((l) => l.version.recipe.name))].sort() };
   if (i.purchaseLines.length) return { code: "invoice" };
-  // Only "bought, then the invoice was undone" pairs may go; anything else is real stock history.
-  if (i.movements.some((m) => !m.reversesId && !m.reversedBy)) return { code: "history" };
-  return null;
+  const real = realEntries(i.movements);
+  if (!real.length) return null;
+  if (real.some((m) => m.type === "CONSUMPTION" || m.orderId || m.platformOrderId || m.freeFoodId)) return { code: "sales" };
+  const total = i.movements.reduce((sum, m) => sum + m.quantity, 0);
+  if (Math.abs(total) > 1e-9) return { code: "history" };
+  return owner ? null : { code: "owner" };
 }
 
 const KEPT_MESSAGE = {
   recipes: (names: string[]) => `It is used in ${names.join(", ")}. Remove it from those recipes first.`,
   invoice: () => "It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.",
+  sales: () => "Sales or free food took stock from it, so it is kept for their history. Merge it into another ingredient instead.",
+  owner: () => "Only the owner can delete it: it has waste or correction entries (they add up to zero).",
   history: () => "It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.",
 };
 
-/** Whether `id` can be deleted, for its page. */
-export async function ingredientKeptReason(id: string) {
+/** Whether `id` can be deleted by this person, for its page. */
+export async function ingredientKeptReason(id: string, owner: boolean) {
   const i = await prisma.ingredient.findUnique({ where: { id }, select: usageSelect });
-  return i ? keptReason(i) : null;
+  return i ? keptReason(i, owner) : null;
 }
 
-/** Ingredients nothing depends on any more, e.g. left over from undone invoices. */
+/** Ingredients nothing depends on any more, e.g. left over from undone invoices (no manual entries either). */
 export async function unusedIngredients() {
   const all = await prisma.ingredient.findMany({ select: usageSelect, orderBy: { name: "asc" } });
-  return all.filter((i) => !keptReason(i)).map((i) => ({ id: i.id, name: i.name }));
+  return all.filter((i) => !keptReason(i, false)).map((i) => ({ id: i.id, name: i.name }));
 }
 
-async function deleteOne(tx: Prisma.TransactionClient, id: string, actor: Actor, via: string) {
+async function deleteOne(tx: Prisma.TransactionClient, id: string, actor: Actor, via: string, owner: boolean) {
   const i = await tx.ingredient.findUnique({ where: { id }, select: { ...usageSelect, nameFa: true, unit: true, category: true } });
   if (!i) throw new OpsError("Ingredient not found.", 404);
-  const kept = keptReason(i);
+  const kept = keptReason(i, owner);
   if (kept) throw new OpsError(kept.code === "recipes" ? KEPT_MESSAGE.recipes(kept.names) : KEPT_MESSAGE[kept.code](), 409, { kept });
-  // The undo entries first: each points at the purchase it cancels.
-  const undos = await tx.stockMovement.deleteMany({ where: { ingredientId: id, reversesId: { not: null } } });
-  const bought = await tx.stockMovement.deleteMany({ where: { ingredientId: id } });
+  // Undo entries first: each points at the entry it cancels.
+  await tx.stockMovement.deleteMany({ where: { ingredientId: id, reversesId: { not: null } } });
+  await tx.stockMovement.deleteMany({ where: { ingredientId: id } });
   // Supplier name memory and recipe-sheet aliases go with it; undone invoices keep their lines (unlinked).
   await tx.ingredient.delete({ where: { id } });
   await tx.auditLog.create({
@@ -272,15 +309,23 @@ async function deleteOne(tx: Prisma.TransactionClient, id: string, actor: Actor,
       entity: "Ingredient",
       entityId: id,
       via,
-      before: { name: i.name, nameFa: i.nameFa, unit: i.unit, category: i.category, undoneMovementsRemoved: undos.count + bought.count },
+      before: {
+        name: i.name,
+        nameFa: i.nameFa,
+        unit: i.unit,
+        category: i.category,
+        undoneMovementsRemoved: i.movements.length - realEntries(i.movements).length,
+        // The manual entries removed with it, so they can still be looked up.
+        manualEntriesRemoved: realEntries(i.movements).map((m) => ({ type: m.type, quantity: m.quantity, at: m.at.toISOString(), note: m.note })),
+      },
     },
   });
   return i.name;
 }
 
 /** Deletes an ingredient nothing uses; otherwise says what still needs it. */
-export async function deleteIngredient(id: string, actor: Actor, via = "manual") {
-  return prisma.$transaction((tx) => deleteOne(tx, id, actor, via));
+export async function deleteIngredient(id: string, actor: Actor, via = "manual", opts: { owner?: boolean } = {}) {
+  return prisma.$transaction((tx) => deleteOne(tx, id, actor, via, !!opts.owner));
 }
 
 /**

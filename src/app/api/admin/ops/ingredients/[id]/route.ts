@@ -17,13 +17,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 }
 
-/** Delete an ingredient nothing uses (same roles as merging). */
+/** Delete an ingredient nothing uses (same roles as merging); the owner also one whose manual entries add up to zero. */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(CMS_ROLES);
   if (auth.response) return auth.response;
   const { id } = await ctx.params;
   try {
-    await deleteIngredient(id, auth.user);
+    await deleteIngredient(id, auth.user, "manual", { owner: auth.user.role === "ADMIN" });
     return ok({ id });
   } catch (e) {
     return opsError(e);

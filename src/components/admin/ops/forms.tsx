@@ -601,7 +601,7 @@ export function OpeningStockForm({
 
 // ─── Deleting unused ingredients ────────────────────────────────────────────
 
-type Kept = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "history" };
+type Kept = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "sales" } | { code: "owner" } | { code: "history" };
 
 /** Why an ingredient has to stay, in the panel's language. */
 export function useKeptText() {
@@ -611,7 +611,11 @@ export function useKeptText() {
       ? t("It is used in {names}. Remove it from those recipes first.", { names: kept.names.join(", ") })
       : kept.code === "invoice"
         ? t("It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.")
-        : t("It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.");
+        : kept.code === "sales"
+          ? t("Sales or free food took stock from it, so it is kept for their history. Merge it into another ingredient instead.")
+          : kept.code === "owner"
+            ? t("Only the owner can delete it: it has waste or correction entries (they add up to zero).")
+            : t("It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.");
 }
 
 async function remove(url: string) {

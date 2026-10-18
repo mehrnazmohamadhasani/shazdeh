@@ -31,7 +31,8 @@ const MOVEMENT_LABEL: Record<string, string> = {
 export default async function IngredientPage({ params }: { params: Promise<{ id: string }> }) {
   const { t, locale, intl } = await getAdminI18n();
   const { id } = await params;
-  const [ingredient, settings, kept, user] = await Promise.all([getIngredient(id), getOpsSettings(), ingredientKeptReason(id), requireAdmin()]);
+  const user = await requireAdmin();
+  const [ingredient, settings, kept] = await Promise.all([getIngredient(id), getOpsSettings(), ingredientKeptReason(id, user.role === "ADMIN")]);
   if (!ingredient) notFound();
   const unit = UNIT[ingredient.unit];
   const sameUnit = await prisma.ingredient.findMany({
