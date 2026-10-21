@@ -33,7 +33,7 @@ export default async function EditMenuItemPage({ params, searchParams }: { param
     <AdminPage
       title={
         <span className="flex items-center gap-3">
-          <Link href="/admin/menu-items" aria-label={t("Back to menu")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href="/admin/menu-items" aria-label={t("Back to menu")} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           <span dir="auto">{item.name}</span>

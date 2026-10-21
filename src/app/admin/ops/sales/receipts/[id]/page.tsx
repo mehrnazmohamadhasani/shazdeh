@@ -47,7 +47,7 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
     <Card
       title={t("Original")}
       actions={
-        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-terracotta-ink underline-offset-4 hover:underline">
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-terracotta-ink admin-link">
           {t("Full size")} <ExternalLink className="h-3.5 w-3.5" />
         </a>
       }
@@ -178,7 +178,7 @@ export default async function PlatformReceiptPage({ params }: { params: Promise<
     <AdminPage
       title={
         <span className="flex flex-wrap items-center gap-3">
-          <Link href={back.href} aria-label={t(back.label)} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href={back.href} aria-label={t(back.label)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           <span>{order ? `${order.channel.name} #${order.orderNo}` : reading ? `${reading.platformPrinted ?? reading.platform} ${reading.orderNo ? `#${reading.orderNo}` : ""}` : t("Platform receipt")}</span>

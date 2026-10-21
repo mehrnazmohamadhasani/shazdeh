@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- private document served by an authenticated route, not next/image */
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, Paperclip, Phone } from "lucide-react";
+import { ArrowLeft, ChevronRight, ExternalLink, Paperclip, Phone } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { DOC_STATUS } from "@/components/admin/ops/status";
 import { InvoiceReview } from "@/components/admin/ops/invoice-review";
@@ -41,7 +41,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     <Card
       title={t("Original")}
       actions={
-        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-terracotta-ink underline-offset-4 hover:underline">
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-terracotta-ink admin-link">
           {t("Full size")} <ExternalLink className="h-3.5 w-3.5" />
         </a>
       }
@@ -74,7 +74,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <div className="space-y-5">
         <Card
           title={
-            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} dir="auto" className="hover:underline">
+            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} dir="auto" className="admin-link">
               {inv.supplier.name}
             </Link>
           }
@@ -97,7 +97,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                       <>
                         {" → +"}
                         {amountText(l.baseQty, UNIT[l.ingredient.unit], locale)}{" "}
-                        <Link href={`/admin/ops/ingredients/${l.ingredientId}`} dir="auto" className="underline-offset-2 hover:underline">
+                        <Link href={`/admin/ops/ingredients/${l.ingredientId}`} dir="auto" className="underline-offset-2 admin-link">
                           {l.ingredient.name}
                         </Link>
                       </>
@@ -127,12 +127,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
         <Card title={t("Supplier")}>
           <div className="space-y-1.5 text-[14px]">
-            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} dir="auto" className="font-medium hover:underline">
+            <Link href={`/admin/ops/suppliers/${inv.supplierId}`} dir="auto" className="font-medium admin-link">
               {inv.supplier.name}
             </Link>
             {inv.supplier.phone ? (
               <p>
-                <a href={`tel:${inv.supplier.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="inline-flex items-center gap-1.5 text-terracotta-ink hover:underline">
+                <a href={`tel:${inv.supplier.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="inline-flex items-center gap-1.5 text-terracotta-ink admin-link">
                   <Phone className="h-3.5 w-3.5" /> {inv.supplier.phone}
                 </a>
               </p>
@@ -168,7 +168,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           {inv.paidAt && inv.paidPersonally && inv.paidBy && (
             <p className="mt-2 text-[13px] text-dark-grey">
               {t("Paid with {name}'s own money — the business owes it back.", { name: inv.paidBy })}{" "}
-              <Link href="/admin/ops/cash" className="font-medium text-terracotta-ink underline-offset-4 hover:underline">
+              <Link href="/admin/ops/cash" className="font-medium text-terracotta-ink admin-link">
                 {t("Owner cash")}
               </Link>
             </p>
@@ -178,7 +178,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               href={`/api/admin/ops/documents/${inv.paymentReceiptId}/file`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-terracotta-ink underline-offset-4 hover:underline"
+              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-terracotta-ink admin-link"
             >
               <Paperclip className="h-3.5 w-3.5" />
               {t(RECEIPT_LABEL[(inv.paymentReceiptKind as ReceiptKind | null) ?? "card"])}
@@ -191,7 +191,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           )}
         </Card>
 
-        <Link href="/admin/ops/stock" className="inline-block text-[13px] font-medium text-terracotta-ink underline-offset-4 hover:underline">
+        <Link href="/admin/ops/stock" className="inline-block text-[13px] font-medium text-terracotta-ink admin-link">
           {t("See stock →")}
         </Link>
       </div>
@@ -229,11 +229,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   {r.date && <span className="text-dark-grey"> · {date(new Date(r.date))}</span>}
                 </span>
                 {r.match ? (
-                  <Link href={r.match.documentId ? `/admin/ops/invoices/${r.match.documentId}` : "#"} className="hover:underline">
+                  r.match.documentId ? (
+                    <Link href={`/admin/ops/invoices/${r.match.documentId}`} className="inline-flex min-h-10 items-center rounded-full">
+                      <StatusPill tone={r.how === "number" ? "good" : "warn"}>
+                        {r.how === "number" ? t("Saved") : t("Saved as #{number}", { number: r.match.invoiceNo ?? "—" })}
+                        <ChevronRight className="h-3.5 w-3.5 rtl:-scale-x-100" aria-hidden />
+                      </StatusPill>
+                    </Link>
+                  ) : (
                     <StatusPill tone={r.how === "number" ? "good" : "warn"}>
                       {r.how === "number" ? t("Saved") : t("Saved as #{number}", { number: r.match.invoiceNo ?? "—" })}
                     </StatusPill>
-                  </Link>
+                  )
                 ) : (
                   <StatusPill tone="bad">{t("Missing")}</StatusPill>
                 )}
@@ -279,7 +286,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     const undone = doc.voidedInvoices[0];
     const [suppliers, ingredients] = await Promise.all([
       prisma.supplier.findMany({ select: { id: true, name: true, trn: true, phone: true, paymentTermsDays: true }, orderBy: { name: "asc" } }),
-      prisma.ingredient.findMany({ select: { id: true, name: true, unit: true }, orderBy: { name: "asc" } }),
+      prisma.ingredient.findMany({ select: { id: true, name: true, nameFa: true, unit: true }, orderBy: { name: "asc" } }),
     ]);
     body = (
       <>
@@ -329,7 +336,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     <AdminPage
       title={
         <span className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/ops/invoices" aria-label={t("Back to invoices")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href="/admin/ops/invoices" aria-label={t("Back to invoices")} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           <span dir="auto">{stored?.reading.supplier.name ?? doc.invoice?.supplier.name ?? (manual ? t("New invoice") : t("Invoice"))}</span>

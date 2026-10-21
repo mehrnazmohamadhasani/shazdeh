@@ -130,7 +130,7 @@ export default async function OwnerCashPage() {
                 <li key={i.id} className="flex items-center gap-3 px-5 py-3 md:px-6">
                   <span className="min-w-0 flex-1">
                     {i.documentId ? (
-                      <Link href={`/admin/ops/invoices/${i.documentId}`} dir="auto" className="font-medium hover:underline">
+                      <Link href={`/admin/ops/invoices/${i.documentId}`} dir="auto" className="font-medium admin-link">
                         {i.supplier.name}
                       </Link>
                     ) : (

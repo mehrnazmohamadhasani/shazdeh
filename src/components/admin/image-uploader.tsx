@@ -4,6 +4,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { Upload, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { chipDangerClass } from "@/components/admin/ui";
 import { messageFromUnknown } from "@/lib/error-message";
 import { uploadAdminImage } from "@/lib/upload-admin-image";
 import { useAdminI18n } from "@/components/admin/i18n";
@@ -117,7 +118,7 @@ export function ImageUploader({
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="inline-flex min-h-9 items-center gap-1.5 text-[12.5px] text-dark-grey transition-colors hover:text-pomegranate-red"
+          className={chipDangerClass}
         >
           <X className="h-3.5 w-3.5" strokeWidth={1.6} /> {t("Remove photo")}
         </button>

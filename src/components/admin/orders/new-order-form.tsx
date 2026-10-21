@@ -366,7 +366,7 @@ export function NewOrderForm({ menu, areas, zones }: { menu: OrderCategory[]; ar
         <div className="p-4">
           <div className="relative">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" />
-            <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Find a dish")} className="ps-9" />
+            <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Find a dish")} aria-label={t("Find a dish")} className="ps-9" />
           </div>
           <div className="mt-3 max-h-[46vh] space-y-4 overflow-y-auto pe-1">
             {shown.map((c) => (

@@ -58,12 +58,18 @@ function SalesCard({ summary, i18n }: { summary: TodaySummary; i18n: AdminI18n }
   const { profit, byChannel } = summary;
   return (
     <Card bodyClassName="p-0 md:p-0">
-      <Link href="/admin/ops/sales" className="block px-5 pb-4 pt-5 md:px-6">
-        <p className="text-[13px] font-medium text-dark-grey">{t("Food sales")}</p>
-        <p className="mt-1 text-[34px] font-bold leading-none tabular-nums tracking-[-0.03em]">{money(profit.salesFils)}</p>
-        <p className="mt-2 text-[13px] text-dark-grey">
-          {orders(profit.orders)} · {t("with VAT, without customer delivery and service fees")}
-        </p>
+      <Link href="/admin/ops/sales" className="flex items-start gap-3 rounded-t-[16px] px-5 pb-4 pt-5 transition-colors hover:bg-black-iron/[0.025] md:px-6">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13px] font-medium text-dark-grey">{t("Food sales")}</span>
+          <span className="mt-1 block text-[34px] font-bold leading-none tabular-nums tracking-[-0.03em]">{money(profit.salesFils)}</span>
+          <span className="mt-2 block text-[13px] text-dark-grey">
+            {orders(profit.orders)} · {t("with VAT, without customer delivery and service fees")}
+          </span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-terracotta-ink">
+          {t("Sales")}
+          <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
+        </span>
       </Link>
       <ul className="divide-y divide-black-iron/[0.06] border-t border-black-iron/[0.06] text-[15px]">
         {/* The website always shows; WhatsApp, phone and each platform only on a day they sold. */}
@@ -122,11 +128,12 @@ function ProfitCard({ summary, i18n }: { summary: TodaySummary; i18n: AdminI18n 
       {/* Staff meals, gifts… a cost with no sale: shown next to the profit, never hidden in it. */}
       {free.portions > 0 && (
         <div className="border-t border-black-iron/[0.06] px-5 py-3.5 text-[14px] md:px-6">
-          <Link href="/admin/ops/free-food" className="flex items-center justify-between gap-3 hover:underline">
-            <span className="text-dark-grey">{t("Free food (no sale)")}</span>
+          <Link href="/admin/ops/free-food" className="flex min-h-11 items-center gap-3">
+            <span className="min-w-0 flex-1 text-dark-grey">{t("Free food (no sale)")}</span>
             <span className="tabular-nums">
               {free.unknownRecords === free.byKind.reduce((n, k) => n + k.records, 0) ? t("Food cost not known yet") : `− ${money(free.knownCostFils)}`}
             </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" />
           </Link>
           <p className="mt-0.5 text-[12.5px] text-dark-grey">
             {free.byKind.map((k) => `${t(FREE_FOOD_LABEL[k.kind])} ${k.portions}`).join(" · ")}

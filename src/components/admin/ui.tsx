@@ -24,8 +24,9 @@ export function AdminPage({
 }) {
   return (
     <div className={cn("mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 md:px-8 md:py-10", className)}>
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between md:mb-8 print:hidden">
-        <div className="min-w-0">
+      {/* Actions wrap below the title when there are too many to fit beside it. */}
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between md:mb-8 print:hidden">
+        <div className="min-w-0 sm:min-w-[18rem] sm:flex-1">
           <h1 className="text-[26px] font-bold leading-tight tracking-[-0.03em] text-black-iron md:text-[30px]">
             {title}
           </h1>
@@ -45,6 +46,7 @@ export function Card({
   children,
   className,
   bodyClassName,
+  id,
 }: {
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -52,9 +54,12 @@ export function Card({
   children: React.ReactNode;
   className?: string;
   bodyClassName?: string;
+  /** Anchor to link to (e.g. "#details" from a list's Edit button). */
+  id?: string;
 }) {
   return (
     <section
+      id={id}
       className={cn(
         "rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
         className,
@@ -89,14 +94,30 @@ export function Field({
   className?: string;
   htmlFor?: string;
 }) {
+  // Tie the label (and hint) to the control, so tapping the label focuses
+  // it and screen readers announce its name. Done automatically for the
+  // field's first input, select or textarea (e.g. one followed by its datalist).
+  const autoId = React.useId();
+  const hintId = hint ? `${autoId}-hint` : undefined;
+  const kids = React.Children.toArray(children);
+  const at = kids.findIndex((c) => React.isValidElement(c) && CONTROLS.has(c.type));
+  const target = at >= 0 ? (kids[at] as React.ReactElement<{ id?: string; "aria-describedby"?: string }>) : null;
+  const id = target ? (target.props.id ?? htmlFor ?? autoId) : htmlFor;
+  const control = target
+    ? kids.map((c, i) =>
+        i === at
+          ? React.cloneElement(target, { id, "aria-describedby": cn(target.props["aria-describedby"], hintId) || undefined })
+          : c,
+      )
+    : children;
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={htmlFor} className="block text-[13px] font-medium text-black-iron">
+      <label htmlFor={id} className="block text-[13px] font-medium text-black-iron">
         {label}
         {required && <span className="ms-0.5 text-terracotta-ink">*</span>}
       </label>
-      {children}
-      {hint && <p className="text-[12px] text-dark-grey">{hint}</p>}
+      {control}
+      {hint && <p id={hintId} className="text-[12px] text-dark-grey">{hint}</p>}
     </div>
   );
 }
@@ -121,6 +142,8 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
   ({ className, ...props }, ref) => <select ref={ref} className={cn(controlClass, "h-11 pe-8", className)} {...props} />,
 );
 Select.displayName = "Select";
+
+const CONTROLS = new Set<unknown>([TextInput, TextArea, Select, "input", "select", "textarea"]);
 
 export function EmptyState({
   title,
@@ -204,6 +227,12 @@ export function SwitchRow({
   );
 }
 
+/** Compact pill for secondary row actions (Edit, Delete, Undo…) — small, but still a button. */
+export const chipButtonClass =
+  "inline-flex min-h-9 items-center gap-1.5 rounded-full bg-black-iron/[0.05] px-3 text-[13px] font-medium text-black-iron/80 transition-colors hover:bg-black-iron/[0.09] hover:text-black-iron active:bg-black-iron/[0.12] disabled:opacity-50";
+export const chipDangerClass =
+  "inline-flex min-h-9 items-center gap-1.5 rounded-full bg-pomegranate-red/[0.08] px-3 text-[13px] font-medium text-pomegranate-red transition-colors hover:bg-pomegranate-red/[0.14] disabled:opacity-50";
+
 /** Round icon button for row actions (reorder, delete…). Always pass a label. */
 export function IconButton({
   label,
@@ -228,9 +257,10 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "grid place-items-center rounded-full text-dark-grey transition-colors disabled:opacity-30",
-        size === "sm" ? "h-8 w-8" : "h-9 w-9",
-        danger ? "hover:bg-pomegranate-red/[0.08] hover:text-pomegranate-red" : "hover:bg-black-iron/[0.05] hover:text-black-iron",
+        // A soft fill at rest, so it reads as a button before any hover.
+        "grid shrink-0 place-items-center rounded-full bg-black-iron/[0.04] text-dark-grey transition-colors active:bg-black-iron/[0.12] disabled:bg-transparent disabled:opacity-30",
+        size === "sm" ? "h-9 w-9" : "h-10 w-10",
+        danger ? "hover:bg-pomegranate-red/[0.1] hover:text-pomegranate-red" : "hover:bg-black-iron/[0.08] hover:text-black-iron",
       )}
     >
       {children}

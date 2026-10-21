@@ -225,13 +225,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                 </div>
                 <ul className="divide-y divide-black-iron/[0.06] border-b border-black-iron/[0.06] last:border-b-0">
                   {d.rows.map((inv) => (
-                    <li key={inv.id} role="row" className={cn(ROW, "grid gap-y-2 py-3")}>
+                    <li key={inv.id} role="row" className={cn(ROW, "relative grid cursor-pointer gap-y-2 py-3 hover:bg-black-iron/[0.03]")}>
                       <Link
                         role="cell"
                         href={inv.documentId ? `/admin/ops/invoices/${inv.documentId}` : `/admin/ops/suppliers/${inv.supplier.id}`}
-                        className="group col-start-1 row-start-1 min-w-0 md:col-auto md:row-auto"
+                        className="row-link col-start-1 row-start-1 min-w-0 md:col-auto md:row-auto"
                       >
-                        <p dir="auto" className="truncate text-[14.5px] font-medium text-black-iron group-hover:underline">
+                        <p dir="auto" className="truncate text-[14.5px] font-medium text-black-iron">
                           {inv.supplier.name}
                         </p>
                         <p className="mt-0.5 truncate text-[12.5px] text-dark-grey">
@@ -244,10 +244,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                           </p>
                         )}
                       </Link>
-                      <span role="cell" className="col-start-2 row-start-1 self-start text-end text-[15px] font-semibold tabular-nums md:col-auto md:row-auto md:self-center">
+                      <span role="cell" className="col-start-2 row-start-1 inline-flex items-center justify-end gap-2 self-start text-[15px] font-semibold tabular-nums md:col-auto md:row-auto md:self-center">
                         {money(inv.totalFils)}
+                        <ChevronRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" aria-hidden />
                       </span>
-                      <div role="cell" className="col-span-2 md:col-span-1">
+                      <div role="cell" className="relative z-10 col-span-2 md:col-span-1">
                         <InvoicePayment
                           invoiceId={inv.id}
                           method={(inv.paymentMode as PaymentMethod | null) ?? null}

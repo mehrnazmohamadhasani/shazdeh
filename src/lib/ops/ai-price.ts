@@ -18,6 +18,22 @@ export function aiPrices(env: Record<string, string | undefined> = process.env):
 }
 
 /*
+ * List prices (US$ per million tokens) of the models SHĀZDEH uses when they
+ * differ from the default above: the assistant runs on gpt-4.1-mini. The
+ * AI_PRICE_* settings still win for the reading model.
+ */
+const MODEL_PRICES: Record<string, AiPrices> = {
+  "gpt-4.1-mini": { inputPerMTok: 0.4, outputPerMTok: 1.6 },
+  "gpt-4.1-nano": { inputPerMTok: 0.1, outputPerMTok: 0.4 },
+  "gpt-4.1": { inputPerMTok: 2, outputPerMTok: 8 },
+};
+
+/** Prices for `model`: its own list price when known, otherwise the configured default. */
+export function pricesFor(model: string, env: Record<string, string | undefined> = process.env): AiPrices {
+  return MODEL_PRICES[model] ?? aiPrices(env);
+}
+
+/*
  * Speech-to-text (gpt-4o-transcribe) is billed per token too, at its own
  * rates — audio in (about US$ 0.006 a minute), the vocabulary prompt in
  * as text, the transcript out:

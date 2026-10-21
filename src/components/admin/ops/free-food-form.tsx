@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Check, Gift, Loader2, Minus, Pencil, Plus, Search, Soup, Trash2, Users, Wine } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, TextInput } from "@/components/admin/ui";
+import { Field, TextInput, chipButtonClass, chipDangerClass } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { messageFromUnknown } from "@/lib/error-message";
 import { FREE_FOOD_KINDS, FREE_FOOD_LABEL, type FreeFoodKind } from "@/lib/ops/free-food-shared";
@@ -270,21 +270,21 @@ export function FreeFoodActions({ id, editHref }: { id: string; editHref: string
     }
   }
   return asking ? (
-    <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+    <span className="inline-flex flex-wrap items-center justify-end gap-2">
       <span className="text-[13px] text-pomegranate-red">{t("Delete this record?")}</span>
-      <button type="button" disabled={busy} onClick={remove} className="inline-flex items-center gap-1 text-[13px] font-medium text-pomegranate-red">
+      <button type="button" disabled={busy} onClick={remove} className={chipDangerClass}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} {t("Delete")}
       </button>
-      <button type="button" onClick={() => setAsking(false)} className="text-[13px] text-dark-grey">
+      <button type="button" onClick={() => setAsking(false)} className={chipButtonClass}>
         {t("Cancel")}
       </button>
     </span>
   ) : (
-    <span className="inline-flex items-center gap-3">
-      <Link href={editHref} className="inline-flex items-center gap-1 text-[13px] text-dark-grey hover:text-black-iron">
+    <span className="inline-flex items-center gap-2">
+      <Link href={editHref} className={chipButtonClass}>
         <Pencil className="h-3.5 w-3.5" /> {t("Edit")}
       </Link>
-      <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center gap-1 text-[13px] text-dark-grey hover:text-pomegranate-red">
+      <button type="button" onClick={() => setAsking(true)} className={chipDangerClass}>
         <Trash2 className="h-3.5 w-3.5" /> {t("Delete")}
       </button>
     </span>

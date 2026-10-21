@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { MergeForm, SupplierForm } from "@/components/admin/ops/forms";
+import { DeleteSupplierButton, MergeForm, SupplierForm } from "@/components/admin/ops/forms";
+import { CMS_ROLES } from "@/lib/api";
+import { requireAdmin } from "@/lib/auth";
 import { UNIT, amountText, day } from "@/components/admin/ops/format";
 import { getSupplier } from "@/lib/ops/catalog";
 import { prisma } from "@/lib/prisma";
@@ -17,9 +19,12 @@ export async function generateMetadata() {
 export default async function SupplierPage({ params }: { params: Promise<{ id: string }> }) {
   const { t, money, locale, intl } = await getAdminI18n();
   const { id } = await params;
-  const [supplier, others] = await Promise.all([
+  const [supplier, others, user, invoiceCount] = await Promise.all([
     getSupplier(id),
     prisma.supplier.findMany({ where: { id: { not: id } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    requireAdmin(),
+    // All invoices, undone ones too: any of them keeps the supplier.
+    prisma.purchaseInvoice.count({ where: { supplierId: id } }),
   ]);
   if (!supplier) notFound();
 
@@ -27,14 +32,14 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
     <AdminPage
       title={
         <span className="flex items-center gap-3">
-          <Link href="/admin/ops/suppliers" aria-label={t("Back to suppliers")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href="/admin/ops/suppliers" aria-label={t("Back to suppliers")} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           <span dir="auto">{supplier.name}</span>
         </span>
       }
     >
-      <Card title={t("Details")}>
+      <Card title={t("Details")} id="details">
         <SupplierForm supplier={supplier} />
       </Card>
 
@@ -67,9 +72,13 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
                   {docId ? (
                     <Link href={`/admin/ops/invoices/${docId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-black-iron/[0.02] md:px-6">
                       {row}
+                      <ChevronRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" />
                     </Link>
                   ) : (
-                    <div className="flex items-center gap-3 px-5 py-3 md:px-6">{row}</div>
+                    <div className="flex items-center gap-3 px-5 py-3 md:px-6">
+                      {row}
+                      <span className="w-4 shrink-0" aria-hidden />
+                    </div>
                   )}
                 </li>
               );
@@ -90,7 +99,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
                 <span dir="auto" className="min-w-0 truncate text-dark-grey">{item.rawName}</span>
                 <span className="shrink-0">
                   {t("1 unit = {amount}", { amount: amountText(item.baseQtyPerUnit, UNIT[item.ingredient.unit], locale) })}{" "}
-                  <Link href={`/admin/ops/ingredients/${item.ingredient.id}`} dir="auto" className="font-medium hover:underline">
+                  <Link href={`/admin/ops/ingredients/${item.ingredient.id}`} dir="auto" className="font-medium admin-link">
                     {item.ingredient.name}
                   </Link>
                 </span>
@@ -103,6 +112,13 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
       <Card title={t("Merge")} description={t("Same supplier under two names (e.g. “Unknown (handwritten veg)”)? Move everything into the right one.")}>
         <MergeForm url={`/api/admin/ops/suppliers/${supplier.id}/merge`} options={others} noun="supplier" redirectTo="/admin/ops/suppliers/{id}" />
       </Card>
+
+      {/* Same roles as deleting an ingredient. */}
+      {CMS_ROLES.includes(user.role) && (
+        <Card title={t("Delete")}>
+          <DeleteSupplierButton id={supplier.id} name={supplier.name} invoiceCount={invoiceCount} />
+        </Card>
+      )}
     </AdminPage>
   );
 }

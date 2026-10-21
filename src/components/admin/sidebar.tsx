@@ -102,7 +102,7 @@ export function AdminSidebar({ user }: { user: { email: string; name: string | n
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-e border-black-iron/[0.07] bg-white pb-[var(--safe-bottom)] pt-[var(--safe-top)] lg:flex print:!hidden">
       <div className="flex h-16 items-center px-5">
-        <Link href={roleHome(user.role)} aria-label={t("SHĀZDEH admin home")}>
+        <Link href={roleHome(user.role)} aria-label={t("SHĀZDEH admin home")} className="inline-flex min-h-11 items-center">
           <Wordmark size="sm" />
         </Link>
       </div>
@@ -180,7 +180,7 @@ export function AdminMobileBar({ user }: { user: { email: string; name: string |
   return (
     <header className="sticky top-0 z-40 border-b border-black-iron/[0.07] bg-white/95 pt-[var(--safe-top)] backdrop-blur lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between px-[max(1rem,var(--safe-left))]">
-        <Link href={roleHome(user.role)} aria-label={t("SHĀZDEH admin home")}>
+        <Link href={roleHome(user.role)} aria-label={t("SHĀZDEH admin home")} className="inline-flex min-h-11 items-center">
           <Wordmark size="xs" />
         </Link>
         <div className="-me-2 flex items-center">

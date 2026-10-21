@@ -17,7 +17,7 @@ type IngredientCategory = "FOOD" | "PACKAGING" | "SUPPLIES";
 
 export async function listSuppliers() {
   const [suppliers, totals, unpaid] = await Promise.all([
-    prisma.supplier.findMany({ orderBy: { name: "asc" } }),
+    prisma.supplier.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { invoices: true } } } }),
     prisma.purchaseInvoice.groupBy({
       by: ["supplierId"],
       where: { voidedAt: null },
@@ -31,11 +31,13 @@ export async function listSuppliers() {
       _sum: { totalFils: true },
     }),
   ]);
-  return suppliers.map((s) => {
+  return suppliers.map(({ _count, ...s }) => {
     const t = totals.find((x) => x.supplierId === s.id);
     return {
       ...s,
       invoiceCount: t?._count ?? 0,
+      // Undone invoices too: any invoice keeps the supplier from being deleted.
+      allInvoiceCount: _count.invoices,
       spendFils: t?._sum.totalFils ?? 0,
       lastInvoice: t?._max.invoiceDate ?? null,
       owedFils: unpaid.find((x) => x.supplierId === s.id)?._sum.totalFils ?? 0,
@@ -87,6 +89,35 @@ export async function updateSupplier(id: string, data: SupplierUpdate, actor: Ac
   });
 }
 
+/** A supplier added by hand, before its first invoice (invoices also add them automatically). */
+export async function createSupplier(data: SupplierUpdate, actor: Actor) {
+  const clash = await prisma.supplier.findFirst({ where: { name: { equals: data.name, mode: "insensitive" } }, select: { name: true } });
+  if (clash) throw new OpsError(`"${clash.name}" already exists.`, 409);
+  const supplier = await prisma.supplier.create({ data });
+  await prisma.auditLog.create({
+    data: { actor: actor.email, action: "supplier.create", entity: "Supplier", entityId: supplier.id, after: pick(supplier) },
+  });
+  return { id: supplier.id, name: supplier.name };
+}
+
+/**
+ * Only a supplier with no invoices (counted or undone) can be deleted; its
+ * learned item names go with it. One with invoices is merged instead.
+ */
+export async function deleteSupplier(id: string, actor: Actor) {
+  await prisma.$transaction(async (tx) => {
+    const s = await tx.supplier.findUnique({ where: { id }, include: { _count: { select: { invoices: true } } } });
+    if (!s) throw new OpsError("Supplier not found.", 404);
+    if (s._count.invoices > 0) {
+      throw new OpsError("It has invoices, so it is kept for their history. Merge it into another supplier instead.", 409, { kept: { code: "invoices" } });
+    }
+    await tx.supplier.delete({ where: { id } });
+    await tx.auditLog.create({
+      data: { actor: actor.email, action: "supplier.delete", entity: "Supplier", entityId: id, before: pick(s) },
+    });
+  });
+}
+
 function pick(s: SupplierUpdate) {
   const { name, trn, phone, notes, deliveryDays, leadTimeDays, paymentTermsDays } = s;
   return { name, trn, phone, notes, deliveryDays, leadTimeDays, paymentTermsDays };
@@ -133,7 +164,9 @@ export async function getIngredient(id: string) {
   const ingredient = await prisma.ingredient.findUnique({
     where: { id },
     include: {
-      movements: { orderBy: { at: "desc" }, take: 100 },
+      // Newest change first: by when it was entered (an invoice saved today
+      // for 4 Oct is still the latest change), then by its date.
+      movements: { orderBy: [{ createdAt: "desc" }, { at: "desc" }, { id: "desc" }], take: 100 },
       purchaseLines: {
         where: { invoice: { voidedAt: null } },
         orderBy: { invoice: { invoiceDate: "desc" } },
@@ -279,6 +312,15 @@ const KEPT_MESSAGE = {
   owner: () => "Only the owner can delete it: it has waste or correction entries (they add up to zero).",
   history: () => "It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.",
 };
+
+/** Why each ingredient has to stay (missing: it can be deleted), for the Stock list. */
+export async function ingredientKeptReasons(owner: boolean) {
+  const all = await prisma.ingredient.findMany({ select: usageSelect });
+  return new Map(all.flatMap((i) => {
+    const kept = keptReason(i, owner);
+    return kept ? [[i.id, kept] as const] : [];
+  }));
+}
 
 /** Whether `id` can be deleted by this person, for its page. */
 export async function ingredientKeptReason(id: string, owner: boolean) {

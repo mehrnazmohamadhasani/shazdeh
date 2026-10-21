@@ -61,7 +61,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
     <AdminPage
       title={
         <span className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/ops/stock" aria-label={t("Back to stock")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href="/admin/ops/stock" aria-label={t("Back to stock")} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           <span dir="auto">{ingredient.name}</span>
@@ -98,7 +98,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
             {bySupplier.map((p, i) => (
               <li key={p.supplier.id} className="flex items-center justify-between gap-3 px-5 py-3 md:px-6">
-                <Link href={`/admin/ops/suppliers/${p.supplier.id}`} dir="auto" className="font-medium hover:underline">
+                <Link href={`/admin/ops/suppliers/${p.supplier.id}`} dir="auto" className="font-medium admin-link">
                   {p.supplier.name}
                 </Link>
                 <span className="flex items-center gap-2 tabular-nums">
@@ -122,7 +122,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
                 <span className="w-16 shrink-0 text-dark-grey">{day(p.at, false, intl)}</span>
                 <span dir="auto" className="min-w-0 flex-1 truncate">
                   {p.documentId ? (
-                    <Link href={`/admin/ops/invoices/${p.documentId}`} className="hover:underline">
+                    <Link href={`/admin/ops/invoices/${p.documentId}`} className="admin-link">
                       {p.supplier.name}
                     </Link>
                   ) : (
@@ -164,7 +164,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
         )}
       </Card>
 
-      <Card title={t("Details")}>
+      <Card title={t("Details")} id="details">
         <IngredientForm ingredient={{ id: ingredient.id, name: ingredient.name, nameFa: ingredient.nameFa, category: ingredient.category === "PACKAGING" || ingredient.category === "SUPPLIES" ? ingredient.category : "FOOD", unit, lowStockAt: ingredient.lowStockAt }} />
       </Card>
 

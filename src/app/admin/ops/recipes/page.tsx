@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pencil, Plus } from "lucide-react";
+import { ArrowRight, ChevronRight, Pencil, Plus } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
 import { DeleteRecipeButton, NewRecipeDialog } from "@/components/admin/ops/recipe-forms";
 import { UNIT, unitPrice } from "@/components/admin/ops/format";
@@ -80,6 +80,7 @@ export default async function RecipesPage() {
                     </span>
                     <span className="shrink-0 text-[12.5px] text-dark-grey">{day(p.createdAt, false, intl)}</span>
                     <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" aria-hidden />
                   </Link>
                 </li>
               );
@@ -100,59 +101,66 @@ export default async function RecipesPage() {
           <table className="w-full text-[14px]">
             <thead>
               <tr className="border-b border-black-iron/[0.06] text-start text-[12px] text-dark-grey">
-                <th className="px-5 py-3 text-start font-medium md:px-6">{t("Dish")}</th>
+                <th className="py-3 ps-4 pe-2 text-start font-medium sm:px-5 md:px-6">{t("Dish")}</th>
                 <th className="px-3 py-3 text-end font-medium max-sm:hidden">{t("Menu price")}</th>
                 <th className="px-3 py-3 text-end font-medium max-sm:hidden">{t("Food cost")}</th>
-                <th className="px-3 py-3 text-end font-medium">{t("Food cost %")}</th>
-                <th className="px-5 py-3 text-end font-medium md:px-6" />
+                <th className="px-2 py-3 text-end font-medium sm:px-3">{t("Food cost %")}</th>
+                <th className="py-3 ps-2 pe-4 text-end font-medium sm:px-5 md:px-6" />
               </tr>
             </thead>
             <tbody id="dish-rows" className="divide-y divide-black-iron/[0.06]">
               {dishes.map(({ menuItem, recipe }) => (
-                <tr key={menuItem.id} data-search={`${menuItem.name} ${menuItem.nameFa ?? ""} ${menuItem.category.name}`} className="hover:bg-black-iron/[0.02]">
-                  <td className="px-5 py-3 md:px-6">
-                    <Link href={recipe ? `/admin/ops/recipes/${recipe.id}` : `/admin/menu-items/${menuItem.id}#recipe`} dir="auto" className="font-medium hover:underline">
+                <tr key={menuItem.id} data-search={`${menuItem.name} ${menuItem.nameFa ?? ""} ${menuItem.category.name}`} className="relative cursor-pointer hover:bg-black-iron/[0.03]">
+                  <td className="py-3 ps-4 pe-2 sm:px-5 md:px-6">
+                    <Link href={recipe ? `/admin/ops/recipes/${recipe.id}` : `/admin/menu-items/${menuItem.id}#recipe`} dir="auto" className="row-link font-medium">
                       {name(menuItem)}
                     </Link>
-                    <span className="ms-2 text-[12px] text-dark-grey">{menuItem.category.name}</span>
+                    <span className="block text-[12px] text-dark-grey sm:ms-2 sm:inline">{menuItem.category.name}</span>
                   </td>
                   <td className="px-3 py-3 text-end tabular-nums text-dark-grey max-sm:hidden">{price(menuItem.price)}</td>
                   <td className="px-3 py-3 text-end tabular-nums max-sm:hidden">{recipe?.perUnitFils != null ? money(Math.round(recipe.perUnitFils)) : "—"}</td>
-                  <td className="px-3 py-3 text-end tabular-nums">
+                  <td className="px-2 py-3 text-end tabular-nums sm:px-3">
                     {recipe?.margin?.foodCostPct != null ? `${number(recipe.margin.foodCostPct, { max: 1 })}%` : "—"}
                   </td>
-                  <td className="px-5 py-3 text-end md:px-6">
+                  <td className="py-3 ps-2 pe-4 text-end sm:px-5 md:px-6">
                     {recipe ? (
-                      <span className="inline-flex items-center gap-2">
+                      <span className="inline-flex flex-wrap items-center justify-end gap-2">
                         {status(recipe)}
-                        {edit(recipe.id)}
-                        {remove(recipe, "DISH")}
+                        <span className="relative z-10 inline-flex items-center gap-2">
+                          {edit(recipe.id)}
+                          {remove(recipe, "DISH")}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" aria-hidden />
                       </span>
                     ) : (
                       // On the dish's page: type it, a photo or PDF, or say it to the assistant.
                       <Link
                         href={`/admin/menu-items/${menuItem.id}#recipe`}
-                        className="inline-flex h-10 items-center gap-1.5 rounded-full border border-terracotta/40 px-3.5 text-[13px] font-medium text-terracotta-ink hover:bg-terracotta/[0.06]"
+                        className="relative z-10 inline-flex h-10 items-center gap-1.5 rounded-full border border-terracotta/40 px-3.5 text-[13px] font-medium text-terracotta-ink hover:bg-terracotta/[0.06]"
                       >
                         <Plus className="h-3.5 w-3.5" /> {t("Add recipe")}
                       </Link>
                     )}
+                    {!recipe && <ChevronRight className="ms-2 inline h-4 w-4 align-middle text-dark-grey rtl:-scale-x-100" aria-hidden />}
                   </td>
                 </tr>
               ))}
               {orphanDishes.map((r) => (
-                <tr key={r.id} data-search={`${r.name} ${r.nameFa ?? ""}`}>
+                <tr key={r.id} data-search={`${r.name} ${r.nameFa ?? ""}`} className="relative cursor-pointer hover:bg-black-iron/[0.03]">
                   <td className="px-5 py-3 md:px-6" colSpan={4}>
-                    <Link href={`/admin/ops/recipes/${r.id}`} dir="auto" className="font-medium hover:underline">
+                    <Link href={`/admin/ops/recipes/${r.id}`} dir="auto" className="row-link font-medium">
                       {name(r)}
                     </Link>
                     <span className="ms-2 text-[12px] text-dark-grey">{t("not on the menu")}</span>
                   </td>
-                  <td className="px-5 py-3 text-end md:px-6">
-                    <span className="inline-flex items-center gap-2">
+                  <td className="py-3 ps-2 pe-4 text-end sm:px-5 md:px-6">
+                    <span className="inline-flex flex-wrap items-center justify-end gap-2">
                       {status(r)}
-                      {edit(r.id)}
-                      {remove(r, "DISH")}
+                      <span className="relative z-10 inline-flex items-center gap-2">
+                        {edit(r.id)}
+                        {remove(r, "DISH")}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" aria-hidden />
                     </span>
                   </td>
                 </tr>
@@ -170,16 +178,19 @@ export default async function RecipesPage() {
         {preps.length > 0 && (
           <ul className="divide-y divide-black-iron/[0.06] border-b border-black-iron/[0.06] text-[14px]">
             {preps.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 px-5 py-3 md:px-6">
-                <Link href={`/admin/ops/recipes/${p.id}`} dir="auto" className="min-w-0 flex-1 truncate font-medium hover:underline">
+              <li key={p.id} className="relative flex cursor-pointer items-center gap-3 px-5 py-3 hover:bg-black-iron/[0.03] md:px-6">
+                <Link href={`/admin/ops/recipes/${p.id}`} dir="auto" className="row-link min-w-0 flex-1 truncate font-medium">
                   {name(p)}
                 </Link>
                 <span className="shrink-0 tabular-nums text-dark-grey">
                   {p.perUnitFils != null && p.perUnitFils > 0 ? unitPrice(p.perUnitFils, UNIT[p.yieldUnit], locale) : "—"}
                 </span>
                 {status(p)}
-                {edit(p.id)}
-                {remove(p, "PREP")}
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  {edit(p.id)}
+                  {remove(p, "PREP")}
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" aria-hidden />
               </li>
             ))}
           </ul>

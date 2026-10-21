@@ -239,6 +239,29 @@
 
 /* Declared with @utility so responsive / state variants work. */
 
+/* Admin text links: underlined at rest (never hover-only), so they read as
+ * links on touch screens too. The underline darkens on hover. */
+@utility admin-link {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in oklab, currentColor 35%, transparent);
+  transition: text-decoration-color 150ms;
+  &:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+/* Whole-row links: the row's main <a> stretches over its row (which needs
+ * `relative`). Other controls in the row sit above it with `relative z-10`. */
+@utility row-link {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+}
+
 @utility tracking-brand {
   letter-spacing: 0.06em;
 }

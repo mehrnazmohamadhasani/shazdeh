@@ -627,7 +627,7 @@ export function RecipeSheet({ lines, kind, yieldQuantity, yieldUnit }: { lines: 
           <li key={l.key} className="flex items-center gap-3 px-5 py-3 md:px-6">
             <span dir="auto" className="min-w-0 flex-1 truncate">
               {l.href ? (
-                <Link href={l.href} className="hover:underline">
+                <Link href={l.href} className="admin-link">
                   {l.name}
                 </Link>
               ) : (

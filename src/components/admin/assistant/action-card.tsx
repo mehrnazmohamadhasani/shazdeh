@@ -212,7 +212,7 @@ function NewRecipeBody({ p, i18n, applied }: { p: NewRecipePreview; i18n: I18n; 
       {applied ? (
         <Link
           href={`/admin/menu-items/${p.dish.id}#recipe`}
-          className="mt-2 inline-flex min-h-10 items-center gap-1.5 text-[13.5px] font-medium text-terracotta-ink underline-offset-4 hover:underline"
+          className="mt-2 inline-flex min-h-10 items-center gap-1.5 text-[13.5px] font-medium text-terracotta-ink admin-link"
         >
           {t("Open the recipe to approve it")} <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
         </Link>

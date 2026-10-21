@@ -3,7 +3,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { AlertCircle, History, Loader2, MessagesSquare, Mic, RotateCw, SendHorizontal, Square, SquarePen, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AdminPage } from "@/components/admin/ui";
+import { AdminPage, chipButtonClass } from "@/components/admin/ui";
 import { UploadButton } from "@/components/admin/ops/upload-button";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { messageFromUnknown } from "@/lib/error-message";
@@ -351,7 +351,7 @@ export function AssistantChat({
                       type="button"
                       disabled={sending}
                       onClick={() => void send(m.text, m)}
-                      className="inline-flex items-center gap-1 font-medium text-terracotta-ink hover:underline disabled:opacity-50"
+                      className="inline-flex items-center gap-1 font-medium text-terracotta-ink admin-link disabled:opacity-50"
                     >
                       <RotateCw className="h-3.5 w-3.5" /> {t("Retry")}
                     </button>
@@ -380,7 +380,7 @@ export function AssistantChat({
               </span>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 text-dark-grey hover:text-black-iron"
+                className={chipButtonClass}
                 onClick={() => {
                   setVoiceId(null);
                   setText("");
@@ -436,6 +436,7 @@ export function AssistantChat({
                   }
                 }}
                 placeholder={transcribing ? t("Writing down your voice note…") : t("Type, or tap the mic and speak")}
+                aria-label={t("Type, or tap the mic and speak")}
                 className="max-h-40 min-h-12 flex-1 resize-none rounded-[22px] border border-black-iron/[0.12] bg-white px-4 py-3 text-[15px] leading-snug text-black-iron outline-none placeholder:text-dark-grey/70 focus:border-terracotta [field-sizing:content]"
               />
               {text.trim() ? (

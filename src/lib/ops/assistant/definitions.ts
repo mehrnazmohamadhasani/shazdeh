@@ -78,13 +78,13 @@ export const TOOLS: Record<ToolName, Definition> = {
     roles: PURCHASING,
     write: false,
     description:
-      "Stock on hand of one ingredient (by name in any language), or with item null every ingredient with its amount and status (ok, low, out). Use null for a full or partial stock list, or for what is low or out.",
+      "Stock on hand of one ingredient (by name in any language) with its last purchase price however long ago it was bought, or with item null every ingredient with its amount and status (ok, low, out). Use it for \"how much do we have\" and for an ingredient's price. Use null for a full or partial stock list, or for what is low or out.",
     parameters: obj({ item: nullable("Ingredient name, or null for every ingredient.") }),
   },
   recent_purchases: {
     roles: PURCHASING,
     write: false,
-    description: "Saved invoice lines of the last days (default 14): date, supplier, item, quantity, unit price. Use it to find the line to correct.",
+    description: "Saved invoice lines of the last days (default 14): date, supplier, item, quantity, unit price. Use it to find an invoice line to correct, or for what was bought lately — not for an ingredient's price (stock_level has it).",
     parameters: obj({
       item: nullable("Ingredient name, or null for all."),
       supplier: nullable("Supplier name, or null for all."),
