@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendPush } from "@/lib/notifications/push";
 import { reportError } from "@/lib/report-error";
-import { aiCostMicroUsd, aiPrices, dubaiMonth, dubaiMonthStart } from "./ai-price";
+import { aiCostMicroUsd, dubaiMonth, dubaiMonthStart, pricesFor } from "./ai-price";
 import { getOpsSettings } from "./settings";
 
 /*
@@ -45,7 +45,7 @@ export async function recordAiUsage(entry: {
       model: entry.model,
       inputTokens,
       outputTokens,
-      costMicroUsd: entry.costMicroUsd ?? aiCostMicroUsd(inputTokens, outputTokens, aiPrices()),
+      costMicroUsd: entry.costMicroUsd ?? aiCostMicroUsd(inputTokens, outputTokens, pricesFor(entry.model)),
       documentId: entry.documentId ?? null,
     },
   });

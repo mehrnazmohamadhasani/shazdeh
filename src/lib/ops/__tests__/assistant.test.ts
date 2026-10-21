@@ -190,6 +190,13 @@ test("the answer's language follows the latest message", () => {
   assert.equal(replyLanguage("كم بقي من اللحم؟"), "Arabic");
   assert.equal(replyLanguage("Change beef in قرمه سبزی to 150 g"), "English");
   assert.equal(replyLanguage("قیمت Fanoos رو درست کن"), "Persian");
+  // Finglish is Persian; English that shares a word with it stays English.
+  assert.equal(replyLanguage("chand kilo berenj darim?"), "Persian");
+  assert.equal(replyLanguage("2 kilo piaz dur rikhtim"), "Persian");
+  assert.equal(replyLanguage("salam"), "Persian");
+  assert.equal(replyLanguage("Are we low on ham?"), "English");
+  assert.equal(replyLanguage("How much rice is left?"), "English");
+  assert.equal(replyLanguage("12"), "English");
 });
 
 test("the model is given AED, never fils to divide", () => {

@@ -23,7 +23,7 @@ export default async function OpeningStockPage() {
     <AdminPage
       title={
         <span className="flex items-center gap-3">
-          <Link href="/admin/ops/stock" aria-label={t("Back to stock")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href="/admin/ops/stock" aria-label={t("Back to stock")} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           {t("Opening stock")}

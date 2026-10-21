@@ -3,6 +3,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ClipboardPaste, Loader2, Plus, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, IconButton, Select, TextArea, TextInput } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
@@ -264,12 +265,13 @@ export function IngredientForm({
   );
 }
 
-const MOVEMENT_LABEL = { WASTE: "Waste (thrown away)", STAFF_MEAL: "Staff meal", ADJUSTMENT: "Correction (+ or −)" } as const;
+// Correction first (and chosen by default): the most common entry.
+const MOVEMENT_LABEL = { ADJUSTMENT: "Correction (+ or −)", WASTE: "Waste (thrown away)", STAFF_MEAL: "Staff meal" } as const;
 
 export function MovementForm({ ingredientId, unit }: { ingredientId: string; unit: BaseUnit }) {
   const { t } = useAdminI18n();
   const { busy, submit, router } = useSubmit();
-  const [type, setType] = React.useState<keyof typeof MOVEMENT_LABEL>("WASTE");
+  const [type, setType] = React.useState<keyof typeof MOVEMENT_LABEL>("ADJUSTMENT");
   const [amount, setAmount] = React.useState("");
   const [day, setDay] = React.useState(today);
   const [note, setNote] = React.useState("");
@@ -625,37 +627,209 @@ async function remove(url: string) {
   return json as Record<string, unknown>;
 }
 
-/** On an ingredient's page; disabled with the reason while something still uses it. */
-export function DeleteIngredientButton({ id, name, kept }: { id: string; name: string; kept: Kept | null }) {
+/**
+ * On an ingredient's page, or as an icon in a Stock row (`compact`, stays on
+ * the list after). Disabled with the reason while something still uses it.
+ */
+export function DeleteIngredientButton({ id, name, kept, compact = false }: { id: string; name: string; kept: Kept | null; compact?: boolean }) {
   const { t } = useAdminI18n();
   const keptText = useKeptText();
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
+  async function run() {
+    if (!window.confirm(t("Delete {name}? This can't be undone.", { name }))) return;
+    setBusy(true);
+    try {
+      await remove(`/api/admin/ops/ingredients/${id}`);
+      toast.success(t("Ingredient deleted"));
+      if (!compact) router.push("/admin/ops/stock?show=all");
+      router.refresh();
+    } catch (e) {
+      const body = (e ?? {}) as { kept?: Kept };
+      toast.error(body.kept ? keptText(body.kept) : t(messageFromUnknown(e, "Could not delete")), { duration: 8000 });
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (compact) {
+    // Still tappable while kept: it says why instead of doing nothing.
+    return (
+      <IconButton
+        label={kept ? `${t("Delete ingredient")}: ${keptText(kept)}` : t("Delete {name}", { name })}
+        danger
+        disabled={busy}
+        onClick={() => (kept ? toast.message(keptText(kept), { duration: 8000 }) : void run())}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className={cn("h-4 w-4", kept && "opacity-40")} />}
+      </IconButton>
+    );
+  }
   return (
     <div className="space-y-2">
-      <Button
-        variant="destructive"
-        size="sm"
-        disabled={busy || !!kept}
-        onClick={async () => {
-          if (!window.confirm(t("Delete {name}? This can't be undone.", { name }))) return;
-          setBusy(true);
-          try {
-            await remove(`/api/admin/ops/ingredients/${id}`);
-            toast.success(t("Ingredient deleted"));
-            router.push("/admin/ops/stock?show=all");
-            router.refresh();
-          } catch (e) {
-            const body = (e ?? {}) as { kept?: Kept };
-            toast.error(body.kept ? keptText(body.kept) : t(messageFromUnknown(e, "Could not delete")), { duration: 8000 });
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
+      <Button variant="destructive" size="sm" disabled={busy || !!kept} onClick={() => void run()}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} {t("Delete ingredient")}
       </Button>
       <p className="text-[12.5px] text-dark-grey">{kept ? keptText(kept) : t("Nothing uses it any more, so it can be deleted.")}</p>
+    </div>
+  );
+}
+
+// ─── New ingredient / supplier ──────────────────────────────────────────────
+
+/** "New ingredient" on the Stock screen: name and unit, then its page for the rest. */
+export function NewIngredientButton() {
+  const { t } = useAdminI18n();
+  const { busy, submit, router } = useSubmit();
+  const [open, setOpen] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [nameFa, setNameFa] = React.useState("");
+  const [unit, setUnit] = React.useState<"G" | "ML" | "PCS">("G");
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button variant="outline" size="md" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" /> {t("New ingredient")}
+      </Button>
+      <DialogContent className="bg-white text-black-iron sm:max-w-lg">
+        <form
+          className="space-y-5 p-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit("/api/admin/ops/ingredients", "POST", { name, nameFa, unit }, t("Ingredient added"), (json) => {
+              setOpen(false);
+              router.push(`/admin/ops/ingredients/${json.id}`);
+            });
+          }}
+        >
+          <DialogTitle className="text-[22px] font-bold text-black-iron">{t("New ingredient")}</DialogTitle>
+          <DialogDescription className="text-[13.5px] text-dark-grey">
+            {t("Invoices add ingredients automatically. Add one here to use it before it is ever bought.")}
+          </DialogDescription>
+          <Field label={t("Name")} required>
+            <TextInput dir="auto" required autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("e.g. {example}", { example: "Basmati rice" })} />
+          </Field>
+          <Field label={t("Persian name")}>
+            <TextInput dir="rtl" lang="fa" value={nameFa} onChange={(e) => setNameFa(e.target.value)} placeholder="مثلاً برنج" />
+          </Field>
+          <Field label={t("Counted in")} hint={t("This can't be changed later.")}>
+            <Select value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)}>
+              <option value="G">{t("kg")}</option>
+              <option value="ML">{t("litres")}</option>
+              <option value="PCS">{t("pieces")}</option>
+            </Select>
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+              {t("Cancel")}
+            </Button>
+            <Button type="submit" size="sm" disabled={busy}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("Add ingredient")}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** "New supplier" on the Suppliers screen: name and phone, then its page for the rest. */
+export function NewSupplierButton() {
+  const { t } = useAdminI18n();
+  const { busy, submit, router } = useSubmit();
+  const [open, setOpen] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [trn, setTrn] = React.useState("");
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button size="md" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" /> {t("New supplier")}
+      </Button>
+      <DialogContent className="bg-white text-black-iron sm:max-w-lg">
+        <form
+          className="space-y-5 p-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit(
+              "/api/admin/ops/suppliers",
+              "POST",
+              { name, phone, trn, notes: null, deliveryDays: [], leadTimeDays: null, paymentTermsDays: null },
+              t("Supplier added"),
+              (json) => {
+                setOpen(false);
+                router.push(`/admin/ops/suppliers/${json.id}`);
+              },
+            );
+          }}
+        >
+          <DialogTitle className="text-[22px] font-bold text-black-iron">{t("New supplier")}</DialogTitle>
+          <DialogDescription className="text-[13.5px] text-dark-grey">
+            {t("Invoices add suppliers automatically. Set delivery days and payment terms on the next screen.")}
+          </DialogDescription>
+          <Field label={t("Name")} required>
+            <TextInput dir="auto" required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label={t("Phone")}>
+            <TextInput dir="ltr" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+971…" />
+          </Field>
+          <Field label={t("TRN")}>
+            <TextInput dir="ltr" inputMode="numeric" value={trn} onChange={(e) => setTrn(e.target.value)} placeholder={t("15 digits")} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+              {t("Cancel")}
+            </Button>
+            <Button type="submit" size="sm" disabled={busy}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("Add supplier")}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Delete a supplier with no invoices: a full button on its page, an icon in a list row (`compact`). */
+export function DeleteSupplierButton({ id, name, invoiceCount, compact = false }: { id: string; name: string; invoiceCount: number; compact?: boolean }) {
+  const { t } = useAdminI18n();
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  const keptText = t("It has invoices, so it is kept for their history. Merge it into another supplier instead.");
+  const kept = invoiceCount > 0;
+  async function run() {
+    if (!window.confirm(t("Delete {name}? This can't be undone.", { name }))) return;
+    setBusy(true);
+    try {
+      await remove(`/api/admin/ops/suppliers/${id}`);
+      toast.success(t("Supplier deleted"));
+      if (!compact) router.push("/admin/ops/suppliers");
+      router.refresh();
+    } catch (e) {
+      const body = (e ?? {}) as { kept?: unknown };
+      toast.error(body.kept ? keptText : t(messageFromUnknown(e, "Could not delete")), { duration: 8000 });
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (compact) {
+    return (
+      <IconButton
+        label={kept ? `${t("Delete supplier")}: ${keptText}` : t("Delete {name}", { name })}
+        danger
+        disabled={busy}
+        onClick={() => (kept ? toast.message(keptText, { duration: 8000 }) : void run())}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className={cn("h-4 w-4", kept && "opacity-40")} />}
+      </IconButton>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <Button variant="destructive" size="sm" disabled={busy || kept} onClick={() => void run()}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} {t("Delete supplier")}
+      </Button>
+      <p className="text-[12.5px] text-dark-grey">{kept ? keptText : t("It has no invoices, so it can be deleted.")}</p>
     </div>
   );
 }

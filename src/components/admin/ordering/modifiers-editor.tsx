@@ -127,7 +127,7 @@ export function ModifiersEditor({ itemId, initial }: { itemId: string; initial: 
               <button
                 type="button"
                 onClick={() => setGroup(gi, { options: [...g.options, { name: "", price: 0, isAvailable: true }] })}
-                className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-medium text-terracotta-ink hover:underline"
+                className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-medium text-terracotta-ink admin-link"
               >
                 <Plus className="h-3.5 w-3.5" /> {t("Add option")}
               </button>

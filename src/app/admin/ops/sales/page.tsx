@@ -86,7 +86,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                       {c.feesFils != null ? (
                         money(c.feesFils)
                       ) : (
-                        <Link href="/admin/ops/channels" className="text-cinnamon-bark underline-offset-4 hover:underline">
+                        <Link href="/admin/ops/channels" className="text-cinnamon-bark admin-link">
                           {t("Unknown — add fee terms")}
                         </Link>
                       )}

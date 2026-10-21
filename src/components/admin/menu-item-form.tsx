@@ -2,11 +2,11 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/admin/image-uploader";
-import { Card, Field, Select, SwitchRow, TextArea, TextInput } from "@/components/admin/ui";
-import { slugify } from "@/lib/utils";
+import { Card, Field, Select, SwitchRow, TextArea, TextInput, chipButtonClass } from "@/components/admin/ui";
+import { cn, slugify } from "@/lib/utils";
 import { useAdminI18n } from "@/components/admin/i18n";
 import type { Translate } from "@/lib/admin-i18n";
 
@@ -199,8 +199,9 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
           <SwitchRow label={t("In stock")} description={t("Off shows it as sold out.")} checked={draft.isAvailable} onCheckedChange={(v) => update("isAvailable", v)} />
         </div>
         <details className="group mt-5 border-t border-black-iron/[0.06] pt-4">
-          <summary className="cursor-pointer list-none text-[13px] font-medium text-dark-grey hover:text-black-iron [&::-webkit-details-marker]:hidden">
-            {t("Advanced")} <span className="text-black-iron/40 group-open:hidden">· {t("web address")}</span>
+          <summary className={cn(chipButtonClass, "cursor-pointer list-none [&::-webkit-details-marker]:hidden")}>
+            {t("Advanced")} <span className="text-black-iron/45 group-open:hidden">· {t("web address")}</span>
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
           </summary>
           <Field label={t("Web address")} hint={<span dir="ltr">{`shazdeh.ae/menu/${draft.slug || slugify(draft.name) || "…"}`}</span>} className="mt-3 max-w-md">
             <TextInput value={draft.slug} onChange={(e) => update("slug", slugify(e.target.value))} placeholder={slugify(draft.name)} className="font-mono text-[13px]" dir="ltr" />
@@ -210,7 +211,7 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
 
       <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-black-iron/[0.07] bg-warm-white/95 px-4 py-3 pb-[max(0.75rem,var(--safe-bottom))] backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:px-8">
         {isEditing ? (
-          <Button type="button" variant="ghost" size="sm" onClick={handleDelete} disabled={removing} className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]">
+          <Button type="button" variant="destructive-ghost" size="sm" onClick={handleDelete} disabled={removing}>
             <Trash2 className="h-4 w-4" />
             {removing ? t("Deleting…") : t("Delete dish")}
           </Button>

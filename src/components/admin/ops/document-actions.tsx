@@ -352,7 +352,7 @@ export function InvoicePayment({
                             href={`/api/admin/ops/documents/${receiptId}/file`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-terracotta-ink underline-offset-4 hover:underline"
+                            className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-terracotta-ink admin-link"
                           >
                             {t("View receipt")}
                           </a>

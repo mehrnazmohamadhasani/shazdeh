@@ -99,6 +99,52 @@ export async function readWithSchema(
   return { json: JSON.parse(text), model, inputTokens: body.usage?.input_tokens ?? null, outputTokens: body.usage?.output_tokens ?? null };
 }
 
+/**
+ * A text-only question with a strict JSON answer (no file), e.g. matching
+ * invoice lines to stock. Same budget, usage log and model as readings.
+ */
+export async function askWithSchema(opts: {
+  instructions: string;
+  prompt: string;
+  schemaName: string;
+  jsonSchema: object;
+  usage: { kind: "invoice" | "recipe" | "platform"; documentId?: string };
+}): Promise<unknown> {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) throw new AiNotConfiguredError();
+  await assertAiBudget();
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
+  const res = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      instructions: opts.instructions,
+      input: [{ role: "user", content: [{ type: "input_text", text: opts.prompt }] }],
+      text: { format: { type: "json_schema", name: opts.schemaName, schema: opts.jsonSchema, strict: true } },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`OpenAI ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  const body = (await res.json()) as {
+    output?: { type: string; content?: { type: string; text?: string }[] }[];
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
+  await recordAiUsage({
+    kind: opts.usage.kind,
+    model,
+    inputTokens: body.usage?.input_tokens ?? null,
+    outputTokens: body.usage?.output_tokens ?? null,
+    documentId: opts.usage.documentId,
+  });
+  const text = (body.output ?? []).filter((o) => o.type === "message").flatMap((o) => o.content ?? []).find((p) => p.type === "output_text")?.text;
+  if (!text) throw new Error("The model returned no answer.");
+  return JSON.parse(text);
+}
+
 /** Development only: a realistic reading (Rasti Lari rice + Hexing pantry lines). */
 async function sampleReading(): Promise<ReadResult> {
   await new Promise((r) => setTimeout(r, 800));

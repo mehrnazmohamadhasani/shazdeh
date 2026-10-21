@@ -132,6 +132,7 @@ export function CategoriesManager({ initial }: { initial: Cat[] }) {
               <label className="flex items-center gap-2 text-[13px] text-dark-grey">
                 <Switch
                   checked={c.isActive}
+                  aria-label={t("Show {name} on the menu", { name: c.name })}
                   disabled={busy !== null}
                   onCheckedChange={(v) => run(c.id, () => request(`/api/categories/${c.id}`, "PATCH", { isActive: v }), v ? t("Category shown") : t("Category hidden"))}
                 />

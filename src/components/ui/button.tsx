@@ -28,11 +28,15 @@ const buttonVariants = cva(
           "border border-[var(--color-foreground)]/30 text-[var(--color-foreground)] hover:border-terracotta hover:text-terracotta-ink bg-transparent",
         "outline-light":
           "border border-warm-white/45 text-warm-white hover:border-warm-white hover:bg-warm-white/10 bg-transparent",
+        // Quiet, but still visibly a button before anyone hovers it.
         ghost:
-          "text-[var(--color-foreground)] hover:bg-[var(--color-foreground)]/[0.05]",
+          "bg-[var(--color-foreground)]/[0.05] text-[var(--color-foreground)] hover:bg-[var(--color-foreground)]/[0.1]",
         link: "text-terracotta-ink underline-offset-4 hover:underline rounded-none normal-case tracking-normal",
         destructive:
           "bg-pomegranate-red text-warm-white hover:bg-pomegranate-red/90",
+        // Secondary destructive action (e.g. "Delete dish" beside "Save").
+        "destructive-ghost":
+          "bg-pomegranate-red/[0.07] text-pomegranate-red hover:bg-pomegranate-red/[0.14]",
       },
       size: {
         sm: "h-10 px-5 text-[11px] tracking-[0.18em] rounded-pill",

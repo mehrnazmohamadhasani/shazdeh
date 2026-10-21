@@ -175,7 +175,7 @@ function CouponEditor({ coupon, onDone }: { coupon: CouponRow; onDone?: () => vo
             {t("Cancel")}
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]" onClick={remove}>
+          <Button variant="destructive-ghost" size="sm" onClick={remove}>
             <Trash2 className="h-4 w-4" /> {t("Delete")}
           </Button>
         )}

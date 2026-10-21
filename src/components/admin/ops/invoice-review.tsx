@@ -15,6 +15,7 @@ import type { BaseUnit } from "@/lib/ops/units";
 import type { Translate } from "@/lib/admin-i18n";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { amountText } from "@/components/admin/ops/format";
+import { IngredientPicker, IngredientStatus } from "@/components/admin/ops/ingredient-picker";
 
 /*
  * Review screen for one AI reading. Everything is pre-filled and
@@ -26,7 +27,7 @@ import { amountText } from "@/components/admin/ops/format";
 type Category = (typeof SPEND_CATEGORIES)[number];
 type Known = { id: string; name: string };
 type KnownSupplier = Known & { trn: string | null; phone: string | null; paymentTermsDays: number | null };
-type KnownIngredient = Known & { unit: BaseUnit };
+type KnownIngredient = Known & { unit: BaseUnit; nameFa?: string | null };
 
 type LineState = {
   key: string;
@@ -173,6 +174,28 @@ export function InvoiceReview({
 
   function update(key: string, patch: Partial<LineState>) {
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  }
+
+  // "Find matches with AI": a suggestion per line, shown first in its picker; never applied on its own.
+  const [aiMatches, setAiMatches] = React.useState<Record<string, KnownIngredient | null>>({});
+  const [matching, setMatching] = React.useState(false);
+  const unmatched = lines.filter((l) => isStock(l.category) && !ingredientFor(l.ingredientName) && !(l.key in aiMatches));
+  async function findWithAi() {
+    setMatching(true);
+    try {
+      const json = (await post("match", { lines: unmatched.map((l) => ({ key: l.key, description: l.rawName })) })) as {
+        matches: { key: string; ingredientId: string | null }[];
+      };
+      const found = Object.fromEntries(json.matches.map((m) => [m.key, ingredients.find((i) => i.id === m.ingredientId) ?? null]));
+      setAiMatches((a) => ({ ...a, ...found }));
+      const n = Object.values(found).filter(Boolean).length;
+      if (n) toast.success(t(n === 1 ? "AI found 1 likely match — check it and tap Use" : "AI found {n} likely matches — check them and tap Use", { n }));
+      else toast.message(t("AI found no match in stock. These look like new ingredients."));
+    } catch (e) {
+      toast.error(t(messageFromUnknown(e, "Could not ask the AI")));
+    } finally {
+      setMatching(false);
+    }
   }
 
   async function post(path: string, body?: unknown) {
@@ -368,6 +391,14 @@ export function InvoiceReview({
         title={t("Items ({n})", { n: lines.length })}
         description={t("Food and packaging go into stock. Check the ingredient name and how much came in.")}
         bodyClassName="p-0"
+        actions={
+          unmatched.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => void findWithAi()} disabled={matching}>
+              {matching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {t("Find matches with AI")}
+            </Button>
+          )
+        }
       >
         <ul className="divide-y divide-black-iron/[0.06]">
           {lines.map((l, i) => {
@@ -410,23 +441,27 @@ export function InvoiceReview({
                   </Field>
                 </div>
                 {isStock(l.category) && (
-                  <div className="ms-8 grid gap-3 rounded-[12px] bg-black-iron/[0.025] p-3 sm:grid-cols-[1fr_auto]">
+                  <div className="ms-8 grid gap-3 rounded-[12px] bg-black-iron/[0.025] p-3 2xl:grid-cols-[minmax(0,1fr)_auto]">
                     <Field
                       label={t("Ingredient")}
+                      htmlFor={`${l.key}-ingredient`}
                       hint={
-                        known
-                          ? t("Existing ingredient")
-                          : l.ingredientName.trim()
-                            ? t("New ingredient")
-                            : t("Leave empty to keep it out of stock")
+                        <IngredientStatus
+                          value={l.ingredientName}
+                          ingredients={ingredients}
+                          printed={l.rawName}
+                          aiSuggestion={aiMatches[l.key]}
+                          onUse={(name) => update(l.key, { ingredientName: name })}
+                        />
                       }
                     >
-                      <TextInput
-                        list="ops-ingredients"
-                        dir="auto"
+                      <IngredientPicker
+                        id={`${l.key}-ingredient`}
                         value={l.ingredientName}
-                        onChange={(e) => update(l.key, { ingredientName: e.target.value })}
-                        placeholder={t("e.g. Sella rice")}
+                        onChange={(name) => update(l.key, { ingredientName: name })}
+                        ingredients={ingredients}
+                        printed={l.rawName}
+                        aiSuggestion={aiMatches[l.key]}
                       />
                     </Field>
                     <Field
@@ -467,11 +502,6 @@ export function InvoiceReview({
             );
           })}
         </ul>
-        <datalist id="ops-ingredients">
-          {ingredients.map((i) => (
-            <option key={i.id} value={i.name} />
-          ))}
-        </datalist>
         <div className="border-t border-black-iron/[0.06] px-5 py-3 md:px-6">
           <Button
             variant="ghost"
@@ -540,7 +570,7 @@ export function InvoiceReview({
               {busy === "read" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} {t("Read again")}
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={discard} disabled={!!busy} className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]">
+          <Button variant="destructive-ghost" size="sm" onClick={discard} disabled={!!busy}>
             {t("Discard")}
           </Button>
         </div>

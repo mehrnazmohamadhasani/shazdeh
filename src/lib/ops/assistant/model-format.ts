@@ -36,10 +36,27 @@ export function pricePerBigUnit(filsPerUnit: number, unit: "G" | "ML" | "PCS") {
 export function replyLanguage(text: string): "Persian" | "Arabic" | "English" {
   const arabicScript = (text.match(/[\u0600-\u06FF]/g) ?? []).length;
   const latin = (text.match(/[A-Za-z]/g) ?? []).length;
-  if (latin >= arabicScript) return "English";
+  if (latin >= arabicScript) return isFinglish(text) ? "Persian" : "English";
   if (/[پچژگ]/.test(text)) return "Persian";
   if (/[ةيك]/.test(text)) return "Arabic";
   return /[یک]/.test(text) ? "Persian" : "Arabic";
+}
+
+// Everyday Persian words as typed in Latin letters (Finglish), leaving out any
+// that are also English ("are", "ham", "kilo"). Two of them in a message means
+// Persian: "chand kilo berenj darim?", "2 kilo piaz dur rikhtim".
+const FINGLISH = new Set([
+  "chand", "chi", "chera", "chetor", "chetori", "koja", "kodum", "kodom", "kei", "darim", "dare", "nadarim", "hast", "hastesh", "nist", "mikham",
+  "mikhaym", "bedeh", "begu", "bego", "kon", "bokon", "konid", "bezan", "bezar", "bebin", "beriz", "rikhtim", "rikhtam", "dur", "shod", "shode",
+  "kharab", "munde", "monde", "mande", "baraye", "barye", "emruz", "emrooz", "dirooz", "diruz", "farda", "hafte", "geram", "gerami", "adad", "dune",
+  "doone", "ghaza", "ghazaye", "personel", "kharid", "kharidim", "forush", "forushe", "furush", "gheymat", "gheimat", "ghimat", "berenj", "piaz",
+  "goosht", "gusht", "morgh", "sabzi", "roghan", "namak", "zard", "zardchoube", "anbar", "mojudi", "mojoodi", "lotfan", "salam", "salaam", "mamnun",
+  "mamnoon", "kheili",
+]);
+
+function isFinglish(text: string): boolean {
+  const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
+  return words.length > 0 && words.filter((w) => FINGLISH.has(w)).length >= Math.min(2, words.length);
 }
 
 /** A conversation's name in the list: the first thing said, on one line, shortened. */

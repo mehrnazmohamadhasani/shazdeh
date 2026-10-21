@@ -64,7 +64,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
     <AdminPage
       title={
         <span className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/ops/recipes" aria-label={t("Back to recipes")} className="grid h-9 w-9 place-items-center rounded-full hover:bg-black-iron/[0.05]">
+          <Link href="/admin/ops/recipes" aria-label={t("Back to recipes")} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black-iron/[0.04] transition-colors hover:bg-black-iron/[0.08]">
             <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
           </Link>
           <span dir="auto">{recipe.name}</span>
@@ -118,7 +118,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
           )}
           {approved.version.sourceDocumentId && (
             <p className="border-t border-black-iron/[0.06] px-5 py-3 text-[13px] md:px-6">
-              <Link href={`/admin/ops/recipes/import/${approved.version.sourceDocumentId}`} className="text-terracotta-ink underline-offset-4 hover:underline">
+              <Link href={`/admin/ops/recipes/import/${approved.version.sourceDocumentId}`} className="text-terracotta-ink admin-link">
                 {t("Read from a photo — see the original")}
               </Link>
             </p>
@@ -146,7 +146,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
           >
             {draft?.version.sourceDocumentId && (
               <p className="mb-4 text-[13px]">
-                <Link href={`/admin/ops/recipes/import/${draft.version.sourceDocumentId}`} className="text-terracotta-ink underline-offset-4 hover:underline">
+                <Link href={`/admin/ops/recipes/import/${draft.version.sourceDocumentId}`} className="text-terracotta-ink admin-link">
                   {t("Read from a photo — see the original")}
                 </Link>
               </p>

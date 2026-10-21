@@ -179,7 +179,7 @@ function ZoneEditor({ zone, onDone }: { zone: ZoneRow; onDone?: () => void }) {
       </Field>
       <div className="mt-5 flex items-center justify-between">
         {!isNew ? (
-          <Button variant="ghost" size="sm" onClick={remove} className="text-pomegranate-red hover:bg-pomegranate-red/[0.08]">
+          <Button variant="destructive-ghost" size="sm" onClick={remove}>
             <Trash2 className="h-4 w-4" /> {t("Delete zone")}
           </Button>
         ) : (

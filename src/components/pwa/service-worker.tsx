@@ -18,12 +18,48 @@ import { toast } from "sonner";
 const VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 const OFFLINE_TOAST = "network-offline";
 
+/*
+ * This sits in the root layout, outside the admin's i18n provider, so it
+ * reads the panel's language from the page: staff get admin wording (in
+ * Persian when the panel is), guests get the site's.
+ */
+const MESSAGES = {
+  site: {
+    update: "A new version of SHĀZDEH is ready.",
+    refresh: "Refresh",
+    offline: "You're offline",
+    offlineHint: "Pages you've opened before still work. Ordering and tracking need a connection.",
+    online: "Back online",
+  },
+  admin: {
+    update: "A new version of the panel is ready.",
+    refresh: "Refresh",
+    offline: "You're offline",
+    offlineHint: "Changes can't be saved until the connection is back.",
+    online: "Back online",
+  },
+  adminFa: {
+    update: "نسخه‌ی تازه‌ی پنل آماده است.",
+    refresh: "تازه‌سازی",
+    offline: "اتصال اینترنت قطع است",
+    offlineHint: "تا اتصال برنگردد، تغییرات ذخیره نمی‌شوند.",
+    online: "اتصال برقرار شد",
+  },
+};
+
+function messages() {
+  const admin = document.querySelector(".admin-root");
+  if (!admin) return MESSAGES.site;
+  return admin.getAttribute("lang") === "fa" ? MESSAGES.adminFa : MESSAGES.admin;
+}
+
 function promptRefresh(worker: ServiceWorker) {
-  toast("A new version of SHĀZDEH is ready.", {
+  const m = messages();
+  toast(m.update, {
     id: "sw-update",
     duration: Infinity,
     action: {
-      label: "Refresh",
+      label: m.refresh,
       onClick: () => worker.postMessage({ type: "SKIP_WAITING" }),
     },
   });
@@ -88,16 +124,13 @@ function useServiceWorker() {
 
 function useNetworkStatus() {
   React.useEffect(() => {
-    const offline = () =>
-      toast("You're offline", {
-        id: OFFLINE_TOAST,
-        description:
-          "Pages you've opened before still work. Ordering and tracking need a connection.",
-        duration: Infinity,
-      });
+    const offline = () => {
+      const m = messages();
+      toast(m.offline, { id: OFFLINE_TOAST, description: m.offlineHint, duration: Infinity });
+    };
     const online = () => {
       toast.dismiss(OFFLINE_TOAST);
-      toast.success("Back online", { duration: 2500 });
+      toast.success(messages().online, { duration: 2500 });
     };
     if (!navigator.onLine) offline();
     window.addEventListener("offline", offline);

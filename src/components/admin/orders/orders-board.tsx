@@ -343,7 +343,7 @@ function OrderCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link href={`/admin/orders/${o.id}`} className="whitespace-nowrap text-[20px] font-bold tabular-nums tracking-[-0.02em] text-black-iron hover:text-terracotta-ink">
+          <Link href={`/admin/orders/${o.id}`} className="admin-link whitespace-nowrap text-[20px] font-bold tabular-nums tracking-[-0.02em] text-black-iron hover:text-terracotta-ink">
             {o.number}
           </Link>
           <p dir="auto" className="mt-0.5 text-[14px] font-semibold text-black-iron">{o.customerName}</p>
@@ -459,7 +459,7 @@ function HistoryTable({ orders }: { orders: BoardOrder[] }) {
           {orders.map((o) => (
             <tr key={o.id} className="hover:bg-black-iron/[0.03]">
               <td className="whitespace-nowrap px-4 py-3">
-                <Link href={`/admin/orders/${o.id}`} className="font-semibold tabular-nums text-black-iron hover:text-terracotta-ink">
+                <Link href={`/admin/orders/${o.id}`} className="admin-link font-semibold tabular-nums text-black-iron hover:text-terracotta-ink">
                   {o.number}
                 </Link>
               </td>
@@ -470,7 +470,7 @@ function HistoryTable({ orders }: { orders: BoardOrder[] }) {
                 {o.customerName} · {o.areaName}
               </td>
               <td className="whitespace-nowrap px-4 py-3 tabular-nums max-lg:hidden">
-                <a href={`tel:${o.customerPhone}`} dir="ltr" className="text-black-iron/80 hover:text-terracotta-ink">
+                <a href={`tel:${o.customerPhone}`} dir="ltr" className="admin-link text-black-iron/80 hover:text-terracotta-ink">
                   {formatPhone(o.customerPhone)}
                 </a>
               </td>
