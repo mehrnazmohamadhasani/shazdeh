@@ -1,5 +1,6 @@
 # Checks every pull request and push to main: types, lint, unit tests,
 # all migrations on an empty Postgres, the seed, and a production build.
+# A push to main that passes is then deployed to Vercel (see "deploy").
 name: CI
 
 on:
@@ -55,3 +56,23 @@ jobs:
         run: npm run db:seed && npm run db:seed
       - name: Production build
         run: npm run build
+
+  # Vercel's own GitHub trigger stopped firing (Oct 2026), so a push to main
+  # that passed "check" is deployed through a Vercel Deploy Hook (Project →
+  # Settings → Git → Deploy Hooks, branch main), stored as the repository
+  # secret VERCEL_DEPLOY_HOOK_URL. Without the secret this step does nothing.
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger the Vercel production deployment
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::VERCEL_DEPLOY_HOOK_URL is not set; not deploying."
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST "$HOOK"
