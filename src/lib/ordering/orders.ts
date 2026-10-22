@@ -7,6 +7,7 @@ import { getOrderingConfig, getOrderingSettings } from "@/lib/ordering/config";
 import { loadPricingItems } from "@/lib/ordering/catalog";
 import { resolveDelivery } from "@/lib/ordering/zones";
 import { lookupCoupon } from "@/lib/ordering/coupons";
+import { giftForPhone } from "@/lib/ordering/gifts";
 import { normalizeMobile } from "@/lib/ordering/phone";
 import {
   computeTotals,
@@ -43,12 +44,17 @@ export type Quote = {
   deliveryError: string | null;
   coupon: { code: string; description: string | null } | null;
   couponError: string | null;
+  /** The coupon above is the customer's QR gift, found by mobile (website checkout only). */
+  gift: { state: "applied" } | null;
   totals: Totals;
   /** Human-readable reasons checkout can't proceed yet. Empty = ready. */
   blockers: string[];
 };
 
-export async function quoteOrder(input: QuoteInput): Promise<Quote & { couponId: string | null; couponUsageLimit: number | null }> {
+type InternalQuote = Quote & { couponId: string | null; couponUsageLimit: number | null; giftClaimId: string | null };
+
+/** `autoGift`: with no code typed, apply the QR gift claimed by this mobile (website checkout). */
+export async function quoteOrder(input: QuoteInput, { autoGift = false }: { autoGift?: boolean } = {}): Promise<InternalQuote> {
   const [config, items] = await Promise.all([
     getOrderingConfig(),
     loadPricingItems(input.lines.map((l) => l.itemId)),
@@ -60,9 +66,16 @@ export async function quoteOrder(input: QuoteInput): Promise<Quote & { couponId:
   const zone = delivery.ok ? delivery.zone : null;
 
   let couponLookup: Awaited<ReturnType<typeof lookupCoupon>> | null = null;
+  const phone = input.phone ? normalizeMobile(input.phone) : null;
   if (input.couponCode?.trim()) {
-    const phone = input.phone ? normalizeMobile(input.phone) : null;
     couponLookup = await lookupCoupon(input.couponCode, phone);
+  } else if (autoGift && phone) {
+    const found = await giftForPhone(phone);
+    if (found) {
+      const lookup = await lookupCoupon(found.code, phone);
+      // A gift that doesn't fit this order (e.g. first-order-only) just isn't applied.
+      if (lookup.ok) couponLookup = lookup;
+    }
   }
 
   const totals = computeTotals({
@@ -94,18 +107,21 @@ export async function quoteOrder(input: QuoteInput): Promise<Quote & { couponId:
       ? { code: couponLookup.terms.code, description: couponLookup.terms.description ?? null }
       : null,
     couponError: couponLookup && !couponLookup.ok ? couponLookup.message : totals.couponApplied ? null : totals.couponMessage,
+    gift: couponLookup?.ok && couponLookup.giftClaimId && totals.couponApplied ? { state: "applied" } : null,
     couponId: couponLookup?.ok && totals.couponApplied ? couponLookup.id : null,
     couponUsageLimit: couponLookup?.ok ? couponLookup.usageLimit : null,
+    giftClaimId: couponLookup?.ok && totals.couponApplied ? couponLookup.giftClaimId : null,
     totals,
     blockers,
   };
 }
 
 /** Public shape of a quote (drops internal ids). */
-export function publicQuote(q: Awaited<ReturnType<typeof quoteOrder>>): Quote {
-  const { couponId: _id, couponUsageLimit: _limit, ...rest } = q;
+export function publicQuote(q: InternalQuote): Quote {
+  const { couponId: _id, couponUsageLimit: _limit, giftClaimId: _gift, ...rest } = q;
   void _id;
   void _limit;
+  void _gift;
   return rest;
 }
 
@@ -130,7 +146,7 @@ type OrderDraft = {
   address: PlaceOrderInput["address"];
   notes: string | null;
   cutlery: boolean;
-  quote: Awaited<ReturnType<typeof quoteOrder>>;
+  quote: InternalQuote;
   source: "WEBSITE" | "WHATSAPP" | "PHONE";
   enteredById: string | null;
   event: { message: string; actor: string };
@@ -178,7 +194,7 @@ async function insertOrder(d: OrderDraft): Promise<{ created: boolean; id: strin
           },
         });
 
-        return tx.order.create({
+        const created = await tx.order.create({
           data: {
             number: orderNumber(),
             trackingToken: randomBytes(18).toString("base64url"),
@@ -240,6 +256,15 @@ async function insertOrder(d: OrderDraft): Promise<{ created: boolean; id: strin
           },
           select: { id: true, number: true, trackingToken: true },
         });
+        if (quote.giftClaimId) {
+          // Same guard as the coupon count: a gift is used by one order only.
+          const res = await tx.giftClaim.updateMany({
+            where: { id: quote.giftClaimId, orderId: null },
+            data: { orderId: created.id, usedAt: d.now },
+          });
+          if (res.count === 0) throw new CouponExhausted();
+        }
+        return created;
       });
       return { created: true, ...order };
     } catch (e) {
@@ -271,14 +296,17 @@ export async function placeOrder(input: PlaceOrderInput, origin: string): Promis
     return { ok: false, status: 422, error: "That payment method isn't available right now." };
   }
 
-  const quote = await quoteOrder({
-    lines: input.lines,
-    areaId: input.address.areaId,
-    couponCode: input.couponCode,
-    phone: input.customer.phone,
-    lat: input.address.lat,
-    lng: input.address.lng,
-  });
+  const quote = await quoteOrder(
+    {
+      lines: input.lines,
+      areaId: input.address.areaId,
+      couponCode: input.couponCode,
+      phone: input.customer.phone,
+      lat: input.address.lat,
+      lng: input.address.lng,
+    },
+    { autoGift: true },
+  );
   if (quote.blockers.length) {
     return { ok: false, status: 409, code: "blocked", error: quote.blockers[0], quote: publicQuote(quote) };
   }
@@ -440,6 +468,7 @@ export async function failPendingOrder(orderId: string, reason: string, actor: s
     const order = await tx.order.findUnique({ where: { id: orderId }, select: { couponId: true } });
     if (order?.couponId) {
       await tx.coupon.updateMany({ where: { id: order.couponId, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+      await tx.giftClaim.updateMany({ where: { orderId }, data: { orderId: null, usedAt: null } });
     }
   });
 }
@@ -597,6 +626,7 @@ export async function transitionOrder(
     }
     if ((to === "REJECTED" || to === "CANCELLED") && order.couponId) {
       await tx.coupon.updateMany({ where: { id: order.couponId, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+      await tx.giftClaim.updateMany({ where: { orderId }, data: { orderId: null, usedAt: null } });
     }
     if ((to === "REJECTED" || to === "CANCELLED") && order.paymentStatus === "PAID" && order.paymentMethod === "ONLINE") {
       await tx.orderEvent.create({

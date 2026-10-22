@@ -53,6 +53,7 @@ const NAV: NavItem[] = [
   { href: "/admin/orders", label: "Orders", icon: ReceiptText, roles: ALL, group: "Orders" },
   { href: "/admin/delivery", label: "Delivery zones", icon: Truck, roles: CMS, group: "Orders" },
   { href: "/admin/coupons", label: "Promo codes", icon: TicketPercent, roles: CMS, group: "Orders" },
+  { href: "/admin/gift-claims", label: "Gift claims", icon: Gift, roles: CMS, group: "Orders" },
   { href: "/admin/ordering", label: "Online ordering", icon: SlidersHorizontal, roles: ADMIN_ONLY, group: "Orders" },
   { href: "/admin/ops/sales", label: "Sales", icon: TrendingUp, roles: CMS, group: "Sales" },
   { href: "/admin/ops/channels", label: "Channels & fees", icon: Percent, roles: CMS, group: "Sales" },

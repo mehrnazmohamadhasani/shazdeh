@@ -265,21 +265,55 @@ model DeliveryArea {
 }
 
 model Coupon {
-  id            String     @id @default(cuid())
-  code          String     @unique // stored upper-case
-  description   String?
-  type          CouponType
-  value         Float      @default(0) // percent (0-100) or AED
-  minSubtotal   Float      @default(0)
-  maxDiscount   Float?
-  startsAt      DateTime?
-  endsAt        DateTime?
-  usageLimit    Int?
-  perPhoneLimit Int?
-  usedCount     Int        @default(0)
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id             String      @id @default(cuid())
+  code           String      @unique // stored upper-case
+  description    String?
+  type           CouponType
+  value          Float       @default(0) // percent (0-100) or AED
+  minSubtotal    Float       @default(0)
+  maxDiscount    Float?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  usageLimit     Int?
+  perPhoneLimit  Int?
+  usedCount      Int         @default(0)
+  isActive       Boolean     @default(true)
+  /// QR gift: customers claim it on /gift/CODE with mobile + email, and
+  /// it is applied by itself when they order with that mobile.
+  isGift         Boolean     @default(false)
+  /// Only for a mobile with no earlier (non-cancelled) order.
+  firstOrderOnly Boolean     @default(false)
+  /// Scans of the printed QR (/g/CODE), roughly one per device.
+  scanCount      Int         @default(0)
+  claims         GiftClaim[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+/// A customer who scanned a gift QR and left their mobile and email.
+/// The gift works for that mobile right away and is used by the order in
+/// orderId (cleared again if that order is cancelled or rejected).
+/// activatedAt: when they first opened the link in the gift email.
+model GiftClaim {
+  id             String    @id @default(cuid())
+  couponId       String
+  coupon         Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  name           String?
+  phone          String // E.164
+  email          String // lower-case
+  marketingOptIn Boolean   @default(false)
+  token          String    @unique // for the activation link
+  emailStatus    String    @default("pending") // sent | failed | skipped | pending
+  activatedAt    DateTime?
+  orderId        String?   @unique
+  order          Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([couponId, phone])
+  @@unique([couponId, email])
+  @@index([phone])
 }
 
 /// Guest customers, keyed by mobile number. No passwords — checkout
@@ -329,15 +363,16 @@ model Order {
   notes   String?
   cutlery Boolean @default(false)
 
-  currency        String  @default("AED")
+  currency        String     @default("AED")
   subtotalFils    Int
   deliveryFeeFils Int
-  serviceFeeFils  Int     @default(0)
-  discountFils    Int     @default(0)
-  vatFils         Int     @default(0) // VAT contained in (or added to) the total
+  serviceFeeFils  Int        @default(0)
+  discountFils    Int        @default(0)
+  vatFils         Int        @default(0) // VAT contained in (or added to) the total
   totalFils       Int
   couponId        String?
   couponCode      String?
+  giftClaim       GiftClaim?
 
   etaMin          Int
   etaMax          Int

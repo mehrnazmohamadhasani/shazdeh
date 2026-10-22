@@ -4,7 +4,7 @@ import { toFils } from "@/lib/ordering/money";
 import type { CouponTerms } from "@/lib/ordering/pricing";
 
 export type CouponLookup =
-  | { ok: true; id: string; usageLimit: number | null; terms: CouponTerms }
+  | { ok: true; id: string; usageLimit: number | null; terms: CouponTerms; giftClaimId: string | null }
   | { ok: false; message: string };
 
 /**
@@ -41,9 +41,26 @@ export async function lookupCoupon(
       return { ok: false, message: "You've already used this promo code." };
     }
   }
+  if (coupon.firstOrderOnly && phone) {
+    const earlier = await prisma.order.count({
+      where: { customerPhone: phone, status: { notIn: ["CANCELLED", "REJECTED"] } },
+    });
+    if (earlier > 0) return { ok: false, message: "This offer is for your first order on our website." };
+  }
+  // A QR gift belongs to the mobile that claimed it.
+  let giftClaimId: string | null = null;
+  if (coupon.isGift) {
+    const claim = phone
+      ? await prisma.giftClaim.findUnique({ where: { couponId_phone: { couponId: coupon.id, phone } } })
+      : null;
+    if (!claim) return { ok: false, message: "This gift is claimed by scanning the QR card from your SHĀZDEH order." };
+    if (claim.orderId) return { ok: false, message: "You've already used this gift." };
+    giftClaimId = claim.id;
+  }
   return {
     ok: true,
     id: coupon.id,
+    giftClaimId,
     usageLimit: coupon.usageLimit,
     terms: {
       code: coupon.code,

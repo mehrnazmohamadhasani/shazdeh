@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const parsed = await parseJson(req, quoteSchema);
   if (!parsed.ok) return parsed.response;
   try {
-    const quote = await quoteOrder(parsed.data);
+    const quote = await quoteOrder(parsed.data, { autoGift: parsed.data.gift === true });
     return NextResponse.json(publicQuote(quote), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return serverError(e);

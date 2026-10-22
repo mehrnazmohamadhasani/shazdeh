@@ -2,7 +2,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, Banknote, Check, CreditCard, Loader2, Lock, MapPin, Smartphone } from "lucide-react";
+import { AlertCircle, ArrowLeft, Banknote, Check, CreditCard, Gift, Loader2, Lock, MapPin, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { AreaPicker } from "@/components/order/area-picker";
 import { orderSource } from "@/components/order/order-source";
@@ -34,6 +34,7 @@ type Quote = {
   issues: { message: string }[];
   coupon: { code: string; description: string | null } | null;
   couponError: string | null;
+  gift: { state: "applied" } | null;
   deliveryError: string | null;
   zone: { name: string; etaMin: number; etaMax: number } | null;
 };
@@ -148,6 +149,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
         lng: cartState.lng,
         couponCode: coupon,
         phone: normalizedPhone,
+        gift: true,
       }),
     [cartState, coupon, normalizedPhone],
   );
@@ -548,12 +550,19 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
               </p>
             )}
             {coupon && quote?.couponError && <p className="mt-2 text-[12.5px] text-rose-sumac">{quote.couponError}</p>}
+            {!coupon && quote?.gift?.state === "applied" && quote.coupon && (
+              <p className="mt-2 text-[12.5px] text-olive-leaf">
+                <Gift className="mr-1 inline h-3.5 w-3.5" strokeWidth={2} />
+                Your SHĀZDEH gift is applied{quote.coupon.description ? ` — ${quote.coupon.description}` : ""}
+              </p>
+            )}
+
 
             <dl className={cn("mt-4 space-y-2 text-[13.5px] transition-opacity", quoting && "opacity-60")}>
               <SummaryRow label="Subtotal" value={formatFils(t.subtotalFils)} />
               <SummaryRow label="Delivery" value={t.deliveryFeeFils === 0 ? "Free" : formatFils(t.deliveryFeeFils)} />
               {t.serviceFeeFils > 0 && <SummaryRow label="Service fee" value={formatFils(t.serviceFeeFils)} />}
-              {t.discountFils > 0 && <SummaryRow label="Promo" value={`−${formatFils(t.discountFils)}`} accent />}
+              {t.discountFils > 0 && <SummaryRow label={!coupon && quote?.gift?.state === "applied" ? "Gift" : "Promo"} value={`−${formatFils(t.discountFils)}`} accent />}
               {!config.pricesIncludeVat && <SummaryRow label={`VAT ${config.vatRate}%`} value={formatFils(t.vatFils)} />}
               <div className="flex items-baseline justify-between border-t border-black-iron/10 pt-3 text-[16px] font-bold">
                 <dt>Total</dt>

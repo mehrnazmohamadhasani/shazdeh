@@ -102,6 +102,8 @@ export const couponSchema = z.object({
   usageLimit: z.number().int().min(1).nullable().optional(),
   perPhoneLimit: z.number().int().min(1).nullable().optional(),
   isActive: z.boolean().optional().default(true),
+  isGift: z.boolean().optional().default(false),
+  firstOrderOnly: z.boolean().optional().default(false),
 }).refine((c) => c.type !== "PERCENT" || c.value <= 100, { message: "A percentage can't exceed 100", path: ["value"] });
 
 export const modifiersSchema = z.object({

@@ -72,6 +72,35 @@ export const setup: Record<string, string> = {
   "Note for customers": "یادداشت برای مشتری‌ها",
   "e.g. 10% off your first order": "مثلاً 10% off your first order",
 
+  // QR gifts
+  "{summary} · QR gift · {scans} scans · {claims} claimed · {used} redeemed":
+    "{summary} · هدیه‌ی QR · {scans} اسکن · {claims} ثبت‌نام · {used} استفاده‌شده",
+  "QR gift": "هدیه‌ی QR",
+  "Customers scan a card from their bag and leave their mobile and email. The gift is then applied by itself when they order with that mobile.":
+    "مشتری کارت داخل پاکت را اسکن می‌کند و موبایل و ایمیلش را وارد می‌کند. بعد هر وقت با همان موبایل سفارش بدهد، هدیه خودکار اعمال می‌شود.",
+  "First website order only": "فقط برای اولین سفارش از وب‌سایت",
+  "Only for a mobile that hasn't ordered from us before.": "فقط برای موبایلی که قبلاً از ما سفارش نداده است.",
+  "QR code for {code}": "کد QR برای {code}",
+  "Link copied": "لینک کپی شد",
+  "Copy link": "کپی لینک",
+  "Bag card (A6)": "کارت داخل پاکت (A6)",
+  "Gift claims": "هدیه‌های ثبت‌شده",
+  "Customers who scanned a QR gift card and left their details.": "مشتری‌هایی که کارت هدیه‌ی QR را اسکن کردند و اطلاعاتشان را وارد کردند.",
+  Scans: "اسکن‌ها",
+  Claimed: "ثبت‌شده",
+  Redeemed: "استفاده‌شده",
+  "Not used yet": "هنوز استفاده نشده",
+  Ended: "تمام‌شده",
+  "All gifts": "همه‌ی هدیه‌ها",
+  "Search name, mobile or email": "جستجوی نام، موبایل یا ایمیل",
+  "Download (Excel)": "دانلود (اکسل)",
+  "No gift claims yet": "هنوز کسی هدیه‌ای ثبت نکرده",
+  "Nothing matches": "موردی پیدا نشد",
+  "When a customer scans a gift card and leaves their details, they show up here.":
+    "وقتی مشتری کارت هدیه را اسکن کند و اطلاعاتش را وارد کند، اینجا نمایش داده می‌شود.",
+  "Email failed": "ارسال ایمیل ناموفق بود",
+  "Email not sent": "ایمیل ارسال نشد",
+
   // Gallery
   "Couldn't save to the gallery": "در گالری ذخیره نشد",
   "{n} photo added": "{n} عکس اضافه شد",

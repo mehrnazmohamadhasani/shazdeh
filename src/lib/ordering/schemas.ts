@@ -26,6 +26,8 @@ export const quoteSchema = z.object({
   areaId: id.nullable().optional(),
   couponCode: z.string().trim().max(32).nullable().optional(),
   phone: z.string().trim().max(32).nullable().optional(),
+  /** Website checkout: apply the QR gift claimed by this mobile (staff entry leaves it off). */
+  gift: z.boolean().optional(),
   ...coords,
 });
 

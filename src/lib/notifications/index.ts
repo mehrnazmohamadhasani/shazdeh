@@ -64,7 +64,7 @@ const ON_THE_WAY_BADGE = "/icons/badge-on-the-way.png?v=2";
 const RESTAURANT_EVENTS: OrderEventName[] = ["order.received", "payment.received", "order.cancelled"];
 
 async function log(
-  orderId: string,
+  orderId: string | null,
   event: string,
   channel: string,
   recipient: string | null,
@@ -109,6 +109,51 @@ export type NotifyOptions = {
 };
 
 /** Sends everything due for an order event. */
+/**
+ * The QR gift email: the customer left this address on /gift/CODE. The
+ * gift already works for their mobile; this is the reminder to keep.
+ * Returns how the send went, for the admin gift list.
+ */
+export async function sendGiftEmail(gift: {
+  email: string;
+  name: string | null;
+  offer: string;
+  note: string | null;
+  endsAt: Date | null;
+  giftUrl: string;
+}): Promise<"sent" | "failed" | "skipped"> {
+  const hello = gift.name ? `Hi ${gift.name},` : "Hi,";
+  const until = gift.endsAt
+    ? `Valid until ${new Intl.DateTimeFormat("en-AE", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Dubai" }).format(gift.endsAt)}.`
+    : null;
+  const lines = [
+    `Thank you for choosing SHĀZDEH. Here is your gift: ${gift.offer} on your next order at our website.`,
+    gift.note,
+    "It's ready to use: it is applied by itself at checkout when you order with the same mobile number.",
+    until,
+  ].filter(Boolean) as string[];
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;color:#1d1d1b">
+<p style="color:#ce4927;font-weight:700;letter-spacing:.08em">SHĀZDEH</p>
+<h1 style="font-size:22px;margin:0 0 8px">Your gift: ${esc(gift.offer)}</h1>
+<p style="margin:4px 0">${esc(hello)}</p>
+${lines.map((l) => `<p style="margin:4px 0">${esc(l)}</p>`).join("")}
+<p style="margin-top:20px"><a href="${esc(gift.giftUrl)}" style="background:#ce4927;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Order with my gift</a></p>
+<p style="color:#777;font-size:12px;margin-top:24px">You get this email because this address was entered on our gift page. SHĀZDEH — Persian Cuisine</p></div>`;
+  try {
+    const status = await sendEmail(
+      gift.email,
+      `SHĀZDEH · Your gift: ${gift.offer}`,
+      `${hello}\n\n${lines.join("\n")}\n\nOrder with my gift: ${gift.giftUrl}\n\nSHĀZDEH — Persian Cuisine`,
+      html,
+    );
+    await log(null, "gift.claimed", "email", gift.email, status);
+    return status;
+  } catch (e) {
+    await log(null, "gift.claimed", "email", gift.email, "failed", String(e));
+    return "failed";
+  }
+}
+
 export async function notifyOrder(orderId: string, event: OrderEventName, { detail, autoAccepted }: NotifyOptions = {}) {
   try {
     const order = await prisma.order.findUnique({
