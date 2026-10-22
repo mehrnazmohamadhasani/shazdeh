@@ -32,9 +32,20 @@ test("customers: one row per mobile from orders and gift claims", () => {
   assert.deepEqual(rows.map((r) => r.phone), ["+971500000001", "+971500000002"]);
 });
 
+test("customers: an unsubscribed email is never OK for offers", () => {
+  const [row] = mergeCustomers(
+    [{ phone: "+971500000001", name: "Sara", email: "Sara@Example.com", marketingOptIn: true, createdAt: d("2026-09-01") }],
+    [],
+    [],
+    new Set(["sara@example.com"]),
+  );
+  assert.equal(row.unsubscribed, true);
+  assert.equal(row.marketingOk, false);
+});
+
 test("customers: filters", () => {
   const now = d("2026-10-22");
-  const base = { name: null, email: null, spentFils: 0, lastOrderId: null, giftCodes: [], firstSeenAt: d("2026-01-01").toISOString() };
+  const base = { name: null, email: null, unsubscribed: false, spentFils: 0, lastOrderId: null, giftCodes: [], firstSeenAt: d("2026-01-01").toISOString() };
   const lapsed = { ...base, phone: "1", orders: 2, lastOrderAt: d("2026-09-01").toISOString(), gift: "none" as const, marketingOk: true };
   const recent = { ...base, phone: "2", orders: 1, lastOrderAt: d("2026-10-15").toISOString(), gift: "none" as const, marketingOk: false };
   const giftOnly = { ...base, phone: "3", orders: 0, lastOrderAt: null, gift: "claimed" as const, marketingOk: false };

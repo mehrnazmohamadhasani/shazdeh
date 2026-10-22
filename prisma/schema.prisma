@@ -1196,3 +1196,35 @@ model FreeFoodItem {
 
   @@index([freeFoodId])
 }
+
+/// An email campaign written in the admin panel and sent as a Resend
+/// Broadcast (marketing quota, separate from order emails). Only to
+/// customers who agreed to news and offers and haven't unsubscribed.
+model Campaign {
+  id             String    @id @default(cuid())
+  subject        String
+  previewText    String?
+  heading        String
+  body           String // plain text; blank lines start a new paragraph
+  imageUrl       String?
+  buttonLabel    String?
+  buttonUrl      String?
+  promoCode      String?
+  audience       String    @default("marketing") // marketing | lapsed | gift_no_order
+  status         String    @default("DRAFT") // DRAFT | SENDING | SENT | FAILED
+  recipientCount Int?
+  broadcastId    String? // Resend Broadcast id, for its stats
+  error          String?
+  createdBy      String?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+/// Emails that unsubscribed from campaigns (copied from Resend before
+/// every send). They never get a campaign again, whatever a later
+/// checkbox says.
+model MarketingUnsubscribe {
+  email String   @id // lower-case
+  at    DateTime @default(now())
+}

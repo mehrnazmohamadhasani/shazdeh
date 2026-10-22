@@ -116,6 +116,61 @@ export const setup: Record<string, string> = {
   "Total spent": "مجموع خرید",
   "Last order": "آخرین سفارش",
   Offers: "پیشنهادها",
+  Unsubscribed: "لغو عضویت کرده",
+
+  // Campaigns
+  Campaigns: "کمپین‌ها",
+  Campaign: "کمپین",
+  "Edit campaign": "ویرایش کمپین",
+  "New campaign": "کمپین جدید",
+  "No campaigns yet": "هنوز کمپینی نساخته‌اید",
+  "Write your first email — you can send yourself a test before anyone else gets it.":
+    "اولین ایمیلتان را بنویسید — قبل از اینکه برای کسی برود، می‌توانید یک نسخه‌ی آزمایشی برای خودتان بفرستید.",
+  "Emails with news and offers, sent only to customers who agreed to receive them.":
+    "ایمیل‌های خبر و پیشنهاد، فقط برای مشتری‌هایی که با دریافتشان موافقت کرده‌اند.",
+  "Campaigns aren't set up on this server yet": "کمپین‌ها هنوز روی سرور راه‌اندازی نشده‌اند",
+  "Add these in Vercel → Settings → Environment Variables, then redeploy:":
+    "این‌ها را در Vercel ← Settings ← Environment Variables اضافه کنید و دوباره deploy کنید:",
+  Subject: "موضوع",
+  Audience: "مخاطبان",
+  Recipients: "گیرندگان",
+  Sending: "در حال ارسال",
+  Sent: "ارسال‌شده",
+  Failed: "ناموفق",
+  "Everyone who agreed to offers": "همه‌ی کسانی که با پیشنهادها موافقت کرده‌اند",
+  "What people see in their inbox.": "چیزی که مردم در صندوق ایمیلشان می‌بینند.",
+  "Preview line": "خط پیش‌نمایش",
+  "Optional. The grey line next to the subject in most inboxes.": "اختیاری. خط خاکستری کنار موضوع در بیشتر صندوق‌های ایمیل.",
+  Headline: "تیتر",
+  Message: "متن پیام",
+  "Leave an empty line between paragraphs. It starts with “Hi <first name>,”.":
+    "بین پاراگراف‌ها یک خط خالی بگذارید. ایمیل با «Hi <نام>,» شروع می‌شود.",
+  "Image link": "لینک عکس",
+  "Optional. A photo link starting with https://, e.g. from the Gallery.": "اختیاری. لینک یک عکس که با https:// شروع شود، مثلاً از گالری.",
+  "Button text": "متن دکمه",
+  "Button link": "لینک دکمه",
+  "A page on the site like /order, or a full https:// link.": "یک صفحه از سایت مثل ‎/order، یا یک لینک کامل https://.",
+  "Promo code": "کد تخفیف",
+  "Optional. Shown in a box in the email — create it first in Promo codes.":
+    "اختیاری. داخل یک کادر در ایمیل نمایش داده می‌شود — اول آن را در «کدهای تخفیف» بسازید.",
+  "Who gets it": "چه کسانی دریافت می‌کنند",
+  "Only customers who agreed to news and offers, have an email, and haven't unsubscribed.":
+    "فقط مشتری‌هایی که با خبرها و پیشنهادها موافقت کرده‌اند، ایمیل دارند و لغو عضویت نکرده‌اند.",
+  "Send a test to": "ارسال نسخه‌ی آزمایشی به",
+  "Send test": "ارسال آزمایشی",
+  "Test sent to {to}": "نسخه‌ی آزمایشی به {to} ارسال شد",
+  "Send to {n} people": "ارسال برای {n} نفر",
+  "Send “{subject}” to {n} people now? This can't be undone.": "«{subject}» همین حالا برای {n} نفر ارسال شود؟ این کار برگشت‌پذیر نیست.",
+  "Sent to {n} people": "برای {n} نفر ارسال شد",
+  "Couldn't send": "ارسال نشد",
+  "Delete this draft?": "این پیش‌نویس حذف شود؟",
+  Preview: "پیش‌نمایش",
+  "{n} recipients": "{n} گیرنده",
+  "Open in Resend (opens, clicks, unsubscribes)": "باز کردن در Resend (باز شدن‌ها، کلیک‌ها، لغو عضویت‌ها)",
+  "The last send didn't go through": "آخرین ارسال انجام نشد",
+  "Check Broadcasts in Resend before trying again, so nobody gets it twice.":
+    "قبل از تلاش دوباره، بخش Broadcasts در Resend را بررسی کنید تا کسی ایمیل را دو بار نگیرد.",
+  "Only an admin can send, once campaigns are set up on the server.": "فقط مدیر می‌تواند ارسال کند، آن هم بعد از راه‌اندازی کمپین‌ها روی سرور.",
   "Showing {n} of {total}. Search, or download the list to see everyone.":
     "{n} مورد از {total} نمایش داده شده. برای دیدن همه جستجو کنید یا فهرست را دانلود کنید.",
 

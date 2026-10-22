@@ -48,7 +48,7 @@ export function CustomersList({ rows }: { rows: CustomerListRow[] }) {
         r.lastOrderAt?.slice(0, 10) ?? "",
         r.gift === "none" ? "" : r.gift,
         r.giftCodes.join(" "),
-        r.marketingOk ? "yes" : "no",
+        r.unsubscribed ? "unsubscribed" : r.marketingOk ? "yes" : "no",
         r.firstSeenAt.slice(0, 10),
       ]),
     ];
@@ -162,7 +162,13 @@ export function CustomersList({ rows }: { rows: CustomerListRow[] }) {
                     )}
                   </td>
                   <td className="px-4 py-3 max-sm:hidden">
-                    {r.marketingOk ? <StatusPill tone="good">{t("Yes")}</StatusPill> : <span className="text-dark-grey">{t("No")}</span>}
+                    {r.unsubscribed ? (
+                      <StatusPill tone="warn">{t("Unsubscribed")}</StatusPill>
+                    ) : r.marketingOk ? (
+                      <StatusPill tone="good">{t("Yes")}</StatusPill>
+                    ) : (
+                      <span className="text-dark-grey">{t("No")}</span>
+                    )}
                   </td>
                 </tr>
               ))}

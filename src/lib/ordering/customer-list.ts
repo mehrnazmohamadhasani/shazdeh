@@ -37,17 +37,26 @@ export type CustomerListRow = {
   lastOrderId: string | null;
   gift: GiftState;
   giftCodes: string[];
+  /** Agreed to news and offers, and hasn't unsubscribed since. */
   marketingOk: boolean;
+  /** Clicked "unsubscribe" in a campaign email. */
+  unsubscribed: boolean;
   /** First time we heard of this mobile (first order or first gift claim). */
   firstSeenAt: string;
 };
 
-export function mergeCustomers(customers: CustomerSource[], stats: OrderStats[], claims: ClaimSource[]): CustomerListRow[] {
+export function mergeCustomers(
+  customers: CustomerSource[],
+  stats: OrderStats[],
+  claims: ClaimSource[],
+  /** Lower-case emails that unsubscribed from campaigns. */
+  unsubscribed: ReadonlySet<string> = new Set(),
+): CustomerListRow[] {
   const byPhone = new Map<string, CustomerListRow>();
   const row = (phone: string, seen: Date) => {
     let r = byPhone.get(phone);
     if (!r) {
-      r = { phone, name: null, email: null, orders: 0, spentFils: 0, lastOrderAt: null, lastOrderId: null, gift: "none", giftCodes: [], marketingOk: false, firstSeenAt: seen.toISOString() };
+      r = { phone, name: null, email: null, orders: 0, spentFils: 0, lastOrderAt: null, lastOrderId: null, gift: "none", giftCodes: [], marketingOk: false, unsubscribed: false, firstSeenAt: seen.toISOString() };
       byPhone.set(phone, r);
     }
     if (seen.toISOString() < r.firstSeenAt) r.firstSeenAt = seen.toISOString();
@@ -78,6 +87,12 @@ export function mergeCustomers(customers: CustomerSource[], stats: OrderStats[],
     if (!r.giftCodes.includes(c.code)) r.giftCodes.push(c.code);
     r.gift = r.gift === "used" || c.used ? "used" : "claimed";
   }
+  for (const r of byPhone.values()) {
+    if (r.email && unsubscribed.has(r.email.toLowerCase())) {
+      r.unsubscribed = true;
+      r.marketingOk = false;
+    }
+  }
   return [...byPhone.values()].sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)));
 }
 
@@ -93,4 +108,25 @@ export function matchesFilter(r: CustomerListRow, filter: CustomerFilter, now = 
   if (filter === "lapsed") return r.orders > 0 && r.lastOrderAt !== null && now.getTime() - new Date(r.lastOrderAt).getTime() > 30 * 86_400_000;
   if (filter === "gift_no_order") return r.gift !== "none" && r.orders === 0;
   return true;
+}
+
+export type CampaignAudience = Exclude<CustomerFilter, "all">;
+export const CAMPAIGN_AUDIENCES: CampaignAudience[] = ["marketing", "lapsed", "gift_no_order"];
+
+/**
+ * Who a campaign goes to: always only customers who agreed to offers (and
+ * didn't unsubscribe) and have an email, narrowed by the audience filter.
+ * One entry per email — two mobiles can share one.
+ */
+export function campaignRecipients(rows: CustomerListRow[], audience: CampaignAudience, now = new Date()) {
+  const seen = new Set<string>();
+  const out: { email: string; firstName: string | null }[] = [];
+  for (const r of rows) {
+    if (!r.marketingOk || !r.email || !matchesFilter(r, audience, now)) continue;
+    const email = r.email.trim().toLowerCase();
+    if (seen.has(email)) continue;
+    seen.add(email);
+    out.push({ email, firstName: r.name?.trim().split(/\s+/)[0] || null });
+  }
+  return out;
 }
