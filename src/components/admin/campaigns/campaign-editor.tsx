@@ -55,7 +55,7 @@ export function CampaignEditor({
   const recipients = counts[audience];
 
   const html = React.useMemo(
-    () => campaignHtml(d, { siteUrl, firstName: "Sara", unsubscribeUrl: "#" }),
+    () => campaignHtml(d, { siteUrl, firstName: "there", unsubscribeUrl: "#" }),
     [d, siteUrl],
   );
 
