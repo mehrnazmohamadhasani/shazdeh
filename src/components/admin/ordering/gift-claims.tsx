@@ -3,7 +3,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download } from "lucide-react";
-import { Card, EmptyState, Select, StatusPill, TextInput, chipButtonClass } from "@/components/admin/ui";
+import { Card, EmptyState, Select, StatTile, StatusPill, TextInput, chipButtonClass } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { formatPhone } from "@/lib/ordering/phone";
 import { cn } from "@/lib/utils";
@@ -82,10 +82,10 @@ export function GiftClaims({
   return (
     <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label={t("Scans")} value={scans} />
-        <Stat label={t("Claimed")} value={claims.length} />
-        <Stat label={t("Not used yet")} value={count("ready")} />
-        <Stat label={t("Redeemed")} value={count("used")} />
+        <StatTile label={t("Scans")} value={scans} />
+        <StatTile label={t("Claimed")} value={claims.length} />
+        <StatTile label={t("Not used yet")} value={count("ready")} />
+        <StatTile label={t("Redeemed")} value={count("used")} />
       </div>
 
       <Card>
@@ -196,14 +196,5 @@ export function GiftClaims({
         </div>
       )}
     </>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-[16px] border border-black-iron/[0.07] bg-white px-4 py-3">
-      <p className="text-[12px] text-dark-grey">{label}</p>
-      <p className="mt-1 text-[24px] font-bold tabular-nums tracking-[-0.02em] text-black-iron">{value}</p>
-    </div>
   );
 }

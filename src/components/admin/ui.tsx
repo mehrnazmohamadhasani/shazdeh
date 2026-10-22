@@ -194,6 +194,16 @@ export function StatusPill({
   );
 }
 
+/** A number with a label, for the summary row at the top of a list. */
+export function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-[16px] border border-black-iron/[0.07] bg-white px-4 py-3">
+      <p className="text-[12px] text-dark-grey">{label}</p>
+      <p className="mt-1 text-[24px] font-bold tabular-nums tracking-[-0.02em] text-black-iron">{value}</p>
+    </div>
+  );
+}
+
 /** A labelled on/off setting — the whole row is the click target. */
 export function SwitchRow({
   label,

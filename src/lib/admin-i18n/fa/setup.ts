@@ -101,6 +101,24 @@ export const setup: Record<string, string> = {
   "Email failed": "ارسال ایمیل ناموفق بود",
   "Email not sent": "ایمیل ارسال نشد",
 
+  // Customers
+  Customers: "مشتری‌ها",
+  "Everyone who ordered from the website (or by WhatsApp and phone) and everyone who claimed a QR gift — one row per mobile.":
+    "همه‌ی کسانی که از وب‌سایت (یا با واتس‌اپ و تلفن) سفارش داده‌اند و همه‌ی کسانی که هدیه‌ی QR گرفته‌اند — هر موبایل یک ردیف.",
+  "OK to send offers": "اجازه‌ی ارسال پیشنهاد",
+  "No order in 30+ days": "بیش از ۳۰ روز سفارش نداده",
+  "Gift claimed, never ordered": "هدیه گرفته، هنوز سفارش نداده",
+  "Only these customers agreed to receive news and offers. Send promotions to them only, with a way to unsubscribe.":
+    "فقط این مشتری‌ها با دریافت خبرها و پیشنهادها موافقت کرده‌اند. تبلیغات را فقط برای آن‌ها بفرستید، همراه با امکان لغو عضویت.",
+  "No customers yet": "هنوز مشتری‌ای ثبت نشده",
+  "Customers appear here after their first website order or gift claim.":
+    "مشتری‌ها بعد از اولین سفارش از وب‌سایت یا گرفتن هدیه اینجا نمایش داده می‌شوند.",
+  "Total spent": "مجموع خرید",
+  "Last order": "آخرین سفارش",
+  Offers: "پیشنهادها",
+  "Showing {n} of {total}. Search, or download the list to see everyone.":
+    "{n} مورد از {total} نمایش داده شده. برای دیدن همه جستجو کنید یا فهرست را دانلود کنید.",
+
   // Gallery
   "Couldn't save to the gallery": "در گالری ذخیره نشد",
   "{n} photo added": "{n} عکس اضافه شد",
