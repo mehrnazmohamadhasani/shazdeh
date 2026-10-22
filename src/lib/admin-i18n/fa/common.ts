@@ -18,6 +18,7 @@ export const common: Record<string, string> = {
   Daily: "کارهای روزانه",
   Home: "خانه",
   Website: "وب‌سایت",
+  Marketing: "بازاریابی",
   Access: "دسترسی‌ها",
   "Go to another screen": "رفتن به صفحه‌ی دیگر",
   "All screens": "همه‌ی صفحه‌ها",
