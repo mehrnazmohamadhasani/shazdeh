@@ -115,7 +115,7 @@ export const ops: Record<string, string> = {
   supplier: "تأمین‌کننده",
   date: "تاریخ",
   total: "جمع کل",
-  "line {n} quantity/total": "مقدار/جمع ردیف {n}",
+  "line {n} total": "جمع ردیف {n}",
   "line {n} stock amount": "مقدار انبار ردیف {n}",
   "Please fill in: {list}": "لطفاً این‌ها را پر کنید: {list}",
   ", ": "، ",

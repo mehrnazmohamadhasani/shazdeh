@@ -618,6 +618,9 @@ model Ingredient {
   /// Warn on Today when stock on hand is at or below this (g / ml / pcs).
   /// Null: no warning set.
   lowStockAt    Float?
+  /// Raw meat: which kind (lamb, beef…). Set from the invoice reading, editable.
+  meatTypeId    String?
+  meatType      MeatType?         @relation(fields: [meatTypeId], references: [id], onDelete: SetNull)
   supplierItems SupplierItem[]
   purchaseLines PurchaseLine[]
   movements     StockMovement[]
@@ -1227,4 +1230,22 @@ model Campaign {
 model MarketingUnsubscribe {
   email String   @id // lower-case
   at    DateTime @default(now())
+}
+
+// ─── Kinds of meat ──────────────────────────────────────────────────────────
+//
+// Only a label on raw-meat ingredients: lamb, beef, chicken, lamb shank.
+// The invoice reading names the kind of each meat line; a person can change it.
+
+model MeatType {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  nameFa      String?
+  /// Counted in pieces, not by weight (lamb shank).
+  countPieces Boolean      @default(false)
+  order       Int          @default(0)
+  isActive    Boolean      @default(true)
+  ingredients Ingredient[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }

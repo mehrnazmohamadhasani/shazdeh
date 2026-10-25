@@ -2,9 +2,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, Info, Loader2, Plus, RotateCw, Sparkles, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, Check, Info, Loader2, Plus, RotateCw, Sparkles, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, Field, IconButton, Select, StatusPill, TextArea, TextInput, controlClass } from "@/components/admin/ui";
+import { Card, Field, Select, StatusPill, TextArea, TextInput, controlClass } from "@/components/admin/ui";
 import { messageFromUnknown } from "@/lib/error-message";
 import { cn } from "@/lib/utils";
 import { checkExtraction, type Flag } from "@/lib/ops/checks";
@@ -16,6 +16,7 @@ import type { Translate } from "@/lib/admin-i18n";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { amountText } from "@/components/admin/ops/format";
 import { IngredientPicker, IngredientStatus } from "@/components/admin/ops/ingredient-picker";
+import { ChangeUnitButton } from "@/components/admin/ops/forms";
 
 /*
  * Review screen for one AI reading. Everything is pre-filled and
@@ -27,10 +28,12 @@ import { IngredientPicker, IngredientStatus } from "@/components/admin/ops/ingre
 type Category = (typeof SPEND_CATEGORIES)[number];
 type Known = { id: string; name: string };
 type KnownSupplier = Known & { trn: string | null; phone: string | null; paymentTermsDays: number | null };
-type KnownIngredient = Known & { unit: BaseUnit; nameFa?: string | null };
+type KnownIngredient = Known & { unit: BaseUnit; nameFa?: string | null; meatTypeId?: string | null };
 
 type LineState = {
   key: string;
+  /** Added on this screen (not on the paper). */
+  added?: boolean;
   rawName: string;
   itemCode: string | null;
   quantity: string;
@@ -46,6 +49,8 @@ type LineState = {
   /** In kg / L / pcs. */
   stock: string;
   source: Suggestions["lines"][number]["source"];
+  /** Kind of meat chosen on this screen, or found by the reading; undefined = the ingredient's own (unchanged). */
+  meatTypeId?: string | null;
   confidence: number;
   note: string | null;
 };
@@ -78,6 +83,7 @@ export function InvoiceReview({
   suggestions,
   suppliers,
   ingredients,
+  meatTypes = [],
   manual = false,
 }: {
   documentId: string;
@@ -85,10 +91,12 @@ export function InvoiceReview({
   suggestions: Suggestions;
   suppliers: KnownSupplier[];
   ingredients: KnownIngredient[];
+  /** Kinds of meat (lamb, beef…): the reading marks each raw-meat line with one; editable here. */
+  meatTypes?: { id: string; name: string; nameFa: string | null; countPieces: boolean }[];
   /** Typed in by hand: there is no photo to read again. */
   manual?: boolean;
 }) {
-  const { t, locale } = useAdminI18n();
+  const { t, locale, money } = useAdminI18n();
   const router = useRouter();
   const [busy, setBusy] = React.useState<null | "save" | "read" | "discard">(null);
   const [supplierName, setSupplierName] = React.useState(suggestions.supplierName ?? reading.supplier.name ?? "");
@@ -108,7 +116,14 @@ export function InvoiceReview({
   const [lines, setLines] = React.useState<LineState[]>(() =>
     reading.lines.map((l, i) => {
       const s = suggestions.lines[i];
-      const unit = s?.unit ?? l.stockUnit ?? "g";
+      // Lamb shank (a kind counted in pieces) is bought by the kg and stocked in pieces:
+      // the pieces are counted and typed, never worked out from the weight.
+      const byPiece = !!meatTypes.find((m) => m.id === s?.meatTypeId)?.countPieces;
+      const known = s?.ingredientId ? ingredients.find((i) => i.id === s.ingredientId) : undefined;
+      const unit = known?.unit ?? (byPiece ? "pcs" : (s?.unit ?? l.stockUnit ?? "g"));
+      // A suggested amount in another unit than the stock's (5 kg for an item counted in pieces) is no amount at all.
+      const byWeight = /(^|[^a-z])(kg|kgs|kilo|g|gm|grams?)([^a-z]|$)|كغ|كيلو|کیلو/i.test(l.unit ?? "");
+      const fits = s?.quantity != null && s.unit === unit && !(byPiece && byWeight);
       return {
         key: `l${i}`,
         rawName: l.description,
@@ -122,8 +137,10 @@ export function InvoiceReview({
         category: l.category,
         ingredientName: s?.ingredientName ?? (isStock(l.category) ? l.description : ""),
         stockUnit: unit,
-        stock: s?.quantity != null ? String(Number((s.quantity / PER_DISPLAY[unit]).toFixed(3))) : "",
+        stock: fits ? String(Number((s!.quantity! / PER_DISPLAY[unit]).toFixed(3))) : "",
         source: s?.source ?? null,
+        // The reading (or the ingredient) says it is raw meat: start with that kind.
+        meatTypeId: s?.meatTypeId ?? undefined,
         confidence: l.confidence,
         note: l.note,
       };
@@ -172,7 +189,45 @@ export function InvoiceReview({
   const lineFlags = (i: number) => flags.filter((f) => f.field === `line:${i}`);
   const errors = flags.filter((f) => f.level === "error").length;
 
+  // Each line is one summary row. Its boxes open when it needs a person:
+  // something doesn't add up, the AI was unsure, or the ingredient is new
+  // or missing. Quantity and unit price only show when they disagree with
+  // the line total (they copy the paper; the cost uses the total).
+  const needsLook = (l: LineState, i: number) => {
+    const known = ingredientFor(l.ingredientName);
+    return (
+      l.confidence < 0.7 ||
+      lineFlags(i).some((f) => f.level !== "info") ||
+      (isStock(l.category) && (!known || !(num(l.stock)! > 0)))
+    );
+  };
+  const [open, setOpen] = React.useState(() => new Set(lines.filter((l, i) => needsLook(l, i)).map((l) => l.key)));
+  const mismatch = (i: number) => lineFlags(i).some((f) => f.message.includes(", but the line says "));
+  const [math, setMath] = React.useState(() => new Set(lines.filter((_, i) => mismatch(i)).map((l) => l.key)));
+  const [showTotals, setShowTotals] = React.useState(() => docFlags.some((f) => f.level === "error"));
+  // A line that doesn't add up stays open, with its quantity and price.
+  const broken = (i: number) => lineFlags(i).some((f) => f.level === "error");
+  function setOpenKey(key: string, on: boolean) {
+    setOpen((o) => {
+      const n = new Set(o);
+      if (on) n.add(key);
+      else n.delete(key);
+      return n;
+    });
+  }
+
+  // A kind of meat counted in pieces (lamb shank) puts a new ingredient into stock in pieces;
+  // a weight read from the invoice can't be pieces, so that amount is typed.
+  function piecesFor(meatTypeId: string | null, l: LineState, known: KnownIngredient | null): Partial<LineState> {
+    if (known || !meatTypes.find((m) => m.id === meatTypeId)?.countPieces || l.stockUnit === "pcs") return {};
+    return { stockUnit: "pcs", stock: "" };
+  }
+
   function update(key: string, patch: Partial<LineState>) {
+    // Keep a line that was being fixed open after it adds up, so its boxes don't vanish mid-typing.
+    const i = lines.findIndex((l) => l.key === key);
+    if (i >= 0 && broken(i)) setOpen((o) => new Set(o).add(key));
+    if (i >= 0 && mismatch(i)) setMath((o) => new Set(o).add(key));
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
@@ -215,7 +270,8 @@ export function InvoiceReview({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) missing.push(t("date"));
     if (num(total) == null) missing.push(t("total"));
     lines.forEach((l, i) => {
-      if (!(num(l.quantity)! > 0) || num(l.lineTotal) == null) missing.push(t("line {n} quantity/total", { n: i + 1 }));
+      // Only the line total counts for cost; a receipt that prints no quantity is one of it.
+      if (num(l.lineTotal) == null) missing.push(t("line {n} total", { n: i + 1 }));
       if (isStock(l.category) && l.ingredientName.trim() && !(num(l.stock)! > 0)) missing.push(t("line {n} stock amount", { n: i + 1 }));
     });
     if (missing.length) return toast.error(t("Please fill in: {list}", { list: missing.join(t(", ")) }));
@@ -243,16 +299,18 @@ export function InvoiceReview({
         const stocked = isStock(l.category) && l.ingredientName.trim();
         const unit = known?.unit ?? l.stockUnit;
         return {
-          rawName: l.rawName.trim() || "Item",
+          rawName: l.rawName.trim() || l.ingredientName.trim() || "Item",
           itemCode: l.itemCode,
-          quantity: num(l.quantity)!,
+          quantity: num(l.quantity)! > 0 ? num(l.quantity)! : 1,
           unit: l.unit.trim() || null,
           unitPrice: num(l.unitPrice),
           discount: l.discount,
           vat: l.vat,
           lineTotal: num(l.lineTotal)!,
           category: l.category,
-          ingredient: stocked ? { id: known?.id ?? null, name: known?.name ?? l.ingredientName.trim(), unit } : null,
+          ingredient: stocked
+            ? { id: known?.id ?? null, name: known?.name ?? l.ingredientName.trim(), unit, ...(l.meatTypeId !== undefined ? { meatTypeId: l.meatTypeId } : {}) }
+            : null,
           stockQuantity: stocked ? num(l.stock)! * PER_DISPLAY[unit] : null,
         };
       }),
@@ -322,18 +380,6 @@ export function InvoiceReview({
               ))}
             </datalist>
           </Field>
-          <Field label={t("TRN")}>
-            <TextInput dir="ltr" value={trn} onChange={(e) => setTrn(e.target.value)} inputMode="numeric" placeholder={t("15 digits")} />
-          </Field>
-          <Field
-            label={t("Phone")}
-            hint={supplier?.phone && phone.trim() && phone.trim() !== supplier.phone ? t("Saved: {phone} (kept)", { phone: supplier.phone }) : undefined}
-          >
-            <TextInput dir="ltr" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={supplier?.phone ?? undefined} />
-          </Field>
-          <Field label={t("Invoice number")}>
-            <TextInput dir="ltr" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
-          </Field>
           <Field label={t("Invoice date")} required>
             <TextInput type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
           </Field>
@@ -373,23 +419,36 @@ export function InvoiceReview({
               </datalist>
             </Field>
           ) : null}
-          <label className="flex min-h-11 items-center gap-3 self-end text-[14px]">
-            <input type="checkbox" className="h-5 w-5 accent-terracotta" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
-            {t("Line prices already include VAT")}
-          </label>
-          <Field
-            label={t("Notes")}
-            hint={t("Handwritten words on the paper are read here (e.g. «باقلی» = fava beans).")}
-            className="sm:col-span-2"
-          >
-            <TextArea dir="auto" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </Field>
         </div>
+        {/* What the AI read for the records; nothing here changes a cost. */}
+        <details className="mt-4 text-[14px]">
+          <summary className="cursor-pointer text-[13px] font-medium text-dark-grey">
+            {t("More details")}
+            {invoiceNo.trim() && <span className="ms-1.5 font-normal">· #{invoiceNo.trim()}</span>}
+          </summary>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Field label={t("Invoice number")}>
+              <TextInput dir="ltr" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
+            </Field>
+            <Field label={t("TRN")}>
+              <TextInput dir="ltr" value={trn} onChange={(e) => setTrn(e.target.value)} inputMode="numeric" placeholder={t("15 digits")} />
+            </Field>
+            <Field
+              label={t("Phone")}
+              hint={supplier?.phone && phone.trim() && phone.trim() !== supplier.phone ? t("Saved: {phone} (kept)", { phone: supplier.phone }) : undefined}
+            >
+              <TextInput dir="ltr" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={supplier?.phone ?? undefined} />
+            </Field>
+            <Field label={t("Notes")} hint={t("Handwritten words on the paper are read here (e.g. «باقلی» = fava beans).")}>
+              <TextArea dir="auto" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </Field>
+          </div>
+        </details>
       </Card>
 
       <Card
         title={t("Items ({n})", { n: lines.length })}
-        description={t("Food and packaging go into stock. Check the ingredient name and how much came in.")}
+        description={t("Check that each item goes to the right ingredient. Tap Edit to change one.")}
         bodyClassName="p-0"
         actions={
           unmatched.length > 0 && (
@@ -405,99 +464,168 @@ export function InvoiceReview({
             const known = ingredientFor(l.ingredientName);
             const unit = known?.unit ?? l.stockUnit;
             const stockBase = num(l.stock) != null ? num(l.stock)! * PER_DISPLAY[unit] : null;
+            const stocked = isStock(l.category) && !!l.ingredientName.trim();
+            const meatId = l.category === "food" ? (l.meatTypeId !== undefined ? l.meatTypeId : known?.meatTypeId) : null;
+            const meat = meatId ? meatTypes.find((m) => m.id === meatId) : null;
+            const flagsHere = lineFlags(i);
+            const isOpen = open.has(l.key) || broken(i);
+            const lineTotal = num(l.lineTotal);
             return (
-              <li key={l.key} className={cn("space-y-3 px-5 py-4 md:px-6", l.confidence < 0.7 && "bg-saffron-orange/[0.05]")}>
-                <div className="flex items-start gap-3">
-                  <span className="mt-2.5 w-5 shrink-0 text-[12px] tabular-nums text-dark-grey">{i + 1}</span>
-                  <TextInput
-                    aria-label={t("Item {n} as printed", { n: i + 1 })}
-                    dir="auto"
-                    value={l.rawName} onChange={(e) => update(l.key, { rawName: e.target.value })} className="font-medium" />
-                  <IconButton label={t("Remove item {n}", { n: i + 1 })} danger onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>
-                    <Trash2 className="h-4 w-4" />
-                  </IconButton>
-                </div>
-                <div className="grid grid-cols-2 gap-3 ps-8 sm:grid-cols-5">
-                  <Field label={t("Qty")}>
-                    <TextInput dir="ltr" inputMode="decimal" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} />
-                  </Field>
-                  <Field label={t("Unit")}>
-                    <TextInput dir="auto" value={l.unit} onChange={(e) => update(l.key, { unit: e.target.value })} placeholder={t("kg, Pcs…")} />
-                  </Field>
-                  <Field label={t("Unit price")}>
-                    <TextInput dir="ltr" inputMode="decimal" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} />
-                  </Field>
-                  <Field label={t("Line total")}>
-                    <TextInput dir="ltr" inputMode="decimal" value={l.lineTotal} onChange={(e) => update(l.key, { lineTotal: e.target.value })} />
-                  </Field>
-                  <Field label={t("Type")} className="col-span-2 sm:col-span-1">
-                    <Select value={l.category} onChange={(e) => update(l.key, { category: e.target.value as Category })}>
-                      {SPEND_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {t(CATEGORY_LABEL[c])}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                </div>
-                {isStock(l.category) && (
-                  <div className="ms-8 grid gap-3 rounded-[12px] bg-black-iron/[0.025] p-3 2xl:grid-cols-[minmax(0,1fr)_auto]">
-                    <Field
-                      label={t("Ingredient")}
-                      htmlFor={`${l.key}-ingredient`}
-                      hint={
-                        <IngredientStatus
-                          value={l.ingredientName}
-                          ingredients={ingredients}
-                          printed={l.rawName}
-                          aiSuggestion={aiMatches[l.key]}
-                          onUse={(name) => update(l.key, { ingredientName: name })}
-                        />
-                      }
-                    >
-                      <IngredientPicker
-                        id={`${l.key}-ingredient`}
-                        value={l.ingredientName}
-                        onChange={(name) => update(l.key, { ingredientName: name })}
-                        ingredients={ingredients}
-                        printed={l.rawName}
-                        aiSuggestion={aiMatches[l.key]}
-                      />
-                    </Field>
-                    <Field
-                      label={t("Stock added")}
-                      hint={
+              <li key={l.key} className={cn("px-5 py-3.5 md:px-6", (l.confidence < 0.7 || flagsHere.some((f) => f.level === "error")) && "bg-saffron-orange/[0.05]")}>
+                {/* One row: what was bought, where it goes, what it cost. */}
+                <div className="flex items-center gap-3">
+                  <span className="w-5 shrink-0 text-[12px] tabular-nums text-dark-grey">{i + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p dir="auto" className="truncate text-[14.5px] font-medium">
+                      {l.rawName.trim() || l.ingredientName.trim() || t("New item")}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-dark-grey">
+                      {stocked ? (
                         <>
-                          {stockBase != null && stockBase > 0 ? amountText(stockBase, unit, locale) : t("Total for this line")}
-                          {l.source && (
-                            <span className="ms-1.5 inline-flex items-center gap-1 text-terracotta-ink">
-                              <Sparkles className="h-3 w-3" />
-                              {t(SOURCE_LABEL[l.source])}
-                            </span>
-                          )}
+                          {known ? <Check className="h-3.5 w-3.5 text-olive-leaf" /> : <Plus className="h-3.5 w-3.5 text-cinnamon-bark" />}
+                          <bdi dir="auto" className={cn(!known && "text-cinnamon-bark")}>
+                            {known
+                              ? same(known.name, l.rawName) && !(locale === "fa" && known.nameFa)
+                                ? t("In stock")
+                                : locale === "fa" && known.nameFa
+                                  ? known.nameFa
+                                  : known.name
+                              : t("New: {name}", { name: l.ingredientName.trim() })}
+                          </bdi>
+                          {stockBase != null && stockBase > 0 && <span className="tabular-nums">· +{amountText(stockBase, unit, locale)}</span>}
+                          {meat && <span>· {locale === "fa" && meat.nameFa ? meat.nameFa : meat.name}</span>}
                         </>
-                      }
-                    >
-                      <div className="flex gap-2">
-                        <TextInput dir="ltr" inputMode="decimal" value={l.stock} onChange={(e) => update(l.key, { stock: e.target.value })} className="w-28" />
-                        <select
-                          aria-label={t("Stock unit")}
-                          value={unit}
-                          disabled={!!known}
-                          onChange={(e) => update(l.key, { stockUnit: e.target.value as BaseUnit })}
-                          className={cn(controlClass, "h-11 w-20")}
-                        >
-                          {(["g", "ml", "pcs"] as const).map((u) => (
-                            <option key={u} value={u}>
-                              {t(DISPLAY_UNIT[u])}
+                      ) : isStock(l.category) ? (
+                        <span className="text-cinnamon-bark">{t("No ingredient yet")}</span>
+                      ) : (
+                        <span>
+                          {t(CATEGORY_LABEL[l.category])} · {t("not stock")}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[14.5px] font-semibold tabular-nums">{lineTotal != null ? money(Math.round(lineTotal * 100)) : "—"}</span>
+                  {!broken(i) && (
+                    <Button variant="ghost" size="sm" onClick={() => setOpenKey(l.key, !isOpen)} aria-expanded={isOpen}>
+                      {isOpen ? t("Close") : t("Edit")}
+                    </Button>
+                  )}
+                </div>
+
+                {isOpen && (
+                  <div className="mt-3 space-y-3 ps-8">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {!isStock(l.category) && (l.added || !l.rawName.trim()) && (
+                        <Field label={t("Item")} className="col-span-2 sm:col-span-1">
+                          <TextInput dir="auto" value={l.rawName} onChange={(e) => update(l.key, { rawName: e.target.value })} placeholder={t("e.g. {example}", { example: t("Gas cylinder") })} />
+                        </Field>
+                      )}
+                      <Field label={t("Type")}>
+                        <Select value={l.category} onChange={(e) => update(l.key, { category: e.target.value as Category })}>
+                          {SPEND_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                              {t(CATEGORY_LABEL[c])}
                             </option>
                           ))}
-                        </select>
+                        </Select>
+                      </Field>
+                      <Field label={t("Line total")}>
+                        <TextInput dir="ltr" inputMode="decimal" value={l.lineTotal} onChange={(e) => update(l.key, { lineTotal: e.target.value })} />
+                      </Field>
+                      {/* Quantity and price only matter when they don't match the line total. */}
+                      {(math.has(l.key) || mismatch(i)) && (
+                        <>
+                          <Field label={t("Qty")}>
+                            <TextInput dir="ltr" inputMode="decimal" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} />
+                          </Field>
+                          <Field label={t("Unit price")}>
+                            <TextInput dir="ltr" inputMode="decimal" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} />
+                          </Field>
+                        </>
+                      )}
+                    </div>
+                    {isStock(l.category) && (
+                      <div className="grid gap-3 rounded-[12px] bg-black-iron/[0.025] p-3 2xl:grid-cols-[minmax(0,1fr)_auto]">
+                        <Field
+                          label={t("Ingredient")}
+                          htmlFor={`${l.key}-ingredient`}
+                          hint={
+                            <IngredientStatus
+                              value={l.ingredientName}
+                              ingredients={ingredients}
+                              printed={l.rawName}
+                              aiSuggestion={aiMatches[l.key]}
+                              onUse={(name) => update(l.key, { ingredientName: name })}
+                            />
+                          }
+                        >
+                          <IngredientPicker
+                            id={`${l.key}-ingredient`}
+                            value={l.ingredientName}
+                            onChange={(name) => update(l.key, { ingredientName: name })}
+                            ingredients={ingredients}
+                            printed={l.rawName}
+                            aiSuggestion={aiMatches[l.key]}
+                          />
+                        </Field>
+                        <Field
+                          label={t("Stock added")}
+                          hint={
+                            l.source ? (
+                              <span className="inline-flex items-center gap-1 text-terracotta-ink">
+                                <Sparkles className="h-3 w-3" />
+                                {t(SOURCE_LABEL[l.source])}
+                              </span>
+                            ) : (
+                              t("Total for this line")
+                            )
+                          }
+                        >
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <TextInput dir="ltr" inputMode="decimal" value={l.stock} onChange={(e) => update(l.key, { stock: e.target.value })} className="w-28" />
+                            {known ? (
+                              <>
+                                <span className="text-[13px] text-dark-grey">{t(DISPLAY_UNIT[unit])}</span>
+                                {/* An ingredient already in stock keeps one unit; changing it converts what is recorded. */}
+                                <ChangeUnitButton ingredientId={known.id} name={known.name} unit={known.unit} />
+                              </>
+                            ) : (
+                              <select
+                                aria-label={t("Stock unit")}
+                                value={unit}
+                                onChange={(e) => update(l.key, { stockUnit: e.target.value as BaseUnit })}
+                                className={cn(controlClass, "h-11 w-20")}
+                              >
+                                {(["g", "ml", "pcs"] as const).map((u) => (
+                                  <option key={u} value={u}>
+                                    {t(DISPLAY_UNIT[u])}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        </Field>
+                        {/* Only meat lines ask for a kind of meat: the reading marks them, or the ingredient is already meat. */}
+                        {meatTypes.length > 0 && l.category === "food" && (l.meatTypeId || known?.meatTypeId) && (
+                          <Field label={t("Kind of meat")} className="2xl:col-span-2">
+                            <Select value={meatId ?? ""} onChange={(e) => update(l.key, { meatTypeId: e.target.value || null, ...piecesFor(e.target.value || null, l, known) })}>
+                              <option value="">{t("Not raw meat")}</option>
+                              {meatTypes.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {locale === "fa" && m.nameFa ? m.nameFa : m.name}
+                                </option>
+                              ))}
+                            </Select>
+                          </Field>
+                        )}
                       </div>
-                    </Field>
+                    )}
+                    <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-medium text-pomegranate-red">
+                      <Trash2 className="h-4 w-4" /> {t("Remove item {n}", { n: i + 1 })}
+                    </button>
                   </div>
                 )}
-                {lineFlags(i).length > 0 && <Flags flags={lineFlags(i)} className="ms-8" compact />}
+                {flagsHere.length > 0 && <Flags flags={flagsHere} className="mt-2 ms-8" compact />}
               </li>
             );
           })}
@@ -506,11 +634,13 @@ export function InvoiceReview({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() =>
+            onClick={() => {
+              const key = `n${Date.now()}`;
               setLines((ls) => [
                 ...ls,
                 {
-                  key: `n${Date.now()}`,
+                  key,
+                  added: true,
                   rawName: "",
                   itemCode: null,
                   quantity: "1",
@@ -527,8 +657,9 @@ export function InvoiceReview({
                   confidence: 1,
                   note: null,
                 },
-              ])
-            }
+              ]);
+              setOpenKey(key, true);
+            }}
           >
             <Plus className="h-4 w-4" /> {t("Add item")}
           </Button>
@@ -536,20 +667,39 @@ export function InvoiceReview({
       </Card>
 
       <Card title={t("Totals (AED)")}>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Field label={t("Subtotal", { context: "invoice" })}>
-            <TextInput dir="ltr" inputMode="decimal" value={subtotal} onChange={(e) => setSubtotal(e.target.value)} />
-          </Field>
-          <Field label={t("Discount")}>
-            <TextInput dir="ltr" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-          </Field>
-          <Field label={t("VAT")}>
-            <TextInput dir="ltr" inputMode="decimal" value={vat} onChange={(e) => setVat(e.target.value)} />
-          </Field>
-          <Field label={t("Total")} required>
+        <div className="flex flex-wrap items-end gap-4">
+          <Field label={t("Total")} required className="w-40">
             <TextInput dir="ltr" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} className="font-semibold" />
           </Field>
+          {!showTotals && (
+            <button type="button" onClick={() => setShowTotals(true)} className="min-h-11 text-start text-[13px] text-dark-grey">
+              {[
+                num(discount) ? t("discount {amount}", { amount: discount }) : null,
+                num(vat) ? t("VAT {amount}", { amount: vat }) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || t("No discount or VAT")}
+              <span className="ms-2 font-medium text-terracotta-ink admin-link">{t("Edit")}</span>
+            </button>
+          )}
         </div>
+        {showTotals && (
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <Field label={t("Subtotal", { context: "invoice" })}>
+              <TextInput dir="ltr" inputMode="decimal" value={subtotal} onChange={(e) => setSubtotal(e.target.value)} />
+            </Field>
+            <Field label={t("Discount")}>
+              <TextInput dir="ltr" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            </Field>
+            <Field label={t("VAT")}>
+              <TextInput dir="ltr" inputMode="decimal" value={vat} onChange={(e) => setVat(e.target.value)} />
+            </Field>
+          </div>
+        )}
+        <label className="mt-4 flex min-h-11 items-center gap-3 text-[14px]">
+          <input type="checkbox" className="h-5 w-5 accent-terracotta" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
+          {t("Line prices already include VAT")}
+        </label>
       </Card>
 
       <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-black-iron/[0.07] bg-warm-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-[16px] sm:border">

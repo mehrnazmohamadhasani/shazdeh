@@ -8,8 +8,6 @@ import { DOC_STATUS } from "@/components/admin/ops/status";
 import { MANUAL_MIME, invoiceMonthCounts, listDocuments, listInvoices, parseStoredReading } from "@/lib/ops/documents";
 import { monthRange } from "@/lib/ops/sales";
 import { MonthPicker } from "@/components/admin/month-picker";
-import { parseStoredPlatform } from "@/lib/ops/platform-import";
-import { prisma } from "@/lib/prisma";
 import { toFils } from "@/lib/ordering/money";
 import { day } from "@/components/admin/ops/format";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
@@ -40,14 +38,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const { start, end, key: month } = monthRange(asked && asked <= thisMonth ? asked : null);
   const role = (await requireAdmin()).role;
   const canPay = role === "ADMIN" || role === "EDITOR";
-  const [docs, receipts, invoices, unpaid, counts] = await Promise.all([
+  const [docs, invoices, unpaid, counts] = await Promise.all([
     listDocuments(),
-    // Platform receipts waiting to be checked — the purchaser's way in, as they don't see Sales.
-    prisma.opsDocument.findMany({
-      where: { kind: "platform_order", status: { in: ["PROCESSING", "NEEDS_REVIEW", "FAILED"] } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, status: true, createdAt: true, extraction: true },
-    }),
     unpaidOnly ? listInvoices({ unpaid: true }) : listInvoices({ from: start, to: end }),
     listInvoices({ unpaid: true }),
     invoiceMonthCounts(),
@@ -74,35 +66,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       description={t("Photograph a supplier invoice or type it in. You check it, the stock is updated, and you record how it is paid.")}
       actions={
         <>
-          <UploadButton kind="platform_order" variant="outline" label={t("Add platform receipt")} />
           <ManualInvoiceButton />
           <UploadButton />
         </>
       }
     >
-      {receipts.length > 0 && (
-        <Card title={t("Platform receipts to check")} bodyClassName="p-0">
-          <ul className="divide-y divide-black-iron/[0.06]">
-            {receipts.map((d) => {
-              const r = parseStoredPlatform(d.extraction);
-              const status = DOC_STATUS[d.status];
-              return (
-                <li key={d.id}>
-                  <Link href={`/admin/ops/sales/receipts/${d.id}`} className="flex min-h-14 items-center gap-3 px-5 py-3 hover:bg-black-iron/[0.02] md:px-6">
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] font-medium">{r ? `${r.platformPrinted ?? r.platform} ${r.orderNo ? `#${r.orderNo}` : ""}` : t("Receipt")}</span>
-                      <span className="block text-[12.5px] text-dark-grey">{t("Uploaded {date}", { date: when(d.createdAt) })}</span>
-                    </span>
-                    <StatusPill tone={status.tone}>{t(status.label)}</StatusPill>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-dark-grey rtl:-scale-x-100" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
-
       {docs.length > 0 && (
         <Card title={t("To check")} bodyClassName="p-0">
           <ul className="divide-y divide-black-iron/[0.06]">

@@ -207,4 +207,19 @@ export const stock: Record<string, string> = {
   "It has no invoices, so it can be deleted.": "فاکتوری ندارد، پس می‌توان حذفش کرد.",
   "They appear here when you save their first invoice, or add one with New supplier.": "با ذخیره‌ی اولین فاکتورشان اینجا نمایش داده می‌شوند، یا با «تأمین‌کننده‌ی جدید» اضافه‌شان کنید.",
   Actions: "کارها",
+  // Changing the unit an ingredient is counted in
+  "Change unit": "تغییر واحد",
+  "Count it in": "واحد جدید",
+  "{old} is how many {new}?": "{old} چند {new} است؟",
+  "Leave empty for 1 : 1.": "برای ۱ به ۱ خالی بگذارید.",
+  "Enter how much one piece is.": "بنویسید هر عدد چقدر است.",
+  "{name} is counted in {unit} now. Stock, past invoices and recipes are converted for you.":
+    "{name} الان با واحد {unit} شمرده می‌شود. موجودی، فاکتورهای قبلی و دستورهای پخت خودکار تبدیل می‌شوند.",
+  "How many {unit} is one piece?": "هر عدد چند {unit} است؟",
+  "e.g. a bottle of oil: 18": "مثلاً یک گالن روغن: ۱۸",
+  "1 piece = {amount} {unit}": "۱ عدد = {amount} {unit}",
+  "1 kg": "۱ کیلو",
+  "1 litre": "۱ لیتر",
+  "{name} is now counted in {unit}. Check the amounts on this screen.": "{name} حالا با واحد {unit} شمرده می‌شود. مقدارهای این صفحه را بررسی کنید.",
+  "Counted in {unit}": "واحد شمارش: {unit}",
 };

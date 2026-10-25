@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { DeleteIngredientButton, IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
+import { ChangeUnitButton, DeleteIngredientButton, IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { getIngredient, ingredientKeptReason } from "@/lib/ops/catalog";
 import { CMS_ROLES } from "@/lib/api";
@@ -10,6 +10,9 @@ import { requireAdmin } from "@/lib/auth";
 import { chosenCost, getOpsSettings } from "@/lib/ops/settings";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { MeatTypeSelect } from "@/components/admin/ops/meat-type-select";
+import { listMeatKinds } from "@/lib/ops/meat";
+import { looksLikeMeat } from "@/lib/ops/meat-kind";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -35,6 +38,7 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
   const [ingredient, settings, kept] = await Promise.all([getIngredient(id), getOpsSettings(), ingredientKeptReason(id, user.role === "ADMIN")]);
   if (!ingredient) notFound();
   const unit = UNIT[ingredient.unit];
+  const meatTypes = await listMeatKinds(ingredient.meatTypeId);
   const sameUnit = await prisma.ingredient.findMany({
     where: { id: { not: id }, unit: ingredient.unit },
     select: { id: true, name: true },
@@ -88,6 +92,13 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
           {bySupplier.length > 1 && <p className="text-[12.5px] text-dark-grey">{t("of {n} suppliers", { n: bySupplier.length })}</p>}
         </Card>
       </div>
+
+      {/* Only meat is asked what kind of meat it is: already marked, or its name says so. */}
+      {ingredient.category === "FOOD" && ingredient.unit !== "ML" && (ingredient.meatTypeId || looksLikeMeat([ingredient.name, ingredient.nameFa], meatTypes.flatMap((m) => [m.name, m.nameFa]))) && (
+        <Card title={t("Kind of meat")} description={t("Read from the invoice when meat is bought; change it here if it is wrong.")}>
+          <MeatTypeSelect ingredientId={ingredient.id} value={ingredient.meatTypeId} types={meatTypes} />
+        </Card>
+      )}
 
       <Card title={t("Waste, staff meal or correction")}>
         <MovementForm ingredientId={ingredient.id} unit={unit} />
@@ -164,7 +175,18 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
         )}
       </Card>
 
-      <Card title={t("Details")} id="details">
+      <Card
+        title={t("Details")}
+        id="details"
+        actions={
+          CMS_ROLES.includes(user.role) ? (
+            <span className="flex items-center gap-2 text-[12.5px] text-dark-grey">
+              {t("Counted in {unit}", { unit: t(unit === "g" ? "kg" : unit === "ml" ? "litres" : "pieces") })}
+              <ChangeUnitButton ingredientId={ingredient.id} name={ingredient.name} unit={unit} />
+            </span>
+          ) : undefined
+        }
+      >
         <IngredientForm ingredient={{ id: ingredient.id, name: ingredient.name, nameFa: ingredient.nameFa, category: ingredient.category === "PACKAGING" || ingredient.category === "SUPPLIES" ? ingredient.category : "FOOD", unit, lowStockAt: ingredient.lowStockAt }} />
       </Card>
 

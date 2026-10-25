@@ -34,6 +34,12 @@ export const extractedLineSchema = z.object({
   /** The AI's guess of how the kitchen counts it, and how much this line adds. */
   stockUnit: z.enum(STOCK_UNITS).nullable(),
   stockQuantity: num,
+  /**
+   * Raw meat or poultry: which of the kitchen's kinds of meat it is (one of
+   * their names, e.g. "Lamb"); null for everything else. Readings saved
+   * before this existed don't have it.
+   */
+  meat: str.optional(),
   confidence: z.number().min(0).max(1),
   note: str,
 });
@@ -99,6 +105,7 @@ export const extractionJsonSchema = obj({
       category: { type: "string", enum: [...SPEND_CATEGORIES] },
       stockUnit: { type: ["string", "null"], enum: [...STOCK_UNITS, null] },
       stockQuantity: n,
+      meat: s,
       confidence: { type: "number" },
       note: s,
     }),
@@ -125,6 +132,7 @@ Rules:
 - packSize: the pack size if printed in a column or in the product name ("4 x 10 kg", "800G", "1000 ml"), else null.
 - category: food = ingredients and drinks for cooking or resale; packaging = takeaway boxes, containers, cups, lids, bags, foil, labels; supplies = things used up in the kitchen that are not food or packaging: cooking gas cylinders, cleaning products, gloves, tissues, bin bags, cling film; smallwares = durable kitchen tools and equipment (pans, trays, knives, GN pans, utensils); delivery = delivery/transport charges; other = anything else.
 - stockUnit / stockQuantity: how the kitchen would count this line in stock — "g" for solids, "ml" for liquids, "pcs" for countable items — and the TOTAL amount the whole line adds (e.g. 5 cartons of 4 x 10 kg rice = 200000 g; 2 pcs of tomato paste 800 g = 1600 g; 15 kg lamb = 15000 g). If the pack size is truly unclear, set stockQuantity to null and say why in note. Use null for delivery and non-stock lines.
+- meat: only for raw meat or poultry — fresh, chilled or frozen mutton, lamb, beef, veal, chicken, shanks…, written in any language or spelling ("FRESH MUTTON", "BEEF BACKSTIP", "موزة خروف", "دجاج", "گوشت گوساله"). Set it to the kitchen's kind of meat it is, using exactly one of the names listed at the end of these instructions (choose the closest: mutton is lamb, veal is beef, a lamb shank is the shank kind when there is one). Use null for everything else: rice, salt, spices, oil, vegetables, tomato paste, stock cubes, sausages, canned or ready-made meat products, and any line that isn't food.
 - confidence (0–1) per line and overall: how sure you are you read it correctly. Lower it for handwriting, blur, glare or ambiguous quantities (e.g. a "3B" that could be 38).
 - invoiceDate as YYYY-MM-DD. Dates may be written 09/07/2026, 16-Jul-2026, 24-08-26 or 27/8/2026 (day first in the UAE).
 - pricesIncludeVat: true if line prices already include VAT, false if VAT is added on top, null if you can't tell.

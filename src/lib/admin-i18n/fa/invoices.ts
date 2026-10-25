@@ -64,4 +64,15 @@ export const invoices: Record<string, string> = {
   "AI found {n} likely matches — check them and tap Use": "هوش مصنوعی {n} مورد احتمالی پیدا کرد — بررسی کنید و «استفاده» را بزنید",
   "AI found no match in stock. These look like new ingredients.": "هوش مصنوعی چیزی در انبار پیدا نکرد. این‌ها ماده‌ی تازه به نظر می‌رسند.",
   "Could not ask the AI": "پرسیدن از هوش مصنوعی انجام نشد",
+
+  // One summary row per item; boxes open only when needed.
+  "More details": "جزئیات بیشتر",
+  "Check that each item goes to the right ingredient. Tap Edit to change one.": "ببینید هر قلم به مادهٔ اولیهٔ درست رفته باشد. برای تغییر، «ویرایش» را بزنید.",
+  "New item": "قلم جدید",
+  "New: {name}": "جدید: {name}",
+  "not stock": "به انبار نمی‌رود",
+  "No ingredient yet": "هنوز مادهٔ اولیه انتخاب نشده",
+  Item: "قلم",
+  "Gas cylinder": "کپسول گاز",
+  "No discount or VAT": "بدون تخفیف و مالیات",
 };
