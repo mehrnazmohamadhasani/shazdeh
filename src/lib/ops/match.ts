@@ -17,6 +17,11 @@ export type LineSuggestion = {
   quantity: number | null;
   /** learned = remembered from an earlier confirmation; parsed = worked out from the printed pack size; ai = the model's estimate */
   source: "learned" | "parsed" | "ai" | null;
+  /**
+   * Raw meat: which kind (lamb, beef…) — the linked ingredient's own, else the
+   * one the reading named. Null: not raw meat. Missing on older readings.
+   */
+  meatTypeId?: string | null;
 };
 
 export type Suggestions = {
@@ -40,14 +45,23 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
   const learned = supplier
     ? await prisma.supplierItem.findMany({
         where: { supplierId: supplier.id, rawName: { in: x.lines.map((l) => normalizeName(l.description)) } },
-        include: { ingredient: { select: { id: true, name: true, unit: true } } },
+        include: { ingredient: { select: { id: true, name: true, unit: true, meatTypeId: true } } },
       })
     : [];
-  const ingredients = await prisma.ingredient.findMany({ select: { id: true, name: true, unit: true } });
+  const [ingredients, meatTypes] = await Promise.all([
+    prisma.ingredient.findMany({ select: { id: true, name: true, unit: true, meatTypeId: true } }),
+    prisma.meatType.findMany({ where: { isActive: true }, select: { id: true, name: true, nameFa: true, countPieces: true } }),
+  ]);
+  // The reading names one of the kinds of meat; match it by name (any case or language).
+  const meatTypeFor = (named: string | null | undefined) => {
+    const n = named?.trim().toLowerCase();
+    if (!n) return null;
+    return meatTypes.find((m) => m.name.toLowerCase() === n || m.nameFa?.trim() === named?.trim())?.id ?? null;
+  };
 
   const lines = x.lines.map((l): LineSuggestion => {
     if (!isStockCategory(l.category)) {
-      return { ingredientId: null, ingredientName: null, unit: null, quantity: null, source: null };
+      return { ingredientId: null, ingredientName: null, unit: null, quantity: null, source: null, meatTypeId: null };
     }
     const memory = learned.find((m) => m.rawName === normalizeName(l.description));
     if (memory && l.quantity != null) {
@@ -57,6 +71,7 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
         unit: UNIT_FROM_DB[memory.ingredient.unit],
         quantity: l.quantity * memory.baseQtyPerUnit,
         source: "learned",
+        meatTypeId: memory.ingredient.meatTypeId ?? meatTypeFor(l.meat),
       };
     }
     const description = normalizeName(l.description);
@@ -65,13 +80,20 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
       return description === n || description.split(" ").includes(n) || (n.length > 3 && description.includes(n));
     });
     const parsed = lineStockAmount(l);
-    const unit = parsed?.unit ?? l.stockUnit ?? (known ? UNIT_FROM_DB[known.unit] : null);
+    const meatTypeId = known?.meatTypeId ?? meatTypeFor(l.meat);
+    // Butchers print "33" and a price per kg: meat by weight with no unit on the line is kilos.
+    const meatKg =
+      !parsed && l.stockQuantity == null && l.quantity != null && !l.unit?.trim() && meatTypeId && !meatTypes.find((m) => m.id === meatTypeId)?.countPieces && (!known || known.unit === "G")
+        ? l.quantity * 1000
+        : null;
+    const unit = parsed?.unit ?? (meatKg != null ? "g" : null) ?? l.stockUnit ?? (known ? UNIT_FROM_DB[known.unit] : null);
     return {
       ingredientId: known?.id ?? null,
       ingredientName: known?.name ?? null,
       unit,
-      quantity: parsed?.amount ?? l.stockQuantity ?? null,
-      source: parsed ? "parsed" : l.stockQuantity != null ? "ai" : null,
+      quantity: parsed?.amount ?? meatKg ?? l.stockQuantity ?? null,
+      source: parsed ? "parsed" : meatKg != null || l.stockQuantity != null ? "ai" : null,
+      meatTypeId,
     };
   });
 

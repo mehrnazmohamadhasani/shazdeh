@@ -10,6 +10,7 @@ import { RECEIPT_LABEL, type ReceiptKind } from "@/components/admin/ops/payment-
 import { ReadAsSaleButton } from "@/components/admin/ops/platform-forms";
 import { EDIT_REASON, MANUAL_MIME, getDocument, parseStoredReading } from "@/lib/ops/documents";
 import { reconcileStatement } from "@/lib/ops/catalog";
+import { listMeatKinds } from "@/lib/ops/meat";
 import { toFils } from "@/lib/ordering/money";
 import { prisma } from "@/lib/prisma";
 import { UNIT, amountText, day } from "@/components/admin/ops/format";
@@ -284,9 +285,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     );
   } else if (doc.status === "NEEDS_REVIEW" && stored) {
     const undone = doc.voidedInvoices[0];
-    const [suppliers, ingredients] = await Promise.all([
+    const [suppliers, ingredients, meatTypes] = await Promise.all([
       prisma.supplier.findMany({ select: { id: true, name: true, trn: true, phone: true, paymentTermsDays: true }, orderBy: { name: "asc" } }),
-      prisma.ingredient.findMany({ select: { id: true, name: true, nameFa: true, unit: true }, orderBy: { name: "asc" } }),
+      prisma.ingredient.findMany({ select: { id: true, name: true, nameFa: true, unit: true, meatTypeId: true }, orderBy: { name: "asc" } }),
+      listMeatKinds(),
     ]);
     body = (
       <>
@@ -308,6 +310,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           suggestions={stored.suggestions}
           suppliers={suppliers}
           ingredients={ingredients.map((i) => ({ ...i, unit: UNIT[i.unit] }))}
+          meatTypes={meatTypes}
           manual={manual}
         />
       </>

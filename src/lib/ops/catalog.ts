@@ -246,6 +246,45 @@ export async function mergeIngredients(fromId: string, intoId: string, actor: Ac
   });
 }
 
+/**
+ * Counts an ingredient in another unit (oil bought "per tin" but used in
+ * grams). Everything already recorded in the old unit is converted by
+ * `factor` — new units per old unit (1 pc = 18 000 g → 18000) — so stock,
+ * purchases, the supplier's learned pack sizes, recipe lines and the
+ * low-stock warning keep their meaning. Money is untouched: each entry
+ * keeps its cost, so the price per unit follows. Audited with the factor.
+ */
+export async function changeIngredientUnit(id: string, unit: "G" | "ML" | "PCS", factor: number, actor: Actor) {
+  if (!(factor > 0) || !Number.isFinite(factor)) throw new OpsError("Enter how much one old unit is in the new unit.");
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Ingredient" WHERE "id" = ${id} FOR UPDATE`;
+    const before = await tx.ingredient.findUnique({ where: { id }, select: { name: true, unit: true, lowStockAt: true } });
+    if (!before) throw new OpsError("Ingredient not found.", 404);
+    if (before.unit === unit) throw new OpsError("It is already counted in that unit.");
+
+    const scale = (table: string, column: string, where: string) =>
+      tx.$executeRawUnsafe(`UPDATE "${table}" SET "${column}" = "${column}" * $1 WHERE ${where} = $2`, factor, id);
+    const counts = {
+      stockMovements: await scale("StockMovement", "quantity", `"ingredientId"`),
+      purchaseLines: await scale("PurchaseLine", "baseQty", `"ingredientId"`),
+      supplierItems: await scale("SupplierItem", "baseQtyPerUnit", `"ingredientId"`),
+      recipeLines: await scale("RecipeLine", "quantity", `"ingredientId"`),
+    };
+    await tx.ingredient.update({ where: { id }, data: { unit, lowStockAt: before.lowStockAt == null ? null : before.lowStockAt * factor } });
+    await tx.auditLog.create({
+      data: {
+        actor: actor.email,
+        action: "ingredient.unit",
+        entity: "Ingredient",
+        entityId: id,
+        before: { unit: before.unit, lowStockAt: before.lowStockAt },
+        after: { unit, factor, converted: counts },
+      },
+    });
+    return counts;
+  });
+}
+
 // ─── Deleting unused ingredients ────────────────────────────────────────────
 
 /** Why an ingredient has to stay, or null when it can be deleted. */

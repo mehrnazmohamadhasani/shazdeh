@@ -28,13 +28,19 @@ export class AiNotConfiguredError extends Error {
   }
 }
 
-export async function readDocument(file: { data: Buffer; mimeType: string; name?: string | null }, documentId?: string): Promise<ReadResult> {
+export async function readDocument(
+  file: { data: Buffer; mimeType: string; name?: string | null },
+  documentId?: string,
+  /** The kitchen's kinds of meat (lamb, beef…), so a meat line can be named as one of them. */
+  meatKinds: string[] = [],
+): Promise<ReadResult> {
   if (!process.env.OPENAI_API_KEY?.trim()) {
     if (process.env.NODE_ENV === "production") throw new AiNotConfiguredError();
     return sampleReading();
   }
+  const kinds = meatKinds.length ? meatKinds.map((k) => `"${k}"`).join(", ") : "none — use null";
   const result = await readWithSchema(file, {
-    instructions: EXTRACTION_PROMPT,
+    instructions: `${EXTRACTION_PROMPT}\n\nThe kitchen's kinds of meat (for "meat"): ${kinds}.`,
     prompt: "Read this document.",
     schemaName: "purchase_document",
     jsonSchema: extractionJsonSchema,

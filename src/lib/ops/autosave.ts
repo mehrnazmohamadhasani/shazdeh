@@ -129,7 +129,9 @@ export function decideInvoiceAutoSave(x: Extraction, s: Suggestions, minConfiden
           vat: l.vat,
           lineTotal: l.lineTotal!,
           category: l.category,
-          ingredient: stocked ? { id: sug!.ingredientId, name: sug!.ingredientName!, unit: sug!.unit! } : null,
+          ingredient: stocked
+            ? { id: sug!.ingredientId, name: sug!.ingredientName!, unit: sug!.unit!, ...(sug!.meatTypeId ? { meatTypeId: sug!.meatTypeId } : {}) }
+            : null,
           stockQuantity: stocked ? sug!.quantity : null,
         };
       }),

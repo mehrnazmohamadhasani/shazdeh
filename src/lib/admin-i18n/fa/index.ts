@@ -13,6 +13,7 @@ import { assistant } from "./assistant";
 import { staffOrders } from "./staff-orders";
 import { freeFood } from "./free-food";
 import { invoices } from "./invoices";
+import { meat } from "./meat";
 
 /*
  * English → Persian for the admin panel, split by area so each file
@@ -35,4 +36,5 @@ export const FA: Record<string, string> = {
   ...staffOrders,
   ...freeFood,
   ...invoices,
+  ...meat,
 };

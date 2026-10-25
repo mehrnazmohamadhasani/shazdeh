@@ -25,6 +25,8 @@ export const saveLineSchema = z.object({
       id: z.string().nullable(),
       name: z.string().trim().min(1).max(120),
       unit: z.enum(STOCK_UNITS),
+      /** The kind of meat this raw meat is (lamb, beef…), set on the ingredient. Left out: unchanged; null: not meat. */
+      meatTypeId: z.string().min(1).nullable().optional(),
     })
     .nullable(),
   /** Stock this line adds, in the ingredient's unit. */

@@ -125,7 +125,8 @@ export async function processDocument(id: string) {
   if (doc.kind === "platform_order") return processPlatformDocument(id);
   await prisma.opsDocument.update({ where: { id }, data: { status: "PROCESSING", error: null } });
   try {
-    const result = await readDocument({ data: Buffer.from(doc.data), mimeType: doc.mimeType, name: doc.originalName }, id);
+    const meatKinds = await prisma.meatType.findMany({ where: { isActive: true }, select: { name: true }, orderBy: [{ order: "asc" }, { name: "asc" }] });
+    const result = await readDocument({ data: Buffer.from(doc.data), mimeType: doc.mimeType, name: doc.originalName }, id, meatKinds.map((m) => m.name));
     // A delivery-platform receipt photographed as an invoice: read it as a sale instead.
     if (result.extraction.documentType === "platform_order") return processPlatformDocument(id);
     const suggestions = await suggestMatches(result.extraction);
@@ -217,7 +218,7 @@ export async function getDocument(id: string) {
       invoice: {
         include: {
           supplier: { select: { name: true, trn: true, phone: true, paymentTermsDays: true } },
-          lines: { include: { ingredient: { select: { name: true, unit: true } } } },
+          lines: { include: { ingredient: { select: { name: true, unit: true, meatTypeId: true } } } },
         },
       },
     },
@@ -298,6 +299,15 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
         }
         if (ingredient.unit !== unit) {
           throw new OpsError(`"${ingredient.name}" is counted in ${ingredient.unit.toLowerCase()}, not ${line.ingredient.unit}.`);
+        }
+        // The kind of meat chosen on review belongs to the ingredient (so the next invoice knows it too).
+        const meatTypeId = line.ingredient.meatTypeId;
+        if (meatTypeId !== undefined && meatTypeId !== ingredient.meatTypeId) {
+          if (meatTypeId && !(await tx.meatType.count({ where: { id: meatTypeId } }))) throw new OpsError("That kind of meat no longer exists.");
+          await tx.ingredient.update({ where: { id: ingredient.id }, data: { meatTypeId } });
+          await tx.auditLog.create({
+            data: { actor: actor.email, action: "ingredient.meat_type", entity: "Ingredient", entityId: ingredient.id, via, before: { meatTypeId: ingredient.meatTypeId }, after: { meatTypeId } },
+          });
         }
         ingredientIds.push(ingredient.id);
       }

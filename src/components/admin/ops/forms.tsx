@@ -864,3 +864,114 @@ export function DeleteUnusedIngredientsButton({ names }: { names: string[] }) {
     </Button>
   );
 }
+
+// ─── Changing the unit an ingredient is counted in ─────────────────────────
+
+const UNIT_PER: Record<BaseUnit, number> = { g: 1000, ml: 1000, pcs: 1 };
+const UNIT_DB: Record<BaseUnit, "G" | "ML" | "PCS"> = { g: "G", ml: "ML", pcs: "PCS" };
+
+/**
+ * "Change unit": count an ingredient in kg / L / pieces instead, saying once
+ * how much one piece is ("1 piece = 18 kg"). What is already recorded is
+ * converted on the server; prices follow, because costs stay the same.
+ */
+export function ChangeUnitButton({ ingredientId, name, unit, onChanged }: { ingredientId: string; name: string; unit: BaseUnit; onChanged?: (unit: BaseUnit) => void }) {
+  const { t } = useAdminI18n();
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [to, setTo] = React.useState<BaseUnit>(unit === "pcs" ? "g" : "pcs");
+  const [amount, setAmount] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const big = (u: BaseUnit) => t(DISPLAY[u] === "L" ? "litres" : DISPLAY[u] === "kg" ? "kg" : "pieces");
+  // With pieces on either side the question is always "1 piece = ? kg";
+  // between kg and litres it is "1 kg = ? L", and 1 : 1 is the usual start.
+  const pieces = unit === "pcs" || to === "pcs";
+  const measure: BaseUnit = unit === "pcs" ? to : unit;
+  const value = pieces ? num(amount) : (num(amount) ?? 1);
+  const preview = value! > 0 ? (pieces ? t("1 piece = {amount} {unit}", { amount: value!, unit: big(measure) }) : `${t(unit === "g" ? "1 kg" : "1 litre")} = ${value} ${big(to)}`) : null;
+
+  function start() {
+    // The unit may have changed since this was first shown (a line matched to another ingredient).
+    setTo(unit === "pcs" ? "g" : "pcs");
+    setAmount("");
+    setOpen(true);
+  }
+
+  async function save() {
+    if (!(value! > 0)) return toast.error(t("Enter how much one piece is."));
+    setBusy(true);
+    try {
+      // How many new base units (g / ml / pcs) one old base unit becomes.
+      const factor = !pieces ? (value! * UNIT_PER[to]) / UNIT_PER[unit] : unit === "pcs" ? value! * UNIT_PER[to] : 1 / (value! * UNIT_PER[unit]);
+      const res = await fetch(`/api/admin/ops/ingredients/${ingredientId}/unit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unit: UNIT_DB[to], factor }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw json;
+      toast.success(t("{name} is now counted in {unit}. Check the amounts on this screen.", { name, unit: big(to) }));
+      setOpen(false);
+      onChanged?.(to);
+      router.refresh();
+    } catch (e) {
+      toast.error(t(messageFromUnknown(e, "Could not save")), { duration: 8000 });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <button type="button" onClick={start} className="inline-flex min-h-8 items-center text-[12.5px] font-medium text-terracotta-ink admin-link">
+        {t("Change unit")}
+      </button>
+      <DialogContent className="bg-white text-black-iron sm:max-w-md">
+        <form
+          className="space-y-5 p-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <DialogTitle className="text-[22px] font-bold text-black-iron">{t("Change unit")}</DialogTitle>
+          <DialogDescription className="text-[13.5px] leading-relaxed text-dark-grey">
+            {t("{name} is counted in {unit} now. Stock, past invoices and recipes are converted for you.", { name, unit: big(unit) })}
+          </DialogDescription>
+          <Field label={t("Count it in")}>
+            <Select value={to} onChange={(e) => setTo(e.target.value as BaseUnit)}>
+              {(["g", "ml", "pcs"] as const)
+                .filter((u) => u !== unit)
+                .map((u) => (
+                  <option key={u} value={u}>
+                    {big(u)}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+          <Field
+            label={pieces ? t("How many {unit} is one piece?", { unit: big(measure) }) : t("{old} is how many {new}?", { old: t(unit === "g" ? "1 kg" : "1 litre"), new: big(to) })}
+            hint={pieces ? t("e.g. a bottle of oil: 18") : t("Leave empty for 1 : 1.")}
+          >
+            <span dir="ltr" className="relative block">
+              <TextInput dir="ltr" inputMode="decimal" autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={pieces ? "0" : "1"} className="pr-16 text-left" />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-dark-grey" aria-hidden>
+                {big(pieces ? measure : to)}
+              </span>
+            </span>
+          </Field>
+          {preview && <p className="rounded-[10px] bg-olive-leaf/[0.08] px-3 py-2 text-[13.5px] font-medium tabular-nums text-olive-leaf">{preview}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+              {t("Cancel")}
+            </Button>
+            <Button type="submit" size="sm" disabled={busy}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("Change unit")}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

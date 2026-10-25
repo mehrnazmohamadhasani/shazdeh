@@ -1,7 +1,6 @@
 "use client";
 import * as React from "react";
 import { Check, ChevronDown, Plus, Search, Sparkles } from "lucide-react";
-import { controlClass } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { STRONG_MATCH, rankIngredients } from "@/lib/ops/ingredient-rank";
 import type { BaseUnit } from "@/lib/ops/units";
@@ -47,6 +46,7 @@ export function IngredientPicker({
   const [active, setActive] = React.useState(0);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const listId = `${id}-list`;
 
   const selected = ingredients.find((i) => i.name.trim().toLowerCase() === value.trim().toLowerCase()) ?? null;
@@ -118,9 +118,15 @@ export function IngredientPicker({
 
   return (
     <div ref={wrapRef} className="relative">
-      <div className="relative">
-        <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-grey" aria-hidden />
+      {/* Icons sit beside the text, not over it: an English name in the Persian panel runs
+          left to right, so icons laid over the box would cover its first letters. */}
+      <div
+        onClick={() => inputRef.current?.focus()}
+        className="flex h-11 w-full cursor-text items-center gap-2.5 rounded-[10px] border border-black-iron/[0.12] bg-white px-3.5 transition-colors focus-within:border-terracotta/60 focus-within:ring-2 focus-within:ring-terracotta/15"
+      >
+        <Search className="h-4 w-4 shrink-0 text-dark-grey" aria-hidden />
         <input
+          ref={inputRef}
           id={id}
           role="combobox"
           aria-expanded={open}
@@ -159,9 +165,9 @@ export function IngredientPicker({
               close();
             }
           }}
-          className={cn(controlClass, "h-11 truncate ps-10", selected ? "pe-20" : "pe-10", selected && "font-medium")}
+          className={cn("h-full min-w-0 flex-1 truncate bg-transparent text-[14px] text-black-iron placeholder:text-black-iron/35 focus:outline-none", selected && "font-medium")}
         />
-        <span className="pointer-events-none absolute end-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+        <span className="pointer-events-none flex shrink-0 items-center gap-2">
           {selected && <span className="rounded-full bg-black-iron/[0.06] px-2 py-0.5 text-[11.5px] font-medium text-dark-grey">{t(UNIT_LABEL[selected.unit])}</span>}
           <ChevronDown className={cn("h-4 w-4 text-dark-grey transition-transform", open && "rotate-180")} aria-hidden />
         </span>
