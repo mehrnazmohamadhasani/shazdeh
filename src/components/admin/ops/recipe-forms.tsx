@@ -706,7 +706,7 @@ export function DeleteRecipeButton({
       const message = body.usedIn?.length
         ? t("This prep is used in {names}. Remove it from them first.", { names: body.usedIn.join(", ") })
         : body.usedBefore?.length
-          ? t("Older versions of {names} used this prep, so it is kept for their history.", { names: body.usedBefore.join(", ") })
+          ? t("Earlier versions of {names} used this prep for sales, so it is kept for their history.", { names: body.usedBefore.join(", ") })
           : t(messageFromUnknown(e, "Could not delete"));
       toast.error(message, { duration: 8000 });
     } finally {

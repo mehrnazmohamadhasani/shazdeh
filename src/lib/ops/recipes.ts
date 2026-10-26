@@ -439,8 +439,10 @@ export async function discardDraft(id: string, actor: Actor, via = "manual") {
 }
 
 /**
- * Deletes a recipe with all its versions. One used inside another recipe
- * (even an old version of it) can't go: the error names those recipes.
+ * Deletes a recipe with all its versions. A prep used inside another
+ * recipe's current version (approved or draft) can't go, nor one an old
+ * version that sales were costed with used: the error names those recipes.
+ * Old versions nothing used are editing history; they lose the line.
  * An approved one is the owner's call (`allowApproved`); a dish's past
  * sales keep their stock movements. The assistant's undo only ever
  * deletes a draft it wrote.
@@ -450,23 +452,27 @@ export async function deleteRecipe(id: string, actor: Actor, via = "manual", opt
     await lockRecipe(tx, id);
     const recipe = await tx.recipe.findUniqueOrThrow({
       where: { id },
-      include: { versions: { include: { lines: true } }, usedIn: { select: { version: { select: { status: true, recipe: { select: { name: true } } } } } } },
+      include: {
+        versions: { include: { lines: true } },
+        usedIn: { select: { id: true, quantity: true, version: { select: { number: true, status: true, recipe: { select: { name: true } }, _count: { select: { stockUses: true } } } } } },
+      },
     });
     // Sales already recorded keep their stock movements (only their link to the version is cleared).
     if (!opts.allowApproved && recipe.versions.some((v) => v.status !== "DRAFT")) {
       throw new OpsError("Only the owner can delete an approved recipe.", 403);
     }
-    const names = (current: boolean) =>
-      [...new Set(recipe.usedIn.filter((u) => (u.version.status !== "RETIRED") === current).map((u) => u.version.recipe.name))].sort();
-    const usedIn = names(true);
+    const names = (lines: typeof recipe.usedIn) => [...new Set(lines.map((u) => u.version.recipe.name))].sort();
+    const usedIn = names(recipe.usedIn.filter((u) => u.version.status !== "RETIRED"));
     if (usedIn.length > 0) {
       throw new OpsError(`This prep is used in ${usedIn.join(", ")}. Remove it from them first.`, 409, { usedIn });
     }
-    // Only old versions use it: deleting would rewrite what those dishes were.
-    const usedBefore = names(false);
+    // Old versions that sales were costed with keep it: deleting would rewrite what was sold.
+    const usedBefore = names(recipe.usedIn.filter((u) => u.version._count.stockUses > 0));
     if (usedBefore.length > 0) {
-      throw new OpsError(`Older versions of ${usedBefore.join(", ")} used this prep, so it is kept for their history.`, 409, { usedBefore });
+      throw new OpsError(`Earlier versions of ${usedBefore.join(", ")} used this prep for sales, so it is kept for their history.`, 409, { usedBefore });
     }
+    // The rest are old versions nothing used: they lose the line (kept in the audit entry below).
+    await tx.recipeLine.deleteMany({ where: { id: { in: recipe.usedIn.map((u) => u.id) } } });
     await tx.recipe.delete({ where: { id } });
     await tx.auditLog.create({
       data: {
@@ -479,6 +485,7 @@ export async function deleteRecipe(id: string, actor: Actor, via = "manual", opt
           name: recipe.name,
           nameFa: recipe.nameFa,
           kind: recipe.kind,
+          oldRecipeLinesRemoved: recipe.usedIn.map((u) => ({ recipe: u.version.recipe.name, version: u.version.number, quantity: u.quantity })),
           versions: recipe.versions.map((v) => ({ number: v.number, status: v.status, yieldQuantity: v.yieldQuantity, yieldUnit: v.yieldUnit, lines: linesSnapshot(v.lines) })),
         },
       },
