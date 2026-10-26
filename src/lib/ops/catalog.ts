@@ -288,12 +288,18 @@ export async function changeIngredientUnit(id: string, unit: "G" | "ML" | "PCS",
 // ─── Deleting unused ingredients ────────────────────────────────────────────
 
 /** Why an ingredient has to stay, or null when it can be deleted. */
-export type KeptReason = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "sales" } | { code: "owner" } | { code: "history" };
+export type KeptReason =
+  | { code: "recipes"; names: string[] }
+  | { code: "recipeHistory"; names: string[] }
+  | { code: "invoice" }
+  | { code: "sales" }
+  | { code: "owner" }
+  | { code: "history" };
 
 const usageSelect = {
   id: true,
   name: true,
-  recipeLines: { select: { version: { select: { recipe: { select: { name: true } } } } } },
+  recipeLines: { select: { version: { select: { status: true, recipe: { select: { name: true } }, _count: { select: { stockUses: true } } } } } },
   // Lines of undone invoices don't count: the invoice keeps them, without the link.
   purchaseLines: { where: { invoice: { voidedAt: null } }, select: { id: true }, take: 1 },
   movements: {
@@ -323,18 +329,31 @@ type Movement = {
   reversesId: string | null;
   reversedBy: unknown;
 };
-type Usage = { recipeLines: { version: { recipe: { name: string } } }[]; purchaseLines: unknown[]; movements: Movement[] };
+type Usage = {
+  recipeLines: { version: { status: string; recipe: { name: string }; _count: { stockUses: number } } }[];
+  purchaseLines: unknown[];
+  movements: Movement[];
+};
 
 /** Entries that aren't a "bought, then the invoice was undone" pair. */
 const realEntries = (ms: Movement[]) => ms.filter((m) => !m.reversesId && !m.reversedBy);
+
+const recipeNames = (lines: Usage["recipeLines"]) => [...new Set(lines.map((l) => l.version.recipe.name))].sort();
 
 /**
  * Anyone may delete an ingredient with no real stock entries. The owner may
  * also delete one whose manual entries (waste, corrections, counts) add up
  * to zero — never one a sale or free food took stock from.
+ *
+ * Recipes: only a current version (approved or draft) keeps it, or an old
+ * (retired) version that sales were costed with. Old versions nothing used
+ * are editing history; they lose the line when it is deleted.
  */
 function keptReason(i: Usage, owner: boolean): KeptReason | null {
-  if (i.recipeLines.length) return { code: "recipes", names: [...new Set(i.recipeLines.map((l) => l.version.recipe.name))].sort() };
+  const current = i.recipeLines.filter((l) => l.version.status !== "RETIRED");
+  if (current.length) return { code: "recipes", names: recipeNames(current) };
+  const sold = i.recipeLines.filter((l) => l.version._count.stockUses > 0);
+  if (sold.length) return { code: "recipeHistory", names: recipeNames(sold) };
   if (i.purchaseLines.length) return { code: "invoice" };
   const real = realEntries(i.movements);
   if (!real.length) return null;
@@ -346,6 +365,7 @@ function keptReason(i: Usage, owner: boolean): KeptReason | null {
 
 const KEPT_MESSAGE = {
   recipes: (names: string[]) => `It is used in ${names.join(", ")}. Remove it from those recipes first.`,
+  recipeHistory: (names: string[]) => `Earlier versions of ${names.join(", ")} used it for sales, so it is kept for their history. Merge it into another ingredient instead.`,
   invoice: () => "It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.",
   sales: () => "Sales or free food took stock from it, so it is kept for their history. Merge it into another ingredient instead.",
   owner: () => "Only the owner can delete it: it has waste or correction entries (they add up to zero).",
@@ -377,7 +397,13 @@ async function deleteOne(tx: Prisma.TransactionClient, id: string, actor: Actor,
   const i = await tx.ingredient.findUnique({ where: { id }, select: { ...usageSelect, nameFa: true, unit: true, category: true } });
   if (!i) throw new OpsError("Ingredient not found.", 404);
   const kept = keptReason(i, owner);
-  if (kept) throw new OpsError(kept.code === "recipes" ? KEPT_MESSAGE.recipes(kept.names) : KEPT_MESSAGE[kept.code](), 409, { kept });
+  if (kept) throw new OpsError(kept.code === "recipes" || kept.code === "recipeHistory" ? KEPT_MESSAGE[kept.code](kept.names) : KEPT_MESSAGE[kept.code](), 409, { kept });
+  // Old recipe versions no sale used lose the line (kept in the audit entry below).
+  const oldLines = await tx.recipeLine.findMany({
+    where: { ingredientId: id },
+    select: { id: true, quantity: true, version: { select: { number: true, recipe: { select: { name: true } } } } },
+  });
+  await tx.recipeLine.deleteMany({ where: { id: { in: oldLines.map((l) => l.id) } } });
   // Undo entries first: each points at the entry it cancels.
   await tx.stockMovement.deleteMany({ where: { ingredientId: id, reversesId: { not: null } } });
   await tx.stockMovement.deleteMany({ where: { ingredientId: id } });
@@ -396,6 +422,7 @@ async function deleteOne(tx: Prisma.TransactionClient, id: string, actor: Actor,
         unit: i.unit,
         category: i.category,
         undoneMovementsRemoved: i.movements.length - realEntries(i.movements).length,
+        oldRecipeLinesRemoved: oldLines.map((l) => ({ recipe: l.version.recipe.name, version: l.version.number, quantity: l.quantity })),
         // The manual entries removed with it, so they can still be looked up.
         manualEntriesRemoved: realEntries(i.movements).map((m) => ({ type: m.type, quantity: m.quantity, at: m.at.toISOString(), note: m.note })),
       },

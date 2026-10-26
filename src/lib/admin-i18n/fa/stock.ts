@@ -183,6 +183,8 @@ export const stock: Record<string, string> = {
   "Ingredient deleted": "ماده حذف شد",
   "Nothing uses it any more, so it can be deleted.": "دیگر چیزی از آن استفاده نمی‌کند، پس می‌شود حذفش کرد.",
   "It is used in {names}. Remove it from those recipes first.": "در {names} استفاده شده. اول از آن دستور پخت‌ها حذفش کنید.",
+  "Earlier versions of {names} used it for sales, so it is kept for their history. Merge it into another ingredient instead.":
+    "نسخه‌های قبلی {names} برای فروش از آن استفاده کرده‌اند، پس برای سابقه نگه داشته می‌شود. به‌جایش آن را با مادهٔ اولیهٔ دیگری ادغام کنید.",
   "It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.": "روی فاکتوری است که هنوز حساب می‌شود. اول آن فاکتور را برگردانید، یا این ماده را با ماده‌ی دیگری ادغام کنید.",
   "It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.": "سابقه‌ی انبار دارد (موجودی اول، شمارش، ضایعات یا فروش). به‌جای حذف، آن را با ماده‌ی دیگری ادغام کنید.",
   "Delete unused ({n})": "حذف بی‌استفاده‌ها ({n})",

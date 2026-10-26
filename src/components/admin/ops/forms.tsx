@@ -603,21 +603,33 @@ export function OpeningStockForm({
 
 // ─── Deleting unused ingredients ────────────────────────────────────────────
 
-type Kept = { code: "recipes"; names: string[] } | { code: "invoice" } | { code: "sales" } | { code: "owner" } | { code: "history" };
+type Kept =
+  | { code: "recipes"; names: string[] }
+  | { code: "recipeHistory"; names: string[] }
+  | { code: "invoice" }
+  | { code: "sales" }
+  | { code: "owner" }
+  | { code: "history" };
 
 /** Why an ingredient has to stay, in the panel's language. */
 export function useKeptText() {
   const { t } = useAdminI18n();
-  return (kept: Kept) =>
-    kept.code === "recipes"
-      ? t("It is used in {names}. Remove it from those recipes first.", { names: kept.names.join(", ") })
-      : kept.code === "invoice"
-        ? t("It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.")
-        : kept.code === "sales"
-          ? t("Sales or free food took stock from it, so it is kept for their history. Merge it into another ingredient instead.")
-          : kept.code === "owner"
-            ? t("Only the owner can delete it: it has waste or correction entries (they add up to zero).")
-            : t("It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.");
+  return (kept: Kept) => {
+    switch (kept.code) {
+      case "recipes":
+        return t("It is used in {names}. Remove it from those recipes first.", { names: kept.names.join(", ") });
+      case "recipeHistory":
+        return t("Earlier versions of {names} used it for sales, so it is kept for their history. Merge it into another ingredient instead.", { names: kept.names.join(", ") });
+      case "invoice":
+        return t("It is on an invoice that still counts. Undo that invoice first, or merge this ingredient into another.");
+      case "sales":
+        return t("Sales or free food took stock from it, so it is kept for their history. Merge it into another ingredient instead.");
+      case "owner":
+        return t("Only the owner can delete it: it has waste or correction entries (they add up to zero).");
+      case "history":
+        return t("It has stock history (opening stock, counts, waste or sales). Merge it into another ingredient instead.");
+    }
+  };
 }
 
 async function remove(url: string) {
