@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { OpsError, dubaiDate } from "./documents";
+import { countTime } from "./stock-count";
 
 /*
  * Suppliers, ingredients, manual stock movements and payables. Every
@@ -479,9 +480,13 @@ export async function addMovement(
 
 /**
  * A stock count: for each counted ingredient, a COUNT movement for the
- * difference between what the ledger says and what is on the shelf.
+ * difference between what the ledger said when the count was taken and
+ * what was on the shelf. Movements dated after the count are left out,
+ * so a count entered late for an earlier day doesn't wipe them out.
  */
 export async function recordCount(counts: { ingredientId: string; counted: number }[], day: string, actor: Actor, via = "manual") {
+  const at = countTime(day);
+  if (!at) throw new OpsError("Choose a day that isn't in the future.");
   return prisma.$transaction(async (tx) => {
     // Lock the counted ingredients (in a fixed order, so two counts can't
     // deadlock) until this transaction ends: a second count of the same
@@ -491,10 +496,9 @@ export async function recordCount(counts: { ingredientId: string; counted: numbe
     await tx.$queryRaw`SELECT "id" FROM "Ingredient" WHERE "id" = ANY(${ids}::text[]) ORDER BY "id" FOR UPDATE`;
     const sums = await tx.stockMovement.groupBy({
       by: ["ingredientId"],
-      where: { ingredientId: { in: counts.map((c) => c.ingredientId) } },
+      where: { ingredientId: { in: counts.map((c) => c.ingredientId) }, at: { lte: at } },
       _sum: { quantity: true },
     });
-    const at = dubaiDate(day);
     const changes: { ingredientId: string; from: number; to: number }[] = [];
     const movementIds: string[] = [];
     for (const c of counts) {

@@ -5,6 +5,7 @@ import { addMovement, recordCount } from "../catalog";
 import { OpsError, editInvoice, saveDocument } from "../documents";
 import { approveDraftTx, deleteRecipe, discardDraft, previewNewRecipeCost, previewRecipeCost, writeDraft, type DraftLineInput } from "../recipes";
 import { dishMargin } from "../recipe-cost";
+import { countTime } from "../stock-count";
 import type { SaveInvoiceInput } from "../save-schema";
 import { itemRef, lastPrices, onHand, pick, valueOf, type Catalog } from "./catalog";
 import { bigCountDifference, checkDay, findByName, normalizeText, toStockUnit, type Named } from "./match";
@@ -347,7 +348,9 @@ export async function preview(input: StoredInput): Promise<{ preview: Preview; s
     }
     case "stock_count": {
       const ids = input.counts.map((c) => c.ingredientId);
-      const [items, have, prices] = await Promise.all([prisma.ingredient.findMany({ where: { id: { in: ids } } }), onHand(ids), lastPrices(ids)]);
+      // The ledger as recordCount will compare it: when the count was taken.
+      const asOf = countTime(input.day) ?? undefined;
+      const [items, have, prices] = await Promise.all([prisma.ingredient.findMany({ where: { id: { in: ids } } }), onHand(ids, asOf), lastPrices(ids)]);
       const rows = input.counts.map((c) => {
         const item = items.find((i) => i.id === c.ingredientId);
         if (!item) throw new OpsError("An ingredient in this count no longer exists.", 404);

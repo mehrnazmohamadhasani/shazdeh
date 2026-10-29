@@ -148,6 +148,7 @@ export const stock: Record<string, string> = {
   "Ingredient not found.": "ماده‌ی اولیه پیدا نشد.",
   "Choose a different ingredient.": "یک ماده‌ی اولیه‌ی دیگر انتخاب کنید.",
   "Enter an amount.": "مقدار را وارد کنید.",
+  "Choose a day that isn't in the future.": "روزی را انتخاب کنید که در آینده نباشد.",
   "Use YYYY-MM-DD": "تاریخ را به شکل YYYY-MM-DD وارد کنید",
   "That record already exists.": "این مورد از قبل وجود دارد.",
   "A related record is missing or still in use.": "یک مورد مرتبط پیدا نشد یا هنوز در حال استفاده است.",
