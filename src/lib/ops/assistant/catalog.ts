@@ -83,8 +83,12 @@ export function pick<T extends Named>(what: string, query: string, items: T[]): 
 export const itemRef = (i: IngredientEntry): ItemRef => ({ id: i.id, name: i.name, nameFa: i.nameFa, unit: i.unit });
 
 /** Stock on hand (g / ml / pcs) of the given ingredients. */
-export async function onHand(ingredientIds: string[]) {
-  const sums = await prisma.stockMovement.groupBy({ by: ["ingredientId"], where: { ingredientId: { in: ingredientIds } }, _sum: { quantity: true } });
+export async function onHand(ingredientIds: string[], asOf?: Date) {
+  const sums = await prisma.stockMovement.groupBy({
+    by: ["ingredientId"],
+    where: { ingredientId: { in: ingredientIds }, ...(asOf ? { at: { lte: asOf } } : {}) },
+    _sum: { quantity: true },
+  });
   return new Map(ingredientIds.map((id) => [id, sums.find((s) => s.ingredientId === id)?._sum.quantity ?? 0]));
 }
 

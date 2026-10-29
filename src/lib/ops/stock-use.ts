@@ -138,6 +138,11 @@ export async function takeStockForWebsiteOrder(orderId: string, status: string) 
   if (!COOKED.includes(status)) return;
   try {
     await prisma.$transaction(async (tx) => {
+      // Lock the order until this transaction ends: two status changes
+      // close together (Ready, then Out for delivery) would otherwise both
+      // pass recordSaleUse's "already used?" check and take stock twice.
+      // The second waits here, then sees the first one's movements.
+      await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         select: { number: true, source: true, items: { select: { menuItemId: true, name: true, quantity: true } } },
