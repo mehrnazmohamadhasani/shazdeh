@@ -640,6 +640,8 @@ model SupplierItem {
   ingredientId   String
   ingredient     Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
   baseQtyPerUnit Float
+  /// How one unit is packed, as last confirmed (src/lib/ops/pack.ts): shown and editable on review.
+  pack           Json?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -717,6 +719,8 @@ model PurchaseLine {
   ingredient    Ingredient?     @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
   /// Stock added, in the ingredient's unit (quantity × pack size).
   baseQty       Float?
+  /// How one unit was packed when saved (src/lib/ops/pack.ts); null when not stock or saved before packs.
+  pack          Json?
   movement      StockMovement?
 
   @@index([invoiceId])

@@ -1,4 +1,5 @@
 import "server-only";
+import { newStockUnit } from "./units";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { OpsError } from "./documents";
@@ -293,7 +294,7 @@ export async function createRecipe(
           number: 1,
           status: "DRAFT",
           yieldQuantity: input.kind === "DISH" ? 1 : 1000,
-          yieldUnit: input.kind === "DISH" ? "PCS" : input.yieldUnit,
+          yieldUnit: input.kind === "DISH" ? "PCS" : newStockUnit(input.yieldUnit),
           createdById: actor.id,
         },
       },

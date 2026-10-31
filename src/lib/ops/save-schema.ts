@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PAYMENT_MODES, SPEND_CATEGORIES, STOCK_UNITS } from "./extraction";
+import { packSchema } from "./pack";
 
 /*
  * What the review screen sends when a person confirms a reading. Shared
@@ -31,6 +32,8 @@ export const saveLineSchema = z.object({
     .nullable(),
   /** Stock this line adds, in the ingredient's unit. */
   stockQuantity: z.number().positive().nullable(),
+  /** How one unit is packed, as confirmed; remembered for this supplier's item. */
+  pack: packSchema.nullable().default(null),
 });
 
 export const saveInvoiceSchema = z.object({

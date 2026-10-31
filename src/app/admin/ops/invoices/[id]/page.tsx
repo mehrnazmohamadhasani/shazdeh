@@ -33,6 +33,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   if (!doc) notFound();
   if (doc.kind === "platform_order") redirect(`/admin/ops/sales/receipts/${doc.id}`);
   const stored = parseStoredReading(doc.extraction);
+  // Another photo of an invoice already saved (refused on upload).
+  const savedCopy = (doc.extraction as { duplicateOf?: { documentId: string | null } } | null)?.duplicateOf ?? null;
   const fileUrl = `/api/admin/ops/documents/${doc.id}/file`;
   const status = DOC_STATUS[doc.status];
 
@@ -321,7 +323,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         {doc.error && doc.status !== "DISCARDED" && <p className="text-[14px] text-pomegranate-red">{t(doc.error)}</p>}
         {doc.status === "DISCARDED" ? (
           <>
-            <p className="text-[14px] text-dark-grey">{t("This document was discarded. Nothing was saved from it.")}</p>
+            {savedCopy ? (
+              <p className="text-[14px] text-dark-grey">
+                {t("This invoice is already saved, so this copy was not added.")}{" "}
+                {savedCopy.documentId && (
+                  <Link href={`/admin/ops/invoices/${savedCopy.documentId}`} className="font-medium text-terracotta-ink admin-link">
+                    {t("Open the saved invoice")}
+                  </Link>
+                )}
+              </p>
+            ) : (
+              <p className="text-[14px] text-dark-grey">{t("This document was discarded. Nothing was saved from it.")}</p>
+            )}
             <div className="mt-4">
               <RetryRead documentId={doc.id} />
             </div>

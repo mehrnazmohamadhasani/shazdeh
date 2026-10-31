@@ -547,7 +547,8 @@ export function OpeningStockForm({
                 </Field>
                 <Field label={t("Unit")}>
                   <Select value={unit} disabled={!!k} onChange={(e) => update(r.key, { unit: e.target.value as BaseUnit })} className="w-24">
-                    {(["g", "ml", "pcs"] as const).map((u) => (
+                    {/* Stock is grams or pieces (1 L = 1 kg); litres only show for an ingredient still counted in them. */}
+                    {(unit === "ml" ? (["g", "ml", "pcs"] as const) : (["g", "pcs"] as const)).map((u) => (
                       <option key={u} value={u}>
                         {t(DISPLAY[u])}
                       </option>
@@ -725,7 +726,6 @@ export function NewIngredientButton() {
           <Field label={t("Counted in")} hint={t("This can't be changed later.")}>
             <Select value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)}>
               <option value="G">{t("kg")}</option>
-              <option value="ML">{t("litres")}</option>
               <option value="PCS">{t("pieces")}</option>
             </Select>
           </Field>
@@ -952,7 +952,8 @@ export function ChangeUnitButton({ ingredientId, name, unit, onChanged }: { ingr
           </DialogDescription>
           <Field label={t("Count it in")}>
             <Select value={to} onChange={(e) => setTo(e.target.value as BaseUnit)}>
-              {(["g", "ml", "pcs"] as const)
+              {/* Never into litres: stock is grams or pieces (1 L = 1 kg). */}
+              {(["g", "pcs"] as const)
                 .filter((u) => u !== unit)
                 .map((u) => (
                   <option key={u} value={u}>

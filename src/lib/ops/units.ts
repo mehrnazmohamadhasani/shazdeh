@@ -76,3 +76,12 @@ export function formatAmount(amount: number, unit: BaseUnit): string {
 export function normalizeName(name: string): string {
   return name.toLowerCase().replace(/\s+/g, " ").trim();
 }
+
+/**
+ * Anything new is counted in grams or pieces, never millilitres: recipes
+ * use grams, and SHĀZDEH counts 1 L = 1 kg, so a litre amount is the same
+ * number of grams. Ingredients already counted in ml keep it until changed.
+ */
+export const newStockUnit = <U extends "G" | "ML" | "PCS">(unit: U): Exclude<U, "ML"> | "G" => (unit === "ML" ? "G" : (unit as Exclude<U, "ML">));
+/** A grams ingredient takes a litre amount as it is (1 ml = 1 g). */
+export const fitsUnit = (ingredient: "G" | "ML" | "PCS", given: "G" | "ML" | "PCS") => ingredient === given || (ingredient === "G" && given === "ML");

@@ -1,4 +1,5 @@
 import "server-only";
+import { fitsUnit, newStockUnit } from "./units";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { OpsError, dubaiDate } from "./documents";
@@ -183,6 +184,7 @@ export async function getIngredient(id: string) {
 
 /** A new food ingredient with no stock yet; it gets a price from its first invoice. */
 export async function createIngredient(data: { name: string; nameFa: string | null; unit: "G" | "ML" | "PCS" }, actor: Actor) {
+  data = { ...data, unit: newStockUnit(data.unit) };
   const clash = await prisma.ingredient.findFirst({ where: { name: { equals: data.name, mode: "insensitive" } } });
   if (clash) {
     if (clash.unit !== data.unit) throw new OpsError(`"${clash.name}" already exists, counted in ${clash.unit.toLowerCase()}.`, 409);
@@ -603,9 +605,9 @@ export async function recordOpeningStock(
         ? await tx.ingredient.findUnique({ where: { id: row.ingredientId } })
         : await tx.ingredient.findFirst({ where: { name: { equals: row.name, mode: "insensitive" } } });
       if (!ingredient) {
-        ingredient = await tx.ingredient.create({ data: { name: row.name, unit, category: row.category } });
+        ingredient = await tx.ingredient.create({ data: { name: row.name, unit: newStockUnit(unit), category: row.category } });
       }
-      if (ingredient.unit !== unit) {
+      if (!fitsUnit(ingredient.unit, unit)) {
         throw new OpsError(`"${ingredient.name}" is counted in ${ingredient.unit.toLowerCase()}, not ${row.unit}.`);
       }
       if (seen.has(ingredient.id)) throw new OpsError(`"${ingredient.name}" is in the list twice.`);

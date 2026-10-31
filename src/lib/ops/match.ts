@@ -1,7 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { isStockCategory, type Extraction } from "./extraction";
-import { lineStockAmount, normalizeName, type BaseUnit } from "./units";
+import { lineNet } from "./costing";
+import { choosePack, packFromBase, packOptions, packStock, readPack, type Pack } from "./pack";
+import { normalizeName, type BaseUnit } from "./units";
 
 /*
  * Links a fresh reading to what SHĀZDEH already knows: the supplier (by
@@ -22,6 +24,12 @@ export type LineSuggestion = {
    * one the reading named. Null: not raw meat. Missing on older readings.
    */
   meatTypeId?: string | null;
+  /** How one invoice unit is packed, most likely first; empty when a person must say. Missing on older readings. */
+  packs?: Pack[];
+  /** The pack chosen: remembered, the only one possible, or the one the last price fits. */
+  pack?: Pack | null;
+  /** False: more than one pack fits (or none does) — a person checks. */
+  packSure?: boolean;
 };
 
 export type Suggestions = {
@@ -48,10 +56,24 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
         include: { ingredient: { select: { id: true, name: true, unit: true, meatTypeId: true } } },
       })
     : [];
-  const [ingredients, meatTypes] = await Promise.all([
+  const stockLines = x.lines.filter((l) => isStockCategory(l.category));
+  const [ingredients, meatTypes, lastBuys] = await Promise.all([
     prisma.ingredient.findMany({ select: { id: true, name: true, unit: true, meatTypeId: true } }),
     prisma.meatType.findMany({ where: { isActive: true }, select: { id: true, name: true, nameFa: true, countPieces: true } }),
+    // The last price paid per g / pc (ex VAT): it tells "a tub" from "a box of six".
+    stockLines.length
+      ? prisma.stockMovement.findMany({
+          where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null, costFils: { not: null }, quantity: { gt: 0 } },
+          orderBy: { at: "desc" },
+          distinct: ["ingredientId"],
+          select: { ingredientId: true, costFils: true, quantity: true },
+        })
+      : [],
   ]);
+  const lastPrice = (ingredientId: string | undefined) => {
+    const m = ingredientId ? lastBuys.find((b) => b.ingredientId === ingredientId) : undefined;
+    return m ? m.costFils! / m.quantity : null;
+  };
   // The reading names one of the kinds of meat; match it by name (any case or language).
   const meatTypeFor = (named: string | null | undefined) => {
     const n = named?.trim().toLowerCase();
@@ -65,13 +87,18 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
     }
     const memory = learned.find((m) => m.rawName === normalizeName(l.description));
     if (memory && l.quantity != null) {
+      const unit = UNIT_FROM_DB[memory.ingredient.unit];
+      const pack = readPack(memory.pack) ?? packFromBase(memory.baseQtyPerUnit, unit);
       return {
         ingredientId: memory.ingredient.id,
         ingredientName: memory.ingredient.name,
-        unit: UNIT_FROM_DB[memory.ingredient.unit],
+        unit,
         quantity: l.quantity * memory.baseQtyPerUnit,
         source: "learned",
         meatTypeId: memory.ingredient.meatTypeId ?? meatTypeFor(l.meat),
+        packs: [pack],
+        pack,
+        packSure: true,
       };
     }
     const description = normalizeName(l.description);
@@ -79,23 +106,38 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
       const n = normalizeName(i.name);
       return description === n || description.split(" ").includes(n) || (n.length > 3 && description.includes(n));
     });
-    const parsed = lineStockAmount(l);
     const meatTypeId = known?.meatTypeId ?? meatTypeFor(l.meat);
     // Butchers print "33" and a price per kg: meat by weight with no unit on the line is kilos.
-    const meatKg =
-      !parsed && l.stockQuantity == null && l.quantity != null && !l.unit?.trim() && meatTypeId && !meatTypes.find((m) => m.id === meatTypeId)?.countPieces && (!known || known.unit === "G")
-        ? l.quantity * 1000
-        : null;
-    const unit = parsed?.unit ?? (meatKg != null ? "g" : null) ?? l.stockUnit ?? (known ? UNIT_FROM_DB[known.unit] : null);
+    const byKilo = !!meatTypeId && !meatTypes.find((m) => m.id === meatTypeId)?.countPieces && (!known || known.unit === "G");
+    // The AI's pack first when the printed text allows it (or says nothing), then what the text allows.
+    const printed = packOptions(l, { meat: byKilo });
+    const ai = l.pack && (!printed.length || printed.some((p) => sameStock(p, l.pack!))) ? [l.pack] : [];
+    const packs = [...ai, ...printed.filter((p) => !ai.some((a) => sameStock(a, p)))];
+    const net = l.quantity != null && l.lineTotal != null ? lineNet({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount ?? 0, vat: l.vat, lineTotal: l.lineTotal }, x.pricesIncludeVat ?? false).net : null;
+    // The AI's pack goes first, but where the paper allows two (a tub, or a box of six?) only
+    // the last price may settle it: the AI is confidently wrong about exactly these.
+    const { pack, sure } = choosePack(packs, l.quantity, net, lastPrice(known?.id));
+    const chosen = { pack };
+    const stock = chosen.pack && l.quantity != null ? packStock(l.quantity, chosen.pack) : null;
+    const unit = stock?.base ?? l.stockUnit ?? (known ? UNIT_FROM_DB[known.unit] : null);
     return {
       ingredientId: known?.id ?? null,
       ingredientName: known?.name ?? null,
       unit,
-      quantity: parsed?.amount ?? meatKg ?? l.stockQuantity ?? null,
-      source: parsed ? "parsed" : meatKg != null || l.stockQuantity != null ? "ai" : null,
+      quantity: stock?.amount ?? l.stockQuantity ?? null,
+      source: stock ? (ai.length && chosen.pack === ai[0] ? "ai" : "parsed") : l.stockQuantity != null ? "ai" : null,
       meatTypeId,
+      packs,
+      pack,
+      packSure: sure,
     };
   });
 
   return { supplierId: supplier?.id ?? null, supplierName: supplier?.name ?? null, lines };
 }
+
+const sameStock = (a: Pack, b: Pack) => {
+  const x = packStock(1, a);
+  const y = packStock(1, b);
+  return x.base === y.base && Math.abs(x.amount - y.amount) < 1e-6;
+};
