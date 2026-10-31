@@ -6,6 +6,7 @@ import { OpsError, editInvoice, saveDocument } from "../documents";
 import { approveDraftTx, deleteRecipe, discardDraft, previewNewRecipeCost, previewRecipeCost, writeDraft, type DraftLineInput } from "../recipes";
 import { dishMargin } from "../recipe-cost";
 import { countTime } from "../stock-count";
+import { readPack } from "../pack";
 import type { SaveInvoiceInput } from "../save-schema";
 import { itemRef, lastPrices, onHand, pick, valueOf, type Catalog } from "./catalog";
 import { bigCountDifference, checkDay, findByName, normalizeText, toStockUnit, type Named } from "./match";
@@ -507,6 +508,7 @@ function invoiceInput(inv: Awaited<ReturnType<typeof loadInvoice>>): SaveInvoice
       category: l.category.toLowerCase() as SaveInvoiceInput["lines"][number]["category"],
       ingredient: l.ingredient ? { id: l.ingredient.id, name: l.ingredient.name, unit: SPOKEN[l.ingredient.unit] } : null,
       stockQuantity: l.baseQty,
+      pack: readPack(l.pack),
     })),
   };
 }

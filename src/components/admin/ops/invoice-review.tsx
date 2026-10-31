@@ -2,27 +2,33 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, Check, Info, Loader2, Plus, RotateCw, Sparkles, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, Check, CircleHelp, Info, Loader2, Plus, RotateCw, Sparkles, Trash2, X, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, Field, Select, StatusPill, TextArea, TextInput, controlClass } from "@/components/admin/ui";
 import { messageFromUnknown } from "@/lib/error-message";
 import { cn } from "@/lib/utils";
 import { checkExtraction, type Flag } from "@/lib/ops/checks";
+import { lineNet } from "@/lib/ops/costing";
 import { SPEND_CATEGORIES, isStockCategory, type Extraction } from "@/lib/ops/extraction";
+import { PACK_UNITS, baseOf, packFromBase, packStock, type Pack, type PackUnit } from "@/lib/ops/pack";
 import type { Suggestions } from "@/lib/ops/match";
 import type { SaveInvoiceInput } from "@/lib/ops/save-schema";
 import type { BaseUnit } from "@/lib/ops/units";
-import type { Translate } from "@/lib/admin-i18n";
+import type { AdminLocale, Translate } from "@/lib/admin-i18n";
 import { useAdminI18n } from "@/components/admin/i18n";
-import { amountText } from "@/components/admin/ops/format";
+import { amountText, unitPrice } from "@/components/admin/ops/format";
 import { IngredientPicker, IngredientStatus } from "@/components/admin/ops/ingredient-picker";
 import { ChangeUnitButton } from "@/components/admin/ops/forms";
 
 /*
  * Review screen for one AI reading. Everything is pre-filled and
  * editable; the arithmetic checks re-run on every keystroke, so fixing
- * a number clears its warning. Stock is entered in kg / L / pieces and
- * stored in g / ml / pieces.
+ * a number clears its warning. Each stock line says in one sentence what
+ * goes into stock and what a kilo (or piece) cost: "1 CTN × 4 × 5 L =
+ * 20 kg · 1.90 AED / kg". The pack behind it is the AI's or the one
+ * remembered for this supplier; a person only answers when more than one
+ * pack fits, or nothing says what one unit holds, and can change any
+ * level. Stock is grams or pieces (1 L = 1 kg).
  */
 
 type Category = (typeof SPEND_CATEGORIES)[number];
@@ -45,15 +51,35 @@ type LineState = {
   vat: number | null;
   category: Category;
   ingredientName: string;
+  /** A new ingredient: counted by weight (g) or in pieces — what recipes use. */
   stockUnit: BaseUnit;
-  /** In kg / L / pcs. */
+  /** In kg / pcs: typed only when the pack can't say it (lamb shank bought by the kg, counted in pieces). */
   stock: string;
+  /** How one unit of the quantity is packed; null until someone (or the AI) says. */
+  pack: PackDraft | null;
+  /** The packs the paper allows, most likely first. */
+  packs: Pack[];
+  /** False: more than one pack fits — a person picks one. */
+  packSure: boolean;
   source: Suggestions["lines"][number]["source"];
   /** Kind of meat chosen on this screen, or found by the reading; undefined = the ingredient's own (unchanged). */
   meatTypeId?: string | null;
   confidence: number;
   note: string | null;
 };
+
+type PackDraft = { inner: { count: string; name: string }[]; amount: string; unit: PackUnit };
+const toDraft = (p: Pack): PackDraft => ({ inner: p.inner.map((l) => ({ count: String(l.count), name: l.name })), amount: String(Number(p.amount.toFixed(3))), unit: p.unit });
+function fromDraft(d: PackDraft | null): Pack | null {
+  if (!d) return null;
+  const amount = num(d.amount);
+  const inner = d.inner.map((l) => ({ count: num(l.count), name: l.name.trim() }));
+  if (!(amount! > 0) || inner.some((l) => !(l.count! > 0))) return null;
+  return { inner: inner as Pack["inner"], amount: amount!, unit: d.unit };
+}
+/** Grams and millilitres are the same number in SHĀZDEH (1 L = 1 kg). */
+const sameBase = (a: BaseUnit, b: BaseUnit) => (a === "pcs") === (b === "pcs");
+const PACK_UNIT_LABEL: Record<PackUnit, string> = { g: "g", kg: "kg", lb: "lb", oz: "oz", ml: "ml", l: "L", pcs: "pcs" };
 
 const CATEGORY_LABEL: Record<Category, string> = {
   food: "Food",
@@ -120,10 +146,9 @@ export function InvoiceReview({
       // the pieces are counted and typed, never worked out from the weight.
       const byPiece = !!meatTypes.find((m) => m.id === s?.meatTypeId)?.countPieces;
       const known = s?.ingredientId ? ingredients.find((i) => i.id === s.ingredientId) : undefined;
-      const unit = known?.unit ?? (byPiece ? "pcs" : (s?.unit ?? l.stockUnit ?? "g"));
-      // A suggested amount in another unit than the stock's (5 kg for an item counted in pieces) is no amount at all.
-      const byWeight = /(^|[^a-z])(kg|kgs|kilo|g|gm|grams?)([^a-z]|$)|كغ|كيلو|کیلو/i.test(l.unit ?? "");
-      const fits = s?.quantity != null && s.unit === unit && !(byPiece && byWeight);
+      // Readings from before packs: the amount per unit, as one level.
+      const pack = s?.pack ?? (s?.quantity != null && s.unit && l.quantity ? packFromBase(s.quantity / l.quantity, s.unit) : null);
+      const unit = known?.unit ?? (byPiece ? "pcs" : pack ? baseOf(pack.unit) : s?.unit === "pcs" || l.stockUnit === "pcs" ? "pcs" : "g");
       return {
         key: `l${i}`,
         rawName: l.description,
@@ -137,7 +162,10 @@ export function InvoiceReview({
         category: l.category,
         ingredientName: s?.ingredientName ?? (isStock(l.category) ? l.description : ""),
         stockUnit: unit,
-        stock: fits ? String(Number((s!.quantity! / PER_DISPLAY[unit]).toFixed(3))) : "",
+        stock: "",
+        pack: pack ? toDraft(pack) : null,
+        packs: s?.packs ?? (pack ? [pack] : []),
+        packSure: s?.packSure ?? s?.source === "learned",
         source: s?.source ?? null,
         // The reading (or the ingredient) says it is raw meat: start with that kind.
         meatTypeId: s?.meatTypeId ?? undefined,
@@ -154,6 +182,20 @@ export function InvoiceReview({
       ? new Date(Date.parse(invoiceDate) + supplier.paymentTermsDays * 86_400_000).toISOString().slice(0, 10)
       : "";
   const ingredientFor = (name: string) => ingredients.find((i) => same(i.name, name)) ?? null;
+
+  /** What a line puts into stock, in the ingredient's unit, and what one g / pc of it cost. */
+  function stockOf(l: LineState) {
+    const known = ingredientFor(l.ingredientName);
+    const unit = known?.unit ?? l.stockUnit;
+    const pack = fromDraft(l.pack);
+    const qty = num(l.quantity);
+    const fromPack = !!pack && qty! > 0 && sameBase(unit, baseOf(pack.unit));
+    const amount = fromPack ? packStock(qty!, pack!).amount : num(l.stock) != null ? num(l.stock)! * PER_DISPLAY[unit] : null;
+    const total = num(l.lineTotal);
+    const net = total != null ? lineNet({ quantity: qty ?? 1, unitPrice: num(l.unitPrice), discount: l.discount, vat: l.vat, lineTotal: total }, pricesIncludeVat).net : null;
+    const filsPer = amount! > 0 && net != null ? (net * 100) / amount! : null;
+    return { unit, pack, fromPack, amount, net, filsPer, counted: !!pack && !fromPack };
+  }
 
   // Live checks on what is on screen now.
   const flags = React.useMemo(
@@ -198,7 +240,7 @@ export function InvoiceReview({
     return (
       l.confidence < 0.7 ||
       lineFlags(i).some((f) => f.level !== "info") ||
-      (isStock(l.category) && (!known || !(num(l.stock)! > 0)))
+      (isStock(l.category) && (!known || !l.packSure || !(stockOf(l).amount! > 0)))
     );
   };
   const [open, setOpen] = React.useState(() => new Set(lines.filter((l, i) => needsLook(l, i)).map((l) => l.key)));
@@ -272,7 +314,8 @@ export function InvoiceReview({
     lines.forEach((l, i) => {
       // Only the line total counts for cost; a receipt that prints no quantity is one of it.
       if (num(l.lineTotal) == null) missing.push(t("line {n} total", { n: i + 1 }));
-      if (isStock(l.category) && l.ingredientName.trim() && !(num(l.stock)! > 0)) missing.push(t("line {n} stock amount", { n: i + 1 }));
+      if (isStock(l.category) && l.ingredientName.trim() && !(stockOf(l).amount! > 0)) missing.push(t("line {n} stock amount", { n: i + 1 }));
+      else if (isStock(l.category) && l.ingredientName.trim() && !l.packSure) missing.push(t("line {n}: which pack", { n: i + 1 }));
     });
     if (missing.length) return toast.error(t("Please fill in: {list}", { list: missing.join(t(", ")) }));
     if (
@@ -297,7 +340,8 @@ export function InvoiceReview({
       lines: lines.map((l) => {
         const known = ingredientFor(l.ingredientName);
         const stocked = isStock(l.category) && l.ingredientName.trim();
-        const unit = known?.unit ?? l.stockUnit;
+        const st = stockOf(l);
+        const unit = st.unit;
         return {
           rawName: l.rawName.trim() || l.ingredientName.trim() || "Item",
           itemCode: l.itemCode,
@@ -311,7 +355,8 @@ export function InvoiceReview({
           ingredient: stocked
             ? { id: known?.id ?? null, name: known?.name ?? l.ingredientName.trim(), unit, ...(l.meatTypeId !== undefined ? { meatTypeId: l.meatTypeId } : {}) }
             : null,
-          stockQuantity: stocked ? num(l.stock)! * PER_DISPLAY[unit] : null,
+          stockQuantity: stocked ? st.amount : null,
+          pack: stocked && st.fromPack ? st.pack : null,
         };
       }),
     };
@@ -462,8 +507,7 @@ export function InvoiceReview({
         <ul className="divide-y divide-black-iron/[0.06]">
           {lines.map((l, i) => {
             const known = ingredientFor(l.ingredientName);
-            const unit = known?.unit ?? l.stockUnit;
-            const stockBase = num(l.stock) != null ? num(l.stock)! * PER_DISPLAY[unit] : null;
+            const st = stockOf(l);
             const stocked = isStock(l.category) && !!l.ingredientName.trim();
             const meatId = l.category === "food" ? (l.meatTypeId !== undefined ? l.meatTypeId : known?.meatTypeId) : null;
             const meat = meatId ? meatTypes.find((m) => m.id === meatId) : null;
@@ -492,7 +536,18 @@ export function InvoiceReview({
                                   : known.name
                               : t("New: {name}", { name: l.ingredientName.trim() })}
                           </bdi>
-                          {stockBase != null && stockBase > 0 && <span className="tabular-nums">· +{amountText(stockBase, unit, locale)}</span>}
+                          {st.amount != null && st.amount > 0 ? (
+                            <bdi dir={locale === "fa" ? "rtl" : "ltr"} className="tabular-nums">
+                              · {packSentence(l, st, t, locale)}
+                            </bdi>
+                          ) : (
+                            <span className="text-cinnamon-bark">· {t("How much is in one?")}</span>
+                          )}
+                          {!l.packSure && st.amount! > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-cinnamon-bark">
+                              <CircleHelp className="h-3.5 w-3.5" /> {t("Check the pack")}
+                            </span>
+                          )}
                           {meat && <span>· {locale === "fa" && meat.nameFa ? meat.nameFa : meat.name}</span>}
                         </>
                       ) : isStock(l.category) ? (
@@ -568,43 +623,12 @@ export function InvoiceReview({
                             aiSuggestion={aiMatches[l.key]}
                           />
                         </Field>
-                        <Field
-                          label={t("Stock added")}
-                          hint={
-                            l.source ? (
-                              <span className="inline-flex items-center gap-1 text-terracotta-ink">
-                                <Sparkles className="h-3 w-3" />
-                                {t(SOURCE_LABEL[l.source])}
-                              </span>
-                            ) : (
-                              t("Total for this line")
-                            )
-                          }
-                        >
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <TextInput dir="ltr" inputMode="decimal" value={l.stock} onChange={(e) => update(l.key, { stock: e.target.value })} className="w-28" />
-                            {known ? (
-                              <>
-                                <span className="text-[13px] text-dark-grey">{t(DISPLAY_UNIT[unit])}</span>
-                                {/* An ingredient already in stock keeps one unit; changing it converts what is recorded. */}
-                                <ChangeUnitButton ingredientId={known.id} name={known.name} unit={known.unit} />
-                              </>
-                            ) : (
-                              <select
-                                aria-label={t("Stock unit")}
-                                value={unit}
-                                onChange={(e) => update(l.key, { stockUnit: e.target.value as BaseUnit })}
-                                className={cn(controlClass, "h-11 w-20")}
-                              >
-                                {(["g", "ml", "pcs"] as const).map((u) => (
-                                  <option key={u} value={u}>
-                                    {t(DISPLAY_UNIT[u])}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                        </Field>
+                        <PackEditor
+                          line={l}
+                          stock={st}
+                          known={known}
+                          onChange={(patch) => update(l.key, patch)}
+                        />
                         {/* Only meat lines ask for a kind of meat: the reading marks them, or the ingredient is already meat. */}
                         {meatTypes.length > 0 && l.category === "food" && (l.meatTypeId || known?.meatTypeId) && (
                           <Field label={t("Kind of meat")} className="2xl:col-span-2">
@@ -653,6 +677,9 @@ export function InvoiceReview({
                   ingredientName: "",
                   stockUnit: "g",
                   stock: "",
+                  pack: null,
+                  packs: [],
+                  packSure: true,
                   source: null,
                   confidence: 1,
                   note: null,
@@ -725,6 +752,197 @@ export function InvoiceReview({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+type LineStock = { unit: BaseUnit; pack: Pack | null; fromPack: boolean; amount: number | null; net: number | null; filsPer: number | null; counted: boolean };
+const fmt = (n: number) => Number(n.toFixed(3)).toLocaleString("en-AE");
+
+/** "1 CTN × 4 × 5 L = 20 kg · 1.90 AED / kg", or "25 kg · 3.50 AED / kg". */
+function packSentence(l: LineState, st: LineStock, t: Translate, locale: AdminLocale) {
+  const amount = amountText(st.amount!, st.unit, locale);
+  const price = st.filsPer != null ? ` · ${unitPrice(st.filsPer, st.unit, locale)}` : "";
+  const p = st.pack;
+  if (!st.fromPack || !p) return amount + price;
+  const qty = num(l.quantity)!;
+  if (!p.inner.length && p.amount === 1) {
+    const same = p.unit === "g" || p.unit === "kg" || p.unit === "pcs";
+    return `${fmt(qty)} ${t(PACK_UNIT_LABEL[p.unit])}${same ? "" : ` = ${amount}`}${price}`;
+  }
+  const parts = [`${fmt(qty)} ${l.unit.trim()}`.trim(), ...p.inner.map((c) => `${fmt(c.count)}${c.name ? ` ${c.name}` : ""}`), `${fmt(p.amount)} ${t(PACK_UNIT_LABEL[p.unit])}`];
+  return `${parts.join(" × ")} = ${amount}${price}`;
+}
+
+/**
+ * Counting the other way: "2 CTN × 24 can × 300 ml" counted in pieces is
+ * 2 CTN × 24 cans; anything else asks for the amount again.
+ */
+function switchBase(d: PackDraft, to: "g" | "pcs"): PackDraft {
+  const last = d.inner[d.inner.length - 1];
+  if (to === "pcs" && last && num(last.count)! > 0) return { inner: d.inner.slice(0, -1), amount: last.count, unit: "pcs" };
+  return { ...d, amount: "", unit: to === "pcs" ? "pcs" : "kg" };
+}
+
+/** One unit of an option, in words: "6 × 2.5 kg", "2.5 kg". */
+function packWords(p: Pack, t: Translate) {
+  return [...p.inner.map((c) => `${fmt(c.count)}${c.name ? ` ${c.name}` : ""}`), `${fmt(p.amount)} ${t(PACK_UNIT_LABEL[p.unit])}`].join(" × ");
+}
+
+/*
+ * The pack behind a stock line, every level editable: quantity and what
+ * the paper calls it, the packs inside, and what the smallest one holds.
+ * When more than one pack fits the paper, the choices come first, each
+ * with what it puts in stock and what a kilo would then cost.
+ */
+function PackEditor({
+  line: l,
+  stock: st,
+  known,
+  onChange,
+}: {
+  line: LineState;
+  stock: LineStock;
+  known: KnownIngredient | null;
+  onChange: (patch: Partial<LineState>) => void;
+}) {
+  const { t, locale } = useAdminI18n();
+  const target = known?.unit ?? l.stockUnit;
+  const draft: PackDraft = l.pack ?? { inner: [], amount: "", unit: target === "pcs" ? "pcs" : "kg" };
+  // Changed by a person: no longer the AI's or the remembered pack.
+  const set = (patch: Partial<PackDraft>) => onChange({ pack: { ...draft, ...patch }, packSure: true, source: null });
+  const setLevel = (j: number, patch: Partial<PackDraft["inner"][number]>) => set({ inner: draft.inner.map((x, k) => (k === j ? { ...x, ...patch } : x)) });
+  const qty = num(l.quantity);
+  const choices = !l.packSure && l.packs.length > 1 ? l.packs : [];
+  const unitName = l.unit.trim() || t("unit");
+  /** What the level above is called: the invoice's unit, then each pack's name. */
+  const levelName = (j: number) => (j === 0 ? unitName : draft.inner[j - 1].name.trim() || t("pack"));
+  return (
+    <div className="space-y-3 2xl:col-span-2">
+      {!known && (
+        <Field label={t("Recipes use it by")}>
+          <div role="radiogroup" aria-label={t("Recipes use it by")} className="inline-flex rounded-full bg-black-iron/[0.05] p-1">
+            {(["pcs", "g"] as const).map((u) => {
+              const on = sameBase(l.stockUnit, u);
+              return (
+                <button
+                  key={u}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => onChange({ stockUnit: u, ...(l.pack && !sameBase(u, baseOf(l.pack.unit)) ? { pack: switchBase(draft, u) } : {}) })}
+                  className={cn("min-h-9 rounded-full px-4 text-[13.5px] font-medium transition-colors", on ? "bg-white text-black-iron shadow-sm" : "text-dark-grey")}
+                >
+                  {t(u === "pcs" ? "Pieces" : "Grams")}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+      )}
+
+      {choices.length > 0 && (
+        <div>
+          <p className="flex items-center gap-1.5 text-[13.5px] font-medium text-cinnamon-bark">
+            <CircleHelp className="h-4 w-4" /> {t("What is one {unit} here?", { unit: l.unit.trim() || t("unit") })}
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {choices.map((p, i) => {
+              const total = qty ? packStock(qty, p) : null;
+              const fils = total && st.net != null && total.amount > 0 ? (st.net * 100) / total.amount : null;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onChange({ pack: toDraft(p), packSure: true })}
+                  className="rounded-[12px] border border-black-iron/[0.1] bg-white px-3.5 py-2.5 text-start text-[13.5px] transition-colors hover:border-terracotta"
+                >
+                  <bdi dir={locale === "fa" ? "rtl" : "ltr"} className="block font-medium">
+                    {t("One {unit} = {pack}", { unit: l.unit.trim() || t("unit"), pack: packWords(p, t) })}
+                  </bdi>
+                  {total && (
+                    <bdi dir={locale === "fa" ? "rtl" : "ltr"} className="mt-0.5 block tabular-nums text-dark-grey">
+                      {amountText(total.amount, total.base, locale)}
+                      {fils != null && ` · ${unitPrice(fils, total.base, locale)}`}
+                    </bdi>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* One row per level, each saying what it is: what came, what each of those has inside, … */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className="text-[13.5px] font-medium">{t("Packing")}</p>
+          {!l.pack ? (
+            <span className="text-[12.5px] text-cinnamon-bark">{t("The paper doesn't say what one {unit} holds — fill in the last row.", { unit: unitName })}</span>
+          ) : l.source ? (
+            <span className="inline-flex items-center gap-1 text-[12.5px] text-terracotta-ink">
+              <Sparkles className="h-3 w-3" />
+              {t(SOURCE_LABEL[l.source])}
+            </span>
+          ) : null}
+        </div>
+        <PackRow label={t("On the invoice")}>
+          <TextInput aria-label={t("Qty")} dir="ltr" inputMode="decimal" value={l.quantity} onChange={(e) => onChange({ quantity: e.target.value })} className="w-20 text-center" />
+          <TextInput aria-label={t("Unit on the paper")} dir="auto" value={l.unit} onChange={(e) => onChange({ unit: e.target.value })} placeholder={t("e.g. carton")} className="w-28" />
+        </PackRow>
+        {draft.inner.map((lvl, j) => (
+          <PackRow key={j} label={t("Each {name} has", { name: levelName(j) })}>
+            <TextInput aria-label={t("How many inside")} dir="ltr" inputMode="decimal" value={lvl.count} onChange={(e) => setLevel(j, { count: e.target.value })} className="w-20 text-center" />
+            <TextInput aria-label={t("Name")} dir="auto" value={lvl.name} onChange={(e) => setLevel(j, { name: e.target.value })} placeholder={t("e.g. can")} className="w-28" />
+            <button type="button" aria-label={t("Remove this level")} onClick={() => set({ inner: draft.inner.filter((_, k) => k !== j) })} className="grid h-11 w-9 place-items-center text-dark-grey hover:text-pomegranate-red">
+              <X className="h-4 w-4" />
+            </button>
+          </PackRow>
+        ))}
+        <PackRow label={t("Each {name} has", { name: levelName(draft.inner.length) })}>
+          <TextInput aria-label={t("Amount in the smallest pack")} dir="ltr" inputMode="decimal" value={draft.amount} onChange={(e) => set({ amount: e.target.value })} className="w-20 text-center" />
+          <select aria-label={t("Unit")} value={draft.unit} onChange={(e) => set({ unit: e.target.value as PackUnit })} className={cn(controlClass, "h-11 w-28")}>
+            {PACK_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {t(PACK_UNIT_LABEL[u])}
+              </option>
+            ))}
+          </select>
+        </PackRow>
+        <button
+          type="button"
+          onClick={() => set({ inner: [...draft.inner, { count: "", name: "" }] })}
+          className="inline-flex min-h-9 items-center gap-1 text-[13px] font-medium text-terracotta-ink"
+        >
+          <Plus className="h-4 w-4" /> {t("Add a pack inside (e.g. 24 cans in a carton)")}
+        </button>
+        {st.fromPack && st.amount! > 0 && (
+          <p className="rounded-[10px] bg-white px-3 py-2 text-[14px]">
+            {t("Goes into stock")}: <span className="font-semibold tabular-nums">{amountText(st.amount!, st.unit, locale)}</span>
+            {st.filsPer != null && <span className="text-dark-grey"> · {unitPrice(st.filsPer, st.unit, locale)}</span>}
+          </p>
+        )}
+      </div>
+
+      {st.counted && (
+        <Field label={t(target === "pcs" ? "Pieces counted" : "Weight that went into stock")} hint={t("The pack is by weight but this is counted in pieces (or the other way): enter the amount.")}>
+          <div className="flex items-center gap-2">
+            <TextInput dir="ltr" inputMode="decimal" value={l.stock} onChange={(e) => onChange({ stock: e.target.value })} className="w-28" />
+            <span className="text-[13px] text-dark-grey">{t(DISPLAY_UNIT[target])}</span>
+          </div>
+        </Field>
+      )}
+      {known && <ChangeUnitButton ingredientId={known.id} name={known.name} unit={known.unit} />}
+    </div>
+  );
+}
+
+/** One labelled row of the pack: "Each carton has  [24] [can]". */
+function PackRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid items-center gap-x-3 gap-y-1 sm:grid-cols-[9rem_minmax(0,1fr)]">
+      <span className="text-[13px] text-dark-grey">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   );
 }

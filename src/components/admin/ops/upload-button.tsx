@@ -79,8 +79,8 @@ export function useDocumentUpload() {
   const router = useRouter();
   const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
 
-  /** Uploads one file; returns the document id (existing one for a duplicate). */
-  async function upload(kind: DocumentKind, file: File): Promise<{ id: string; duplicate: boolean }> {
+  /** Uploads one file; returns the document id (existing one for a duplicate; the saved invoice for another copy of one). */
+  async function upload(kind: DocumentKind, file: File): Promise<{ id: string; duplicate: boolean; saved?: boolean }> {
     const recipe = kind === "recipe";
     const sale = kind === "platform_order";
     const blob = await shrink(file);
@@ -90,7 +90,7 @@ export function useDocumentUpload() {
     form.append("kind", kind);
     const res = await fetch("/api/admin/ops/documents", { method: "POST", body: form });
     const body = await res.json().catch(() => ({}));
-    if (res.status === 409 && body.id) return { id: body.id, duplicate: true };
+    if (res.status === 409 && body.id) return { id: body.id, duplicate: true, saved: !!body.saved };
     if (!res.ok) throw body;
     return { id: body.id, duplicate: false };
   }
@@ -115,8 +115,9 @@ export function useDocumentUpload() {
     // One photo: open it. Several: read them one after another, then show the list.
     if (files.length === 1) {
       try {
-        const { id, duplicate } = await upload(kind, files[0]);
-        if (duplicate) toast.info(t("Already uploaded — opening it."));
+        const { id, duplicate, saved } = await upload(kind, files[0]);
+        if (saved) toast.error(t("This invoice is already saved — opening it. Nothing was added."));
+        else if (duplicate) toast.info(t("Already uploaded — opening it."));
         router.push(openPath(id));
         router.refresh();
       } catch (e) {

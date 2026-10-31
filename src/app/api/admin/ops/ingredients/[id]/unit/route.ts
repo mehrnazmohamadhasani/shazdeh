@@ -4,7 +4,8 @@ import { changeIngredientUnit } from "@/lib/ops/catalog";
 import { opsError } from "@/lib/ops/http";
 
 const schema = z.object({
-  unit: z.enum(["G", "ML", "PCS"]),
+  /** Never into ml: stock is grams or pieces (1 L = 1 kg). */
+  unit: z.enum(["G", "PCS"]),
   /** New units per old unit (g / ml / pcs): 1 pc = 18 kg → 18000. */
   factor: z.number().finite().positive().max(1_000_000),
 });

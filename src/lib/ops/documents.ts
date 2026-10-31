@@ -9,7 +9,8 @@ import { costLines, grossLines } from "./costing";
 import { extractionSchema, isStockCategory, type Extraction } from "./extraction";
 import { suggestMatches, type Suggestions } from "./match";
 import type { SaveInvoiceInput } from "./save-schema";
-import { normalizeName } from "./units";
+import { fitsUnit, newStockUnit, normalizeName } from "./units";
+import { packFromBase, readPack, type Pack } from "./pack";
 import { reportError } from "@/lib/report-error";
 import { processRecipeDocument } from "./recipe-import";
 import { processPlatformDocument } from "./platform-import";
@@ -61,6 +62,7 @@ export async function uploadDocument(
     if (!canReadAgain(existing)) throw new OpsError("This file was already uploaded.", 409, { id: existing.id });
     await reopenDocument(existing, actor, "upload", kind);
     await processDocument(existing.id);
+    await refuseIfSaved(existing.id);
     return existing.id;
   }
 
@@ -77,7 +79,37 @@ export async function uploadDocument(
     select: { id: true },
   });
   await processDocument(doc.id);
+  await refuseIfSaved(doc.id);
   return doc.id;
+}
+
+type SavedCopy = { invoiceId: string; documentId: string | null; invoiceNo: string | null; day: string; totalFils: number };
+const invoiceKey = (no: string | null | undefined) => no?.replace(/[\s#-]+/g, "").toUpperCase() || null;
+
+/**
+ * The live invoice a reading is another copy of: the same supplier and
+ * invoice number, or — when the paper has no number — the same supplier,
+ * day and total.
+ */
+async function savedCopyOf(x: Extraction, supplierId: string | null): Promise<SavedCopy | null> {
+  if (!supplierId || (x.documentType !== "supplier_invoice" && x.documentType !== "shop_receipt")) return null;
+  const key = invoiceKey(x.invoiceNumber);
+  if (!key && (!x.invoiceDate || x.total == null)) return null;
+  const live = await prisma.purchaseInvoice.findMany({
+    where: { supplierId, voidedAt: null, ...(key ? { invoiceNo: { not: null } } : { invoiceDate: dubaiDate(x.invoiceDate!), totalFils: toFils(x.total!) }) },
+    select: { id: true, documentId: true, invoiceNo: true, invoiceDate: true, totalFils: true },
+  });
+  const hit = key ? live.find((i) => invoiceKey(i.invoiceNo) === key) : live[0];
+  if (!hit) return null;
+  const day = new Date(hit.invoiceDate.getTime() + 4 * 3_600_000).toISOString().slice(0, 10);
+  return { invoiceId: hit.id, documentId: hit.documentId, invoiceNo: hit.invoiceNo, day, totalFils: hit.totalFils };
+}
+
+/** An upload that turned out to be a saved invoice: 409 with the saved one, so the screen opens it. */
+async function refuseIfSaved(id: string) {
+  const doc = await prisma.opsDocument.findUnique({ where: { id }, select: { extraction: true } });
+  const saved = (doc?.extraction as { duplicateOf?: SavedCopy } | null)?.duplicateOf;
+  if (saved) throw new OpsError("This invoice is already saved.", 409, { id: saved.documentId ?? id, saved: true });
 }
 
 /** Puts a discarded / failed / stuck document back to be read, with an audit row saying who and how. */
@@ -131,6 +163,24 @@ export async function processDocument(id: string) {
     if (result.extraction.documentType === "platform_order") return processPlatformDocument(id);
     const suggestions = await suggestMatches(result.extraction);
     const stored: StoredReading = { reading: result.extraction, suggestions };
+    // Another photo of an invoice that is already saved: refused, never a second copy of its stock.
+    const saved = await savedCopyOf(result.extraction, suggestions.supplierId);
+    if (saved) {
+      await prisma.$transaction([
+        prisma.opsDocument.update({
+          where: { id },
+          data: {
+            status: "DISCARDED",
+            extraction: { ...stored, duplicateOf: saved } as unknown as Prisma.InputJsonValue,
+            aiModel: result.model,
+            aiInputTokens: result.inputTokens,
+            aiOutputTokens: result.outputTokens,
+          },
+        }),
+        prisma.auditLog.create({ data: { actor: "auto-check", action: "document.duplicate", entity: "OpsDocument", entityId: id, after: saved } }),
+      ]);
+      return;
+    }
     await prisma.opsDocument.update({
       where: { id },
       data: {
@@ -294,10 +344,10 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
           : await tx.ingredient.findFirst({ where: { name: { equals: line.ingredient.name, mode: "insensitive" } } });
         if (!ingredient) {
           ingredient = await tx.ingredient.create({
-            data: { name: line.ingredient.name, unit, category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
+            data: { name: line.ingredient.name, unit: newStockUnit(unit), category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
           });
         }
-        if (ingredient.unit !== unit) {
+        if (!fitsUnit(ingredient.unit, unit)) {
           throw new OpsError(`"${ingredient.name}" is counted in ${ingredient.unit.toLowerCase()}, not ${line.ingredient.unit}.`);
         }
         // The kind of meat chosen on review belongs to the ingredient (so the next invoice knows it too).
@@ -369,6 +419,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
             category: DB_CATEGORY[line.category],
             ingredientId,
             baseQty: stocked ? line.stockQuantity : null,
+            pack: stocked && line.pack ? line.pack : Prisma.DbNull,
           },
         });
         if (stocked) {
@@ -392,8 +443,9 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
               rawName: normalizeName(line.rawName),
               ingredientId: ingredientId!,
               baseQtyPerUnit: line.stockQuantity! / line.quantity,
+              pack: line.pack ?? Prisma.DbNull,
             },
-            update: { ingredientId: ingredientId!, baseQtyPerUnit: line.stockQuantity! / line.quantity },
+            update: { ingredientId: ingredientId!, baseQtyPerUnit: line.stockQuantity! / line.quantity, pack: line.pack ?? Prisma.DbNull },
           });
         }
       }
@@ -485,6 +537,12 @@ export async function voidInvoice(invoiceId: string, reason: string, actor: { id
 /** Why an invoice was voided when someone pressed "Edit" (shown on the review screen). */
 export const EDIT_REASON = "Edited";
 
+function savedPack(l: { pack: unknown; baseQty: number | null; quantity: number; ingredient: { unit: "G" | "ML" | "PCS" } | null }) {
+  if (!l.ingredient || l.baseQty == null) return {};
+  const pack: Pack = readPack(l.pack) ?? packFromBase(l.baseQty / l.quantity, l.ingredient.unit === "PCS" ? "pcs" : "g");
+  return { packs: [pack], pack, packSure: true };
+}
+
 /**
  * "Edit" on a saved invoice: puts its saved values (not the AI's first
  * reading) back on the review screen, then takes the invoice and its
@@ -528,6 +586,7 @@ export async function editInvoice(invoiceId: string, actor: { id: string; email:
       category: l.category.toLowerCase() as Extraction["lines"][number]["category"],
       stockUnit: l.ingredient ? unitOf[l.ingredient.unit] : null,
       stockQuantity: l.baseQty,
+      pack: readPack(l.pack),
       confidence: 1,
       note: null,
     })),
@@ -547,6 +606,8 @@ export async function editInvoice(invoiceId: string, actor: { id: string; email:
       unit: l.ingredient ? unitOf[l.ingredient.unit] : null,
       quantity: l.baseQty,
       source: l.ingredient ? ("learned" as const) : null,
+      // As saved; an older line without a pack shows its amount per unit.
+      ...savedPack(l),
     })),
   };
   const previous = inv.document.extraction as { reading?: unknown; aiReading?: unknown } | null;

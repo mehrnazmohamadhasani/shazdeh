@@ -220,7 +220,7 @@ export function RecipeImportForm({
               <TextInput dir="ltr" inputMode="decimal" className="w-32" value={yieldQuantity} onChange={(e) => setYieldQuantity(e.target.value)} />
               <Select className="w-24" value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value as Unit)}>
                 <option value="G">{t("g")}</option>
-                <option value="ML">{t("ml")}</option>
+                {yieldUnit === "ML" && <option value="ML">{t("ml")}</option>}
                 <option value="PCS">{t("pcs")}</option>
               </Select>
             </div>
@@ -305,7 +305,6 @@ export function RecipeImportForm({
                       {isNew ? (
                         <Select aria-label={t("Unit")} className="w-20 shrink-0" value={r.newUnit} onChange={(e) => update(r.key, { newUnit: e.target.value as Unit })}>
                           <option value="G">{t("g")}</option>
-                          <option value="ML">{t("ml")}</option>
                           <option value="PCS">{t("pcs")}</option>
                         </Select>
                       ) : (

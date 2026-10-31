@@ -6,7 +6,7 @@ import { AiBudgetError } from "./ai-usage";
 import { OpsError } from "./documents";
 import { recipeReadingJsonSchema, recipeReadingPrompt, recipeReadingSchema, sampleRecipeReading, type RecipeReading } from "./recipe-reading";
 import { writeDraft } from "./recipes";
-import { normalizeName } from "./units";
+import { fitsUnit, newStockUnit, normalizeName } from "./units";
 import { reportError } from "@/lib/report-error";
 
 /*
@@ -192,7 +192,7 @@ async function createPrep(tx: Prisma.TransactionClient, name: string, nameFa: st
       kind: "PREP",
       name,
       nameFa,
-      versions: { create: { number: 1, status: "DRAFT", yieldQuantity: unit === "PCS" ? 1 : 1000, yieldUnit: unit, createdById: actor.id } },
+      versions: { create: { number: 1, status: "DRAFT", yieldQuantity: unit === "PCS" ? 1 : 1000, yieldUnit: newStockUnit(unit), createdById: actor.id } },
     },
   });
   await tx.auditLog.create({ data: { actor: actor.email, action: "recipe.create", entity: "Recipe", entityId: created.id, via: "photo", after: { kind: "PREP", name } } });
@@ -239,8 +239,8 @@ export async function saveRecipeImport(documentId: string, input: ImportInput, a
         else if (src.type === "prep") subRecipeId = src.id;
         else if (src.type === "newIngredient") {
           const found = await tx.ingredient.findFirst({ where: { name: { equals: src.name, mode: "insensitive" } } });
-          if (found && found.unit !== src.unit) throw new OpsError(`"${found.name}" already exists, counted in ${found.unit.toLowerCase()}.`, 409);
-          ingredientId = found?.id ?? (await tx.ingredient.create({ data: { name: src.name, nameFa: src.nameFa, unit: src.unit, category: "FOOD" } })).id;
+          if (found && !fitsUnit(found.unit, src.unit)) throw new OpsError(`"${found.name}" already exists, counted in ${found.unit.toLowerCase()}.`, 409);
+          ingredientId = found?.id ?? (await tx.ingredient.create({ data: { name: src.name, nameFa: src.nameFa, unit: newStockUnit(src.unit), category: "FOOD" } })).id;
         } else {
           subRecipeId = await createPrep(tx, src.name, src.nameFa, src.unit, actor);
         }

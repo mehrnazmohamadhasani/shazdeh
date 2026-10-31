@@ -192,7 +192,7 @@ export function NewRecipeDialog({
             <Field label={t("Measured in")}>
               <Select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
                 <option value="G">{t("g")}</option>
-                <option value="ML">{t("ml")}</option>
+                {unit === "ML" && <option value="ML">{t("ml")}</option>}
                 <option value="PCS">{t("pcs")}</option>
               </Select>
             </Field>
@@ -411,7 +411,7 @@ export function DraftEditor({
               }}
             >
               <option value="G">{t("g")}</option>
-              <option value="ML">{t("ml")}</option>
+              {yieldUnit === "ML" && <option value="ML">{t("ml")}</option>}
               <option value="PCS">{t("pcs")}</option>
             </Select>
           </div>
@@ -522,7 +522,6 @@ export function DraftEditor({
           <Field label={t("Measured in")}>
             <Select value={adding.unit} onChange={(e) => setAdding({ ...adding, unit: e.target.value as Unit })}>
               <option value="G">{t("g")}</option>
-              <option value="ML">{t("ml")}</option>
               <option value="PCS">{t("pcs")}</option>
             </Select>
           </Field>

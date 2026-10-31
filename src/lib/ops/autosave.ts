@@ -88,7 +88,7 @@ export function decideInvoiceAutoSave(x: Extraction, s: Suggestions, minConfiden
     if (l.quantity == null || l.quantity <= 0 || l.lineTotal == null) reasons.push(`line ${i + 1} incomplete`);
     const sug = s.lines[i];
     // Stock lines must be remembered from an earlier confirmation, pack size included.
-    if (isStockCategory(l.category) && !(sug?.source === "learned" && sug.ingredientId && sug.unit && sug.quantity)) {
+    if (isStockCategory(l.category) && !(sug?.source === "learned" && sug.ingredientId && sug.unit && sug.quantity && sug.packSure !== false)) {
       reasons.push(`line ${i + 1} not learned yet: ${l.description}`);
     }
   });
@@ -133,6 +133,7 @@ export function decideInvoiceAutoSave(x: Extraction, s: Suggestions, minConfiden
             ? { id: sug!.ingredientId, name: sug!.ingredientName!, unit: sug!.unit!, ...(sug!.meatTypeId ? { meatTypeId: sug!.meatTypeId } : {}) }
             : null,
           stockQuantity: stocked ? sug!.quantity : null,
+          pack: stocked ? (sug!.pack ?? null) : null,
         };
       }),
     },

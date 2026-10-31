@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PACK_UNITS, packSchema } from "./pack";
 
 /*
  * The one canonical shape every supplier invoice, receipt or
@@ -34,6 +35,8 @@ export const extractedLineSchema = z.object({
   /** The AI's guess of how the kitchen counts it, and how much this line adds. */
   stockUnit: z.enum(STOCK_UNITS).nullable(),
   stockQuantity: num,
+  /** How one invoice unit is packed (./pack.ts). Readings saved before this existed don't have it. */
+  pack: packSchema.nullable().optional().catch(null),
   /**
    * Raw meat or poultry: which of the kitchen's kinds of meat it is (one of
    * their names, e.g. "Lamb"); null for everything else. Readings saved
@@ -103,8 +106,18 @@ export const extractionJsonSchema = obj({
       vat: n,
       lineTotal: n,
       category: { type: "string", enum: [...SPEND_CATEGORIES] },
-      stockUnit: { type: ["string", "null"], enum: [...STOCK_UNITS, null] },
+      stockUnit: { type: ["string", "null"], enum: ["g", "pcs", null] },
       stockQuantity: n,
+      pack: {
+        anyOf: [
+          obj({
+            inner: { type: "array", items: obj({ count: { type: "number" }, name: { type: "string" } }) },
+            amount: { type: "number" },
+            unit: { type: "string", enum: [...PACK_UNITS] },
+          }),
+          { type: "null" },
+        ],
+      },
       meat: s,
       confidence: { type: "number" },
       note: s,
@@ -131,7 +144,8 @@ Rules:
 - quantity, unitPrice, discount, vat and lineTotal are the numbers on that line, in AED. vat is the VAT AMOUNT in AED (e.g. 4.25), never the rate (5%). Discounts are positive amounts (a printed "-16.00" discount is 16).
 - packSize: the pack size if printed in a column or in the product name ("4 x 10 kg", "800G", "1000 ml"), else null.
 - category: food = ingredients and drinks for cooking or resale; packaging = takeaway boxes, containers, cups, lids, bags, foil, labels; supplies = things used up in the kitchen that are not food or packaging: cooking gas cylinders, cleaning products, gloves, tissues, bin bags, cling film; smallwares = durable kitchen tools and equipment (pans, trays, knives, GN pans, utensils); delivery = delivery/transport charges; other = anything else.
-- stockUnit / stockQuantity: how the kitchen would count this line in stock — "g" for solids, "ml" for liquids, "pcs" for countable items — and the TOTAL amount the whole line adds (e.g. 5 cartons of 4 x 10 kg rice = 200000 g; 2 pcs of tomato paste 800 g = 1600 g; 15 kg lamb = 15000 g). If the pack size is truly unclear, set stockQuantity to null and say why in note. Use null for delivery and non-stock lines.
+- pack: what ONE unit of quantity holds, for stock lines. inner = the packs inside one unit, outermost first, each with its count and a short name; amount + unit = what the smallest pack holds. Units: g, kg, lb, oz, ml, l or pcs. Examples: 25 kg onion (quantity 25, unit kg) → {inner: [], amount: 1, unit: "kg"}; 24 Pcs of "TOMATO PASTE 700G" → {inner: [], amount: 700, unit: "g"}; 1 CTN of "Dish wash 4X5L" → {inner: [{count: 4, name: "bottle"}], amount: 5, unit: "l"}; 1 CTN of gloves "10 X 100" → {inner: [{count: 10, name: "box"}], amount: 100, unit: "pcs"}; 10 box of dates, 12 packs of 550 g each → {inner: [{count: 12, name: "pack"}], amount: 550, unit: "g"}; 1 PCE of "OIL 35 LB" → {inner: [], amount: 35, unit: "lb"}. Be careful with "2500G X 6 PCS" sold as "4 Pcs" at 95 each: decide from the price whether one Pcs is one tub or a box of six. If nothing printed says what one unit holds (a handwritten "2 ct"), use null and say so in note. Null for delivery and non-stock lines.
+- stockUnit / stockQuantity: how the kitchen counts this line in stock — "g" for anything weighed or poured (liquids count 1 L = 1000 g), "pcs" for countable items — and the TOTAL amount the whole line adds (e.g. 5 cartons of 4 x 10 kg rice = 200000 g; 2 pcs of tomato paste 800 g = 1600 g; 15 kg lamb = 15000 g; 1 carton of 4 x 5 L dish wash = 20000 g). If the pack size is truly unclear, set stockQuantity to null and say why in note. Use null for delivery and non-stock lines.
 - meat: only for raw meat or poultry — fresh, chilled or frozen mutton, lamb, beef, veal, chicken, shanks…, written in any language or spelling ("FRESH MUTTON", "BEEF BACKSTIP", "موزة خروف", "دجاج", "گوشت گوساله"). Set it to the kitchen's kind of meat it is, using exactly one of the names listed at the end of these instructions (choose the closest: mutton is lamb, veal is beef, a lamb shank is the shank kind when there is one). Use null for everything else: rice, salt, spices, oil, vegetables, tomato paste, stock cubes, sausages, canned or ready-made meat products, and any line that isn't food.
 - confidence (0–1) per line and overall: how sure you are you read it correctly. Lower it for handwriting, blur, glare or ambiguous quantities (e.g. a "3B" that could be 38).
 - invoiceDate as YYYY-MM-DD. Dates may be written 09/07/2026, 16-Jul-2026, 24-08-26 or 27/8/2026 (day first in the UAE).
