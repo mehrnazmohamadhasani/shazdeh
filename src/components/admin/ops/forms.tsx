@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ClipboardPaste, Loader2, Plus, Trash2 } from "lucide-react";
+import { ClipboardPaste, Loader2, Plus, Printer, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, IconButton, Select, TextArea, TextInput } from "@/components/admin/ui";
@@ -11,6 +11,9 @@ import { amountText, weekday } from "@/components/admin/ops/format";
 import { messageFromUnknown } from "@/lib/error-message";
 import type { BaseUnit } from "@/lib/ops/units";
 import { parseStockLines } from "@/lib/ops/paste";
+import { countLevels, type CountPack } from "@/lib/ops/pack";
+import { uomName } from "@/lib/ops/uom";
+import { TableFilter } from "@/components/admin/table-filter";
 import { cn } from "@/lib/utils";
 
 /*
@@ -325,74 +328,252 @@ export function MovementForm({ ingredientId, unit }: { ingredientId: string; uni
 
 // ─── Stock count ────────────────────────────────────────────────────────────
 
-export function CountForm({ rows }: { rows: { id: string; name: string; unit: BaseUnit; onHand: number }[] }) {
+export type CountRow = {
+  id: string;
+  name: string;
+  nameFa: string | null;
+  unit: BaseUnit;
+  onHand: number;
+  group: CountGroup;
+  /** Packs it was last bought in, newest first. */
+  packs: CountPack[];
+};
+type CountGroup = "meat" | "FOOD" | "PACKAGING" | "SUPPLIES";
+const COUNT_GROUPS: { key: CountGroup; label: string }[] = [
+  { key: "meat", label: "Meat" },
+  { key: "FOOD", label: "Food" },
+  { key: "PACKAGING", label: "Packaging" },
+  { key: "SUPPLIES", label: "Supplies" },
+];
+
+/** What an item is counted in: the unit its last invoice bought it in, and how much stock one of it is. */
+type CountUnit = { label: string; amount: number; pack: boolean };
+/** A count this far from the system is asked about once before saving. */
+const FAR_OFF = 0.3;
+/** "2", "1.5", "0.25": a few decimals at most. */
+const fmtQty = (n: number) => String(Number(n.toFixed(2)));
+
+/**
+ * The weekly count in the unit each item was bought in: the last invoice
+ * says "Carton (CTN) = 20 kg", the row shows stock as cartons and takes
+ * the count as cartons (1.5 for an opened one); items bought loose are
+ * counted in kilograms or pieces. Rows grouped like the kitchen, with a
+ * search, a printable sheet for counting on paper, and one question
+ * before saving counts far from the system.
+ */
+export function CountForm({ rows }: { rows: CountRow[] }) {
   const { t, locale } = useAdminI18n();
   const { busy, submit, router } = useSubmit();
   const [day, setDay] = React.useState(today);
   const [values, setValues] = React.useState<Record<string, string>>({});
-  const entered = rows.filter((r) => num(values[r.id] ?? "") != null);
+  const [farOff, setFarOff] = React.useState<{ row: CountRow; counted: number }[] | null>(null);
+
+  const label = (r: CountRow) => (locale === "fa" && r.nameFa ? r.nameFa : r.name);
+  const other = (r: CountRow) => (locale === "fa" ? (r.nameFa ? r.name : null) : r.nameFa);
+  const unitOf = (r: CountRow): CountUnit => {
+    const p = r.packs[0];
+    if (p) return { label: uomName(p.outer, locale), amount: countLevels(p.pack, p.outer)[0].amount, pack: true };
+    return r.unit === "pcs" ? { label: uomName("pcs", locale), amount: 1, pack: false } : { label: uomName("kg", locale), amount: 1000, pack: false };
+  };
+  /** "2 Carton (CTN)", plus what that is in kg or pieces when it is a pack. */
+  const inUnit = (amount: number, r: CountRow) => {
+    const u = unitOf(r);
+    const text = `${fmtQty(amount / u.amount)} ${u.label}`;
+    return u.pack ? `${text} (${amountText(amount, r.unit, locale)})` : text;
+  };
+  const countedOf = (r: CountRow) => {
+    const v = num(values[r.id] ?? "");
+    return v == null ? null : v * unitOf(r).amount;
+  };
+
+  const entered = rows.flatMap((r) => {
+    const counted = countedOf(r);
+    return counted == null ? [] : [{ row: r, counted }];
+  });
+  const save = () =>
+    submit(
+      "/api/admin/ops/stock/count",
+      "POST",
+      { day, counts: entered.map((e) => ({ ingredientId: e.row.id, counted: e.counted })) },
+      t(entered.length > 1 ? "Count saved — {n} items" : "Count saved — {n} item", { n: entered.length }),
+      () => {
+        router.push("/admin/ops/stock");
+        router.refresh();
+      },
+    );
+  const groups = COUNT_GROUPS.map((g) => ({
+    ...g,
+    rows: rows.filter((r) => r.group === g.key).sort((a, b) => label(a).localeCompare(label(b), locale)),
+  })).filter((g) => g.rows.length);
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         if (!entered.length) return toast.error(t("Enter at least one count"));
-        void submit(
-          "/api/admin/ops/stock/count",
-          "POST",
-          { day, counts: entered.map((r) => ({ ingredientId: r.id, counted: num(values[r.id])! * PER[r.unit] })) },
-          t(entered.length > 1 ? "Count saved — {n} items" : "Count saved — {n} item", { n: entered.length }),
-          () => {
-            router.push("/admin/ops/stock");
-            router.refresh();
-          },
-        );
+        const far = entered.filter((e) => e.row.onHand > 0 && Math.abs(e.counted - e.row.onHand) > FAR_OFF * e.row.onHand);
+        if (far.length) return setFarOff(far);
+        void save();
       }}
     >
-      <div className="flex flex-wrap items-end gap-3 px-5 py-4 md:px-6">
+      <div className="flex flex-wrap items-end gap-3 px-5 py-4 md:px-6 print:hidden">
         <Field label={t("Count day")}>
           <TextInput type="date" dir="ltr" value={day} onChange={(e) => setDay(e.target.value)} className="w-44" />
         </Field>
-        <p className="pb-3 text-[13px] text-dark-grey">{t("Only fill in what you counted; empty rows are left as they are.")}</p>
+        <TableFilter target="count-rows" placeholder={t("Search ingredients")} className="min-w-48 max-w-sm flex-1" />
+        <Button type="button" variant="outline" size="md" onClick={() => window.print()}>
+          <Printer className="h-4 w-4" /> {t("Print count sheet")}
+        </Button>
+        <p className="basis-full text-[13px] text-dark-grey">{t("Only fill in what you counted; empty rows are left as they are.")}</p>
       </div>
-      <ul className="divide-y divide-black-iron/[0.06] border-t border-black-iron/[0.06]">
-        {rows.map((r) => {
-          const v = num(values[r.id] ?? "");
-          const diff = v == null ? null : v * PER[r.unit] - r.onHand;
-          return (
-            <li key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3 md:px-6">
-              <div className="min-w-0 flex-1">
-                <p dir="auto" className="text-[14.5px] font-medium">{r.name}</p>
-                <p className="text-[12.5px] text-dark-grey">
-                  {t("System says {amount}", { amount: amountText(r.onHand, r.unit, locale) })}
-                  {diff != null && Math.abs(diff) > 1e-9 && (
-                    <span className={diff < 0 ? "text-pomegranate-red" : "text-olive-leaf"}>
-                      {" "}· {diff > 0 ? "+" : "−"}
-                      {amountText(Math.abs(diff), r.unit, locale)}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <TextInput
-                  aria-label={t("{name} counted ({unit})", { name: r.name, unit: t(DISPLAY[r.unit]) })}
-                  dir="ltr"
-                  inputMode="decimal"
-                  className="w-28 text-end"
-                  value={values[r.id] ?? ""}
-                  onChange={(e) => setValues((x) => ({ ...x, [r.id]: e.target.value }))}
-                />
-                <span className="w-8 text-[13px] text-dark-grey">{t(DISPLAY[r.unit])}</span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="sticky bottom-0 border-t border-black-iron/[0.07] bg-white/95 px-5 py-3 backdrop-blur md:px-6">
+
+      <div id="count-rows" className="print:hidden">
+        <div className="hidden grid-cols-[minmax(0,1fr)_13rem_13rem_15rem] gap-4 border-t border-black-iron/[0.06] px-5 py-2 text-[12px] text-dark-grey md:grid md:px-6">
+          <span>{t("Ingredient")}</span>
+          <span>{t("Bought as")}</span>
+          <span>{t("On hand")}</span>
+          <span>{t("Counted")}</span>
+        </div>
+        {groups.map((g) => (
+          <section key={g.key}>
+            <h2 className="border-y border-black-iron/[0.06] bg-black-iron/[0.025] px-5 py-2 text-[12px] font-semibold uppercase tracking-wide text-dark-grey md:px-6">
+              {t(g.label)}
+            </h2>
+            <ul className="divide-y divide-black-iron/[0.06]">
+              {g.rows.map((r) => {
+                const u = unitOf(r);
+                const counted = countedOf(r);
+                const diff = counted == null ? null : counted - r.onHand;
+                const far = diff != null && r.onHand > 0 && Math.abs(diff) > FAR_OFF * r.onHand;
+                return (
+                  <li
+                    key={r.id}
+                    data-search={`${r.name} ${r.nameFa ?? ""}`}
+                    className="grid items-center gap-x-4 gap-y-1.5 px-5 py-3 md:grid-cols-[minmax(0,1fr)_13rem_13rem_15rem] md:px-6"
+                  >
+                    <p dir="auto" className="min-w-0 text-[14.5px] font-medium">
+                      {label(r)}
+                      {other(r) && (
+                        <span className="ms-2 text-[12.5px] font-normal text-dark-grey">
+                          <bdi>{other(r)}</bdi>
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[13px] text-dark-grey">
+                      <span className="md:hidden">{t("Bought as")}: </span>
+                      {u.pack ? `${u.label} = ${amountText(u.amount, r.unit, locale)}` : u.label}
+                    </p>
+                    <p className={cn("text-[13px] tabular-nums", r.onHand < 0 && "text-pomegranate-red")}>
+                      <span className="text-dark-grey md:hidden">{t("On hand")}: </span>
+                      {inUnit(r.onHand, r)}
+                    </p>
+                    <div>
+                      <label className="flex items-center gap-2">
+                        <TextInput
+                          aria-label={t("{name} counted ({unit})", { name: label(r), unit: u.label })}
+                          dir="ltr"
+                          inputMode="decimal"
+                          className="w-24 text-end"
+                          value={values[r.id] ?? ""}
+                          onChange={(e) => setValues((x) => ({ ...x, [r.id]: e.target.value }))}
+                        />
+                        <span className="text-[13px] text-dark-grey">{u.label}</span>
+                      </label>
+                      {diff != null && Math.abs(diff) > 1e-9 && (
+                        <p className={cn("mt-1 text-[12.5px] tabular-nums", far ? "font-semibold text-pomegranate-red" : "text-dark-grey")}>
+                          {u.pack && `= ${amountText(counted!, r.unit, locale)} · `}
+                          {diff > 0 ? "+" : "−"}
+                          {amountText(Math.abs(diff), r.unit, locale)}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      {/* Paper sheet for counting on the shelf: no system amounts, so nobody copies them. */}
+      <div className="hidden print:block">
+        <h1 className="mb-1 text-[18px] font-bold">{t("Stock count")}</h1>
+        <p className="mb-3 text-[12px]">{t("Date: ____________   Counted by: ____________")}</p>
+        {groups.map((g) => (
+          <table key={g.key} className="mb-4 w-full border-collapse text-[11.5px]">
+            <thead>
+              <tr>
+                <th className="w-[40%] border border-black/40 bg-black/[0.06] px-2 py-1 text-start">{t(g.label)}</th>
+                <th className="w-[30%] border border-black/40 bg-black/[0.06] px-2 py-1 text-start">{t("Bought as")}</th>
+                <th className="border border-black/40 bg-black/[0.06] px-2 py-1 text-start">{t("Counted")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {g.rows.map((r) => (
+                <tr key={r.id} className="break-inside-avoid">
+                  <td dir="auto" className="border border-black/40 px-2 py-1.5">
+                    {label(r)}
+                    {other(r) && (
+                      <span className="ms-1.5 text-black/60">
+                        <bdi>{other(r)}</bdi>
+                      </span>
+                    )}
+                  </td>
+                  <td className="border border-black/40 px-2 py-1.5 text-black/60">
+                    {unitOf(r).pack ? `${unitOf(r).label} = ${amountText(unitOf(r).amount, r.unit, locale)}` : unitOf(r).label}
+                  </td>
+                  <td className="border border-black/40 px-2 py-1.5" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ))}
+      </div>
+
+      <div className="sticky bottom-0 border-t border-black-iron/[0.07] bg-white/95 px-5 py-3 backdrop-blur md:px-6 print:hidden">
         <Button type="submit" disabled={busy || !entered.length}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           {t("Save count ({n})", { n: entered.length })}
         </Button>
       </div>
+
+      <Dialog open={!!farOff} onOpenChange={(open) => !open && setFarOff(null)}>
+        <DialogContent className="bg-white text-black-iron sm:max-w-lg">
+          <div className="space-y-4 p-6">
+            <DialogTitle className="text-[20px] font-bold text-black-iron">{t("Check these counts")}</DialogTitle>
+            <DialogDescription className="text-[13.5px] text-dark-grey">
+              {t("These are far from what the system expects. A typo, or really that much?")}
+            </DialogDescription>
+            <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
+              {farOff?.map((f) => (
+                <li key={f.row.id} className="flex justify-between gap-3 py-2">
+                  <span dir="auto" className="font-medium">
+                    {label(f.row)}
+                  </span>
+                  <span className="tabular-nums text-dark-grey">
+                    {amountText(f.row.onHand, f.row.unit, locale)} → <span className="font-semibold text-pomegranate-red">{amountText(f.counted, f.row.unit, locale)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setFarOff(null)}>
+                {t("Check again")}
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  setFarOff(null);
+                  void save();
+                }}
+              >
+                {t("Save anyway")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { choosePack, packFromBase, packOptions, packStock, perUnit, readPack, unitWord, type Pack } from "../pack";
+import { choosePack, countLevels, isPlainPack, packFromBase, packOptions, packStock, perUnit, readPack, unitWord, type Pack } from "../pack";
 
 // Lines as printed on SHĀZDEH's real invoices.
 const line = (description: string, unit: string | null, packSize: string | null = null) => ({ description, unit, packSize });
@@ -91,4 +91,24 @@ test("old memory and stored packs", () => {
   assert.deepEqual(packFromBase(240, "pcs"), { inner: [], amount: 240, unit: "pcs" });
   assert.equal(readPack({ inner: [], amount: 0, unit: "kg" }), null);
   assert.equal(readPack(null), null);
+});
+
+test("a count is typed per pack level", () => {
+  const ctn: Pack = { inner: [{ count: 4, name: "gallon" }], amount: 5, unit: "l" };
+  assert.deepEqual(countLevels(ctn, "CTN"), [
+    { name: "CTN", amount: 20000 },
+    { name: "gallon", amount: 5000 },
+  ]);
+  assert.deepEqual(countLevels({ inner: [], amount: 2.5, unit: "kg" }, "Pcs"), [{ name: "Pcs", amount: 2500 }]);
+});
+
+test("plain units are not packs to count in", () => {
+  assert.equal(isPlainPack({ inner: [], amount: 1, unit: "kg" }), true);
+  assert.equal(isPlainPack({ inner: [], amount: 1, unit: "pcs" }), true);
+  assert.equal(isPlainPack({ inner: [], amount: 0.75, unit: "pcs" }), true);
+  assert.equal(isPlainPack({ inner: [], amount: 237.5, unit: "kg" }), true);
+  assert.equal(isPlainPack({ inner: [], amount: 800, unit: "g" }), false);
+  assert.equal(isPlainPack({ inner: [], amount: 12, unit: "kg" }), false);
+  assert.equal(isPlainPack({ inner: [], amount: 200, unit: "pcs" }), false);
+  assert.equal(isPlainPack({ inner: [{ count: 12, name: "" }], amount: 1, unit: "pcs" }), false);
 });

@@ -10,7 +10,7 @@ import { extractionSchema, isStockCategory, type Extraction } from "./extraction
 import { suggestMatches, type Suggestions } from "./match";
 import type { SaveInvoiceInput } from "./save-schema";
 import { fitsUnit, newStockUnit, normalizeName } from "./units";
-import { packFromBase, readPack, type Pack } from "./pack";
+import { baseOf, isPlainPack, packFromBase, perUnit, readPack, type CountPack, type Pack } from "./pack";
 import { reportError } from "@/lib/report-error";
 import { processRecipeDocument } from "./recipe-import";
 import { processPlatformDocument } from "./platform-import";
@@ -661,6 +661,7 @@ export async function stockSummary() {
       nameFa: i.nameFa,
       unit: i.unit,
       category: i.category,
+      meat: i.meatTypeId != null,
       onHand: sums.find((s) => s.ingredientId === i.id)?._sum.quantity ?? 0,
       lastPurchase: last
         ? {
@@ -674,6 +675,32 @@ export async function stockSummary() {
         : null,
     };
   });
+}
+
+/**
+ * The packs each ingredient was last bought in, newest first (at most
+ * two), so a count can be typed as "3 CTN + 2 kg". Lines saved before
+ * packs give theirs from the stock they added; plain units are left out,
+ * and so is meat, which is always weighed.
+ */
+export async function countPacks(): Promise<Record<string, CountPack[]>> {
+  const lines = await prisma.purchaseLine.findMany({
+    where: { ingredient: { meatTypeId: null }, quantity: { gt: 0 }, baseQty: { gt: 0 }, invoice: { voidedAt: null } },
+    orderBy: [{ invoice: { invoiceDate: "desc" } }, { id: "desc" }],
+    select: { ingredientId: true, unit: true, quantity: true, baseQty: true, pack: true, ingredient: { select: { unit: true } } },
+  });
+  const out: Record<string, CountPack[]> = {};
+  for (const l of lines) {
+    const base = l.ingredient!.unit === "PCS" ? "pcs" : "g";
+    const pack = readPack(l.pack) ?? packFromBase(l.baseQty! / l.quantity, base);
+    if (baseOf(pack.unit) !== base || isPlainPack(pack)) continue;
+    const outer = l.unit?.trim() ?? "";
+    const list = (out[l.ingredientId!] ??= []);
+    const key = (p: CountPack) => `${p.outer.toLowerCase()}|${perUnit(p.pack).amount}|${p.pack.inner.map((x) => x.count).join("x")}`;
+    const next = { outer, pack };
+    if (list.length < 2 && !list.some((p) => key(p) === key(next))) list.push(next);
+  }
+  return out;
 }
 
 // ─── Invoices list, payment, manual entry ───────────────────────────────────
