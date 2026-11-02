@@ -26,13 +26,23 @@ export const stock: Record<string, string> = {
   // Stock count
   "Stock count": "شمارش انبار",
   "Back to stock": "بازگشت به انبار",
-  "Weekly count: type what is actually on the shelf. Differences are saved as corrections, so the history stays complete.":
-    "شمارش هفتگی: مقداری را که واقعاً در قفسه هست وارد کنید. اختلاف‌ها به‌عنوان اصلاحیه ذخیره می‌شوند تا تاریخچه کامل بماند.",
+  "Weekly count: type what is actually on the shelf, in the unit it was bought in. Differences are saved as corrections, so the history stays complete.":
+    "شمارش هفتگی: مقداری را که واقعاً در قفسه هست، با همان واحدی که خریده شده، وارد کنید. اختلاف‌ها به‌عنوان اصلاحیه ذخیره می‌شوند تا تاریخچه کامل بماند.",
   "Nothing to count yet": "هنوز چیزی برای شمارش نیست",
   "Ingredients appear after you save an invoice.": "مواد اولیه بعد از ذخیره‌ی اولین فاکتور اینجا می‌آیند.",
   "Count day": "روز شمارش",
   "Only fill in what you counted; empty rows are left as they are.":
     "فقط چیزهایی را که شمردید پر کنید؛ ردیف‌های خالی دست نمی‌خورند.",
+  "Print count sheet": "چاپ برگه‌ی شمارش",
+  "Date: ____________   Counted by: ____________": "تاریخ: ____________   شمارنده: ____________",
+  Meat: "گوشت",
+  "Bought as": "واحد خرید",
+  Counted: "شمارش",
+  "Check these counts": "این شمارش‌ها را دوباره نگاه کنید",
+  "These are far from what the system expects. A typo, or really that much?":
+    "این‌ها خیلی با مقدار سیستم فرق دارند. اشتباه تایپی است یا واقعاً همین‌قدر است؟",
+  "Check again": "دوباره نگاه می‌کنم",
+  "Save anyway": "همین را ذخیره کن",
   "System says {amount}": "طبق سیستم: {amount}",
   "{name} counted ({unit})": "مقدار شمرده‌شده‌ی {name} ({unit})",
   "Save count ({n})": "ذخیره‌ی شمارش ({n})",

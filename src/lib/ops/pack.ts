@@ -150,3 +150,33 @@ export function readPack(value: unknown): Pack | null {
   const parsed = packSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
+
+/** A pack an ingredient was bought in, and what the invoice called it ("CTN"). */
+export type CountPack = { outer: string; pack: Pack };
+
+/**
+ * What a count is typed in for one pack: the invoice unit, then each pack
+ * inside, with how much stock one of each is. "CTN" of 4 × 5 L →
+ * CTN 20000 g, then 5000 g for each one inside.
+ */
+export function countLevels(pack: Pack, outer: string): { name: string; amount: number }[] {
+  let amount = perUnit(pack).amount;
+  const levels = [{ name: outer, amount }];
+  for (const level of pack.inner) {
+    amount /= level.count;
+    levels.push({ name: level.name, amount });
+  }
+  return levels;
+}
+
+/**
+ * True when counting in this pack is the same as counting loose: one kg,
+ * one gram or one piece. Too big or a fraction of a piece is a misread
+ * line, not a pack anyone counts.
+ */
+export function isPlainPack(pack: Pack): boolean {
+  const { base, amount } = perUnit(pack);
+  if (pack.inner.length) return false;
+  if (base === "pcs") return amount <= 1 || !Number.isInteger(Math.round(amount * 1e6) / 1e6);
+  return amount === 1 || amount === 1000 || amount > 100_000;
+}
