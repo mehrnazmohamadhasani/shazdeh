@@ -39,6 +39,11 @@ export const setup: Record<string, string> = {
   Latest: "دیرترین",
   "Max distance (km)": "حداکثر فاصله (کیلومتر)",
   "Optional. Empty = no limit.": "اختیاری. خالی یعنی بدون محدودیت.",
+  "From the kitchen, in a straight line.": "از آشپزخانه، در خط مستقیم.",
+  "Up to {n} km": "تا {n} کیلومتر",
+  "No max distance — customers can't reach this zone": "حداکثر فاصله ندارد — مشتری‌ها به این منطقه نمی‌رسند",
+  "Delivering by distance: customers pin their location on a map and get the smallest zone whose max distance reaches them. Further than every zone means no delivery. The kitchen location is never shown to customers.":
+    "ارسال بر اساس فاصله: مشتری موقعیتش را روی نقشه مشخص می‌کند و نزدیک‌ترین منطقه‌ای که حداکثر فاصله‌اش به او می‌رسد انتخاب می‌شود. دورتر از همه‌ی منطقه‌ها یعنی ارسال نداریم. موقعیت آشپزخانه هیچ‌وقت به مشتری نشان داده نمی‌شود.",
   "No limit": "بدون محدودیت",
   Areas: "محله‌ها",
   "One per line. Add “| latitude, longitude” to let customers use their location.":

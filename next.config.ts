@@ -26,14 +26,16 @@ const isDev = process.env.NODE_ENV === "development";
  * scripts stay allowed — Next's bootstrap needs them — but everything
  * else is locked to this site plus the image/video hosts we use:
  * Cloudinary and Supabase storage. Admin uploads go straight to
- * Cloudinary from the browser.
+ * Cloudinary from the browser. The delivery-location map loads its
+ * tiles from OpenStreetMap.
  */
 const MEDIA_HOSTS = "https://res.cloudinary.com https://*.supabase.co";
+const MAP_TILES = "https://tile.openstreetmap.org";
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${MEDIA_HOSTS}`,
+  `img-src 'self' data: blob: ${MEDIA_HOSTS} ${MAP_TILES}`,
   `media-src 'self' blob: ${MEDIA_HOSTS}`,
   "font-src 'self' data:",
   `connect-src 'self' https://api.cloudinary.com${isDev ? " ws:" : ""}`,

@@ -9,7 +9,7 @@ import { BasketPanel } from "@/components/order/basket-panel";
 import { ProductSheet, type SheetTarget } from "@/components/order/product-sheet";
 import { cart, useCart } from "@/components/order/cart-store";
 import { RecentOrders } from "@/components/order/recent-orders";
-import { useBasket, useOrderData } from "@/components/order/order-data";
+import { deliverToLabel, useBasket, useOrderData } from "@/components/order/order-data";
 import { formatFils } from "@/lib/ordering/money";
 import type { OrderProduct } from "@/lib/ordering/types";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ const noopSubscribe = () => () => {};
 
 export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsapp?: string }) {
   const { categories, config } = useOrderData();
-  const { areaId } = useCart();
+  const { areaId, lat } = useCart();
   const basket = useBasket();
   const [sheet, setSheet] = React.useState<SheetTarget>(null);
   const [deepLinkDone, setDeepLinkDone] = React.useState(false);
@@ -53,7 +53,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
 
   // Ask for the area up-front, once, if none is chosen yet.
   React.useEffect(() => {
-    if (hydrated && !areaId && config.canOrder) {
+    if (hydrated && (!areaId || (config.deliveryByDistance && lat == null)) && config.canOrder) {
       const t = setTimeout(() => setAreaOpen(true), 400);
       return () => clearTimeout(t);
     }
@@ -152,7 +152,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
             <span className="min-w-0 flex-1">
               <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-dark-grey">Deliver to</span>
               <span className="block truncate text-[15px] font-semibold">
-                {hydrated && basket.area ? basket.area.name : "Choose your area"}
+                {deliverToLabel(hydrated ? basket.area : undefined, config.deliveryByDistance)}
               </span>
             </span>
             <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.6} />

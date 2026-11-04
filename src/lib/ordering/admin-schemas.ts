@@ -82,7 +82,10 @@ export const zoneSchema = z
     order: z.number().int().min(0).optional().default(0),
     areas: z.array(areaInputSchema).max(200),
   })
-  .refine((z) => z.etaMax >= z.etaMin, { message: "Latest time must be after earliest time", path: ["etaMax"] });
+  .refine((z) => z.etaMax >= z.etaMin, { message: "Latest time must be after earliest time", path: ["etaMax"] })
+  // Delivering by distance a zone needs no areas, but orders are placed
+  // under one — so a zone with a max distance and none gets its own name.
+  .transform((z) => (z.areas.length === 0 && z.radiusKm ? { ...z, areas: [{ name: z.name, lat: null, lng: null }] } : z));
 
 export const couponSchema = z.object({
   code: z

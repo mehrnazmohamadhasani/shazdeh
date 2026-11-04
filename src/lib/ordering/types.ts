@@ -61,6 +61,8 @@ export type OrderingConfig = {
   serviceFeeFils: number;
   paymentMethods: ("CASH_ON_DELIVERY" | "CARD_ON_DELIVERY" | "ONLINE")[];
   onlineProviderLabel: string | null;
+  /** Customers pin their location on a map instead of choosing an area. */
+  deliveryByDistance: boolean;
 };
 
 export function variantToPricingItem(product: OrderProduct, v: OrderVariant): PricingItem {

@@ -162,3 +162,13 @@ test("a WhatsApp number from any country: with +code as written, without it in t
   assert.ok(countries.length > 200);
   assert.deepEqual(countries.find((c) => c.code === "AE"), { code: "AE", callingCode: "971" });
 });
+
+test("zone with a max distance and no areas is ordered under its own name", async () => {
+  const { zoneSchema } = await import("../admin-schemas");
+  const base = { name: "Up to 5 km", fee: 0, minOrder: 0, etaMin: 30, etaMax: 45 };
+  const ring = zoneSchema.parse({ ...base, radiusKm: 5, areas: [] });
+  assert.deepEqual(ring.areas, [{ name: "Up to 5 km", lat: null, lng: null }]);
+  // Areas typed by hand stay as they are; no distance means no stand-in area.
+  assert.deepEqual(zoneSchema.parse({ ...base, radiusKm: 5, areas: [{ name: "JLT" }] }).areas.map((a) => a.name), ["JLT"]);
+  assert.deepEqual(zoneSchema.parse({ ...base, areas: [] }).areas, []);
+});

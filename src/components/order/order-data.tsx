@@ -62,6 +62,12 @@ export function useOrderData() {
   return ctx;
 }
 
+/** What the "Deliver to" button says. Delivering by distance, the zone's area name means nothing to customers. */
+export function deliverToLabel(area: OrderArea | undefined, byDistance: boolean) {
+  if (!area) return byDistance ? "Pin your location" : "Choose your area";
+  return byDistance ? "Pinned location" : area.name;
+}
+
 export type BasketLine = PricedLine & { line: CartLine; product: OrderProduct; variant: OrderVariant };
 
 export type Basket = {
@@ -92,7 +98,8 @@ export function useBasket(): Basket {
       name: lookup(i.itemId)?.product.title ?? "A dish",
       message: i.message,
     }));
-    const area = areaById(cart.areaId);
+    // Delivering by distance, an area chosen before (without a pin) no longer counts.
+    const area = config.deliveryByDistance && (cart.lat == null || cart.lng == null) ? undefined : areaById(cart.areaId);
     const zone = zoneById(area?.zoneId);
     const subtotalFils = lines.reduce((s, l) => s + l.lineTotalFils, 0);
     const totals = computeTotals({

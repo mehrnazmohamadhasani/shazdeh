@@ -11,7 +11,8 @@ import { useAdminI18n } from "@/components/admin/i18n";
 /*
  * Delivery zones. Each zone sets fee, minimum and timing; its areas are
  * typed one per line — "Dubai Marina" or, to enable "use my location",
- * "Dubai Marina | 25.0805, 55.1403".
+ * "Dubai Marina | 25.0805, 55.1403". Once the kitchen location is set,
+ * zones are distance rings instead and the areas field goes away.
  */
 
 export type ZoneRow = {
@@ -58,11 +59,18 @@ const BLANK: ZoneRow = {
   areas: [],
 };
 
-export function ZonesManager({ zones }: { zones: ZoneRow[] }) {
+export function ZonesManager({ zones, byDistance }: { zones: ZoneRow[]; byDistance: boolean }) {
   const { t } = useAdminI18n();
   const [adding, setAdding] = React.useState(false);
   return (
     <>
+      {byDistance && (
+        <p className="rounded-[12px] bg-cream px-4 py-3 text-[13.5px] leading-relaxed">
+          {t(
+            "Delivering by distance: customers pin their location on a map and get the smallest zone whose max distance reaches them. Further than every zone means no delivery. The kitchen location is never shown to customers.",
+          )}
+        </p>
+      )}
       {zones.length === 0 && !adding && (
         <Card>
           <EmptyState
@@ -77,10 +85,10 @@ export function ZonesManager({ zones }: { zones: ZoneRow[] }) {
         </Card>
       )}
       {zones.map((z) => (
-        <ZoneEditor key={z.id} zone={z} />
+        <ZoneEditor key={z.id} zone={z} byDistance={byDistance} />
       ))}
       {adding ? (
-        <ZoneEditor zone={{ ...BLANK, order: zones.length }} onDone={() => setAdding(false)} />
+        <ZoneEditor zone={{ ...BLANK, order: zones.length }} byDistance={byDistance} onDone={() => setAdding(false)} />
       ) : (
         zones.length > 0 && (
           <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
@@ -92,7 +100,7 @@ export function ZonesManager({ zones }: { zones: ZoneRow[] }) {
   );
 }
 
-function ZoneEditor({ zone, onDone }: { zone: ZoneRow; onDone?: () => void }) {
+function ZoneEditor({ zone, byDistance, onDone }: { zone: ZoneRow; byDistance: boolean; onDone?: () => void }) {
   const { t } = useAdminI18n();
   const router = useRouter();
   const isNew = !zone.id;
@@ -113,7 +121,7 @@ function ZoneEditor({ zone, onDone }: { zone: ZoneRow; onDone?: () => void }) {
       const res = await fetch(isNew ? "/api/admin/zones" : `/api/admin/zones/${zone.id}`, {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...rest, areas: parseAreas(areasText) }),
+        body: JSON.stringify({ ...rest, areas: byDistance ? [] : parseAreas(areasText) }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't save");
       toast.success(t("Zone saved"));
@@ -138,7 +146,13 @@ function ZoneEditor({ zone, onDone }: { zone: ZoneRow; onDone?: () => void }) {
   return (
     <Card
       title={isNew ? t("New zone") : <span dir="auto">{zone.name}</span>}
-      description={t(areaCount === 1 ? "{n} area" : "{n} areas", { n: areaCount })}
+      description={
+        byDistance
+          ? zone.radiusKm
+            ? t("Up to {n} km", { n: zone.radiusKm })
+            : t("No max distance — customers can't reach this zone")
+          : t(areaCount === 1 ? "{n} area" : "{n} areas", { n: areaCount })
+      }
       actions={
         <label className="flex items-center gap-2 text-[13px] text-dark-grey">
           {t("Active")}
@@ -166,17 +180,19 @@ function ZoneEditor({ zone, onDone }: { zone: ZoneRow; onDone?: () => void }) {
             <TextInput dir="ltr" type="number" min={5} aria-label={t("Latest")} value={d.etaMax} onChange={(e) => set("etaMax", num(e.target.value))} />
           </div>
         </Field>
-        <Field label={t("Max distance (km)")} hint={t("Optional. Empty = no limit.")}>
+        <Field label={t("Max distance (km)")} hint={byDistance ? t("From the kitchen, in a straight line.") : t("Optional. Empty = no limit.")}>
           <TextInput dir="ltr" type="number" min={0} step="0.5" placeholder={t("No limit")} value={d.radiusKm || ""} onChange={(e) => set("radiusKm", numOrNull(e.target.value))} />
         </Field>
       </div>
-      <Field
-        label={t("Areas")}
-        hint={t("One per line. Add “| latitude, longitude” to let customers use their location.")}
-        className="mt-4"
-      >
-        <TextArea dir="ltr" value={areasText} onChange={(e) => setAreasText(e.target.value)} rows={5} className="font-mono text-[13px]" placeholder={"Dubai Marina | 25.0805, 55.1403\nJLT"} />
-      </Field>
+      {!byDistance && (
+        <Field
+          label={t("Areas")}
+          hint={t("One per line. Add “| latitude, longitude” to let customers use their location.")}
+          className="mt-4"
+        >
+          <TextArea dir="ltr" value={areasText} onChange={(e) => setAreasText(e.target.value)} rows={5} className="font-mono text-[13px]" placeholder={"Dubai Marina | 25.0805, 55.1403\nJLT"} />
+        </Field>
+      )}
       <div className="mt-5 flex items-center justify-between">
         {!isNew ? (
           <Button variant="destructive-ghost" size="sm" onClick={remove}>
@@ -187,7 +203,7 @@ function ZoneEditor({ zone, onDone }: { zone: ZoneRow; onDone?: () => void }) {
             {t("Cancel")}
           </Button>
         )}
-        <Button size="sm" onClick={save} disabled={busy || !d.name.trim()}>
+        <Button size="sm" onClick={save} disabled={busy || !d.name.trim() || (byDistance && !d.radiusKm)}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" />} {t("Save zone")}
         </Button>
       </div>

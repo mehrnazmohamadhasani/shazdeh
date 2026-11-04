@@ -72,5 +72,6 @@ export async function getOrderingConfig(now = new Date()): Promise<OrderingConfi
     serviceFeeFils: toFils(row.serviceFee),
     paymentMethods: methods,
     onlineProviderLabel: provider?.label ?? null,
+    deliveryByDistance: row.kitchenLat != null && row.kitchenLng != null,
   };
 }

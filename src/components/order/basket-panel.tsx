@@ -123,7 +123,7 @@ export function BasketPanel({
                 onClick={onChooseArea}
                 className="mb-4 flex min-h-12 w-full items-center justify-between rounded-[12px] bg-cream px-4 text-left text-[13.5px] font-medium"
               >
-                Choose your area to see delivery fee
+                {config.deliveryByDistance ? "Pin your location to see delivery fee" : "Choose your area to see delivery fee"}
                 <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
               </button>
             ) : (
