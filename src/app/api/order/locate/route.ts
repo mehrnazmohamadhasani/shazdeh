@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     const { lat, lng } = parsed.data;
     const [found, place] = await Promise.all([locateDelivery(lat, lng), reverseGeocode(lat, lng)]);
     const body = found.ok
-      ? { ok: true, areaId: found.area.id, place: place?.label ?? null, street: place?.street ?? null }
+      ? { ok: true, areaId: found.area.id, place: place?.label ?? null, street: place?.street ?? null, building: place?.building ?? null }
       : { ok: false, reason: found.reason };
     return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

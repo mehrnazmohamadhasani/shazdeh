@@ -6,7 +6,8 @@
  * answers are cached and a slow or failed lookup simply returns null.
  */
 
-export type Place = { label: string; street: string | null };
+/** `building`: the named place at the pin, if any — a starting guess for the building field. */
+export type Place = { label: string; street: string | null; building: string | null };
 
 type NominatimAddress = Partial<
   Record<"road" | "house_number" | "neighbourhood" | "suburb" | "quarter" | "city_district" | "city", string>
@@ -24,7 +25,7 @@ export function placeFromNominatim(body: { name?: string; address?: NominatimAdd
   const district = a.suburb ?? a.neighbourhood ?? a.quarter ?? a.city_district ?? a.city ?? null;
   const name = body?.name && body.name !== a.road && body.name !== district ? body.name : null;
   const parts = [name, street, district].filter((p): p is string => !!p);
-  return parts.length ? { label: parts.join(", "), street } : null;
+  return parts.length ? { label: parts.join(", "), street, building: name } : null;
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<Place | null> {

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Bookmark, Check, LocateFixed, Loader2, MapPin, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cart, savedAddresses, useCart, type SavedAddress } from "@/components/order/cart-store";
+import { Field } from "@/components/order/form-field";
 import { useOrderData } from "@/components/order/order-data";
 import { distanceKm } from "@/lib/ordering/geo";
 import { formatFils } from "@/lib/ordering/money";
@@ -244,7 +245,7 @@ function PartnerLinks({ partners }: { partners: { label: string; url: string }[]
 
 type Point = { lat: number; lng: number };
 
-/** Delivery by distance: drag the map until the pin is on your building, then confirm. */
+/** Delivery by distance: drag the map until the pin is on your building, confirm, then add the address details. */
 function PinPicker({
   saved,
   partners,
@@ -293,7 +294,11 @@ function PinPicker({
     }, { enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 });
   }
 
-  async function confirm(p: Point) {
+  // The spot the server accepted, waiting for the address details.
+  const [located, setLocated] = React.useState<Located | null>(null);
+
+  /** Checks a spot with the server; a saved address goes straight through, a new pin asks for details. */
+  async function confirm(p: Point, savedAddress?: SavedAddress) {
     setChecking(true);
     setOutside(null);
     setMessage(null);
@@ -307,15 +312,30 @@ function PinPicker({
       if (res.status === 400) setOutside("Sorry — this address is outside our delivery range.");
       else if (!res.ok || !body) setMessage(body?.error ?? "Something went wrong — please try again.");
       else if (!body.ok) setOutside(body.reason);
-      else {
-        cart.setArea(body.areaId, p, { label: body.place ?? null, street: body.street ?? null });
+      else if (savedAddress) {
+        cart.setArea(body.areaId, p, { place: savedPlace(savedAddress) ?? body.place ?? null, addressId: savedAddress.id });
         onDone();
+      } else {
+        setLocated({ areaId: body.areaId, point: p, place: body.place ?? null, street: body.street ?? null, building: body.building ?? null });
       }
     } catch {
       setMessage("Something went wrong — please try again.");
     } finally {
       setChecking(false);
     }
+  }
+
+  if (located) {
+    return (
+      <AddressDetails
+        located={located}
+        onBack={() => {
+          setFocus(located.point);
+          setLocated(null);
+        }}
+        onSaved={onDone}
+      />
+    );
   }
 
   return (
@@ -341,7 +361,7 @@ function PinPicker({
       </div>
 
       <div className="mx-5 h-[42svh] min-h-64 overflow-hidden rounded-[12px] border border-black-iron/10 sm:mx-8">
-        <LocationMap focus={focus} zoom={lat != null ? 17 : 12} onMove={setPin} />
+        <LocationMap focus={focus} zoom={focus === DUBAI ? 12 : 17} onMove={setPin} />
       </div>
 
       <div className="px-5 pb-6 pt-4 sm:px-8">
@@ -360,15 +380,9 @@ function PinPicker({
             <PartnerLinks partners={partners} />
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => confirm(pin)}
-          disabled={checking}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-black-iron px-6 text-[14px] font-semibold text-warm-white transition-colors hover:bg-terracotta-ink disabled:opacity-60"
-        >
-          {checking && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />}
-          Deliver here
-        </button>
+        <PrimaryButton onClick={() => confirm(pin)} busy={checking}>
+          Confirm location
+        </PrimaryButton>
 
         {pinned.length > 0 && (
           <div className="mt-4">
@@ -377,18 +391,179 @@ function PinPicker({
               <button
                 key={s.id}
                 type="button"
-                onClick={() => confirm({ lat: s.lat!, lng: s.lng! })}
+                onClick={() => confirm({ lat: s.lat!, lng: s.lng! }, s)}
                 className="flex min-h-14 w-full items-center gap-3 rounded-[10px] px-1 text-left hover:bg-black-iron/[0.04]"
               >
                 <Bookmark className="h-4 w-4 shrink-0 text-terracotta-ink" strokeWidth={1.6} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14.5px] font-medium">{s.label}</span>
-                  {s.building && <span className="block truncate text-[12.5px] text-dark-grey">{s.building}</span>}
+                  {savedPlace(s) && <span className="block truncate text-[12.5px] text-dark-grey">{savedPlace(s)}</span>}
                 </span>
               </button>
             ))}
           </div>
         )}
+      </div>
+    </>
+  );
+}
+
+type Located = { areaId: string; point: Point; place: string | null; street: string | null; building: string | null };
+
+/** How a saved address reads in one line: "Marina Gate 2, Al Marsa Street". */
+function savedPlace(a: SavedAddress) {
+  return [a.building, a.street].filter(Boolean).join(", ") || null;
+}
+
+function PrimaryButton({ onClick, busy, children }: { onClick: () => void; busy?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-black-iron px-6 text-[14px] font-semibold text-warm-white transition-colors hover:bg-terracotta-ink disabled:opacity-60"
+    >
+      {busy && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />}
+      {children}
+    </button>
+  );
+}
+
+const LABELS = ["Home", "Work", "Other"] as const;
+
+/**
+ * Step two, as on the delivery apps: the pinned spot in words, then the
+ * few things a map can't know — building, apartment, floor — started
+ * from what the map lookup found. Saved on this device; checkout opens
+ * with it filled in.
+ */
+function AddressDetails({ located, onBack, onSaved }: { located: Located; onBack: () => void; onSaved: () => void }) {
+  const [addressType, setAddressType] = React.useState<SavedAddress["addressType"]>("apartment");
+  const [building, setBuilding] = React.useState(located.building ?? "");
+  const [unit, setUnit] = React.useState("");
+  const [floor, setFloor] = React.useState("");
+  const [street, setStreet] = React.useState(located.street ?? "");
+  const [instructions, setInstructions] = React.useState("");
+  const [label, setLabel] = React.useState<(typeof LABELS)[number]>("Home");
+  const [showErrors, setShowErrors] = React.useState(false);
+
+  const villa = addressType === "villa";
+  const errors = {
+    building: !building.trim() ? (villa ? "Enter your villa number" : "Enter your building name") : null,
+    unit: !villa && !unit.trim() ? "Enter your apartment or office number" : null,
+  };
+
+  function save() {
+    setShowErrors(true);
+    if (errors.building || errors.unit) return;
+    const id = `addr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const address: SavedAddress = {
+      id,
+      label: label === "Other" ? building.trim() : label,
+      areaId: located.areaId,
+      addressType,
+      building: building.trim(),
+      street: street.trim(),
+      unit: villa ? "" : unit.trim(),
+      floor: villa ? "" : floor.trim(),
+      instructions: instructions.trim(),
+      lat: located.point.lat,
+      lng: located.point.lng,
+    };
+    savedAddresses.save(address);
+    cart.setArea(located.areaId, located.point, { place: savedPlace(address) ?? located.place, addressId: id });
+    onSaved();
+  }
+
+  return (
+    <>
+      <div className="px-5 pb-2 pt-7 sm:px-8">
+        <DialogTitle className="pr-12 text-[1.625rem] sm:text-[1.75rem]">Address details</DialogTitle>
+        <DialogDescription className="mt-2 text-[14px]">So our rider finds your door.</DialogDescription>
+        <div className="mt-5 flex items-center gap-3 rounded-[12px] bg-cream px-4 py-3">
+          <MapPin className="h-5 w-5 shrink-0 text-terracotta-ink" strokeWidth={1.6} />
+          <span className="min-w-0 flex-1 text-[14px] font-medium">{located.place ?? "Pinned location"}</span>
+          <button type="button" onClick={onBack} className="text-[12.5px] font-medium text-terracotta-ink">
+            Change
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-4 px-5 pb-6 pt-3 sm:px-8">
+        <div role="radiogroup" aria-label="Address type" className="grid grid-cols-3 gap-2">
+          {(["apartment", "villa", "office"] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              role="radio"
+              aria-checked={addressType === type}
+              onClick={() => setAddressType(type)}
+              className={cn(
+                "min-h-11 rounded-[10px] border text-[13px] font-medium capitalize transition-colors",
+                addressType === type ? "border-black-iron bg-black-iron text-warm-white" : "border-black-iron/12 hover:border-black-iron/30",
+              )}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            label={villa ? "Villa number" : "Building name"}
+            value={building}
+            onChange={setBuilding}
+            error={showErrors ? errors.building : null}
+            autoComplete="address-line1"
+            className="col-span-2"
+            placeholder={villa ? "e.g. Villa 14" : "e.g. Marina Gate 2"}
+          />
+          {!villa && (
+            <>
+              <Field
+                label={addressType === "office" ? "Office number" : "Apartment"}
+                value={unit}
+                onChange={setUnit}
+                error={showErrors ? errors.unit : null}
+                autoComplete="address-line2"
+                placeholder="e.g. 1204"
+              />
+              <Field label="Floor" value={floor} onChange={setFloor} optional inputMode="numeric" placeholder="e.g. 12" />
+            </>
+          )}
+          <Field label="Street" value={street} onChange={setStreet} optional className="col-span-2" autoComplete="street-address" />
+          <Field
+            label="Delivery instructions"
+            value={instructions}
+            onChange={setInstructions}
+            optional
+            className="col-span-2"
+            placeholder="Gate code, landmark, call on arrival…"
+            maxLength={300}
+          />
+        </div>
+
+        <div>
+          <p className="text-[12.5px] font-medium">Save as</p>
+          <div className="mt-1.5 flex gap-2">
+            {LABELS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                aria-pressed={label === l}
+                onClick={() => setLabel(l)}
+                className={cn(
+                  "inline-flex min-h-10 items-center rounded-full border px-4 text-[12.5px] font-medium",
+                  label === l ? "border-black-iron bg-black-iron text-warm-white" : "border-black-iron/15",
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <PrimaryButton onClick={save}>Save address</PrimaryButton>
       </div>
     </>
   );

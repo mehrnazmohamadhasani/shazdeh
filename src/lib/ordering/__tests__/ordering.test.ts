@@ -177,16 +177,18 @@ test("pin address reads building, street, district", async () => {
   const { placeFromNominatim } = await import("../reverse-geocode");
   assert.deepEqual(
     placeFromNominatim({ name: "Grand Hyatt Dubai", address: { road: "Sheikh Rashid Road", neighbourhood: "Bur Dubai", suburb: "Umm Hurair 2", city: "Dubai" } }),
-    { label: "Grand Hyatt Dubai, Sheikh Rashid Road, Umm Hurair 2", street: "Sheikh Rashid Road" },
+    { label: "Grand Hyatt Dubai, Sheikh Rashid Road, Umm Hurair 2", street: "Sheikh Rashid Road", building: "Grand Hyatt Dubai" },
   );
   // A name that only repeats the street or district isn't shown twice.
   assert.deepEqual(placeFromNominatim({ name: "Financial Center Street", address: { road: "Financial Center Street", suburb: "Burj Khalifa" } }), {
     label: "Financial Center Street, Burj Khalifa",
     street: "Financial Center Street",
+    building: null,
   });
   assert.deepEqual(placeFromNominatim({ name: "", address: { neighbourhood: "Business Bay", suburb: "Business Bay", city: "Dubai" } }), {
     label: "Business Bay",
     street: null,
+    building: null,
   });
   assert.equal(placeFromNominatim({ address: {} }), null);
   assert.equal(placeFromNominatim(null), null);
