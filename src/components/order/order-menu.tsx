@@ -28,7 +28,7 @@ const noopSubscribe = () => () => {};
 
 export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsapp?: string }) {
   const { categories, config } = useOrderData();
-  const { areaId, lat } = useCart();
+  const { areaId, lat, place } = useCart();
   const basket = useBasket();
   const [sheet, setSheet] = React.useState<SheetTarget>(null);
   const [deepLinkDone, setDeepLinkDone] = React.useState(false);
@@ -152,7 +152,7 @@ export function OrderMenu({ partners, whatsapp }: { partners: Partner[]; whatsap
             <span className="min-w-0 flex-1">
               <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-dark-grey">Deliver to</span>
               <span className="block truncate text-[15px] font-semibold">
-                {deliverToLabel(hydrated ? basket.area : undefined, config.deliveryByDistance)}
+                {deliverToLabel(hydrated ? basket.area : undefined, config.deliveryByDistance, place)}
               </span>
             </span>
             <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.6} />

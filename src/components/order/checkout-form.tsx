@@ -101,7 +101,13 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
   const [building, setBuilding] = React.useState(initialAddress?.building ?? "");
   const [unit, setUnit] = React.useState(initialAddress?.unit ?? "");
   const [floor, setFloor] = React.useState(initialAddress?.floor ?? "");
-  const [street, setStreet] = React.useState(initialAddress?.street ?? "");
+  const [street, setStreet] = React.useState(initialAddress?.street ?? cartState.street ?? "");
+  // A new pin brings its street along; never overwrite what the customer typed.
+  const [pinStreet, setPinStreet] = React.useState(cartState.street);
+  if (cartState.street !== pinStreet) {
+    setPinStreet(cartState.street);
+    if (!street && cartState.street) setStreet(cartState.street);
+  }
   const [instructions, setInstructions] = React.useState(initialAddress?.instructions ?? "");
   const [saveAddress, setSaveAddress] = React.useState(true);
   const [savedId, setSavedId] = React.useState<string | null>(initialAddress?.id ?? null);
@@ -135,7 +141,10 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
     setFloor(a.floor);
     setStreet(a.street);
     setInstructions(a.instructions);
-    if (a.areaId !== cartState.areaId) cart.setArea(a.areaId, a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+    if (a.areaId !== cartState.areaId) {
+      const place = { label: [a.building, a.street].filter(Boolean).join(", ") || null, street: a.street || null };
+      cart.setArea(a.areaId, a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null, place);
+    }
   }
 
   // Server quote — debounced, re-run whenever the basket, area or code changes.
@@ -293,7 +302,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
                 <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-dark-grey">
                   {config.deliveryByDistance ? "Deliver to" : "Area"}
                 </span>
-                <span className="block truncate text-[15px] font-semibold">{deliverToLabel(basket.area, config.deliveryByDistance)}</span>
+                <span className="block truncate text-[15px] font-semibold">{deliverToLabel(basket.area, config.deliveryByDistance, cartState.place)}</span>
               </span>
               <span className="text-[12.5px] font-medium text-terracotta-ink">Change</span>
             </button>

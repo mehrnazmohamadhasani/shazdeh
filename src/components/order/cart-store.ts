@@ -38,10 +38,14 @@ export type CartState = {
   areaId: string | null;
   lat: number | null;
   lng: number | null;
+  /** The pin's address in words ("Al Abraj Street, Business Bay"), when known. */
+  place: string | null;
+  /** Its street, to start the checkout's street field with. */
+  street: string | null;
 };
 
 const KEY = "shazdeh.cart.v1";
-const EMPTY: CartState = { lines: [], areaId: null, lat: null, lng: null };
+const EMPTY: CartState = { lines: [], areaId: null, lat: null, lng: null, place: null, street: null };
 
 let state: CartState = EMPTY;
 let loaded = false;
@@ -59,6 +63,8 @@ function load() {
         areaId: typeof parsed.areaId === "string" ? parsed.areaId : null,
         lat: typeof parsed.lat === "number" ? parsed.lat : null,
         lng: typeof parsed.lng === "number" ? parsed.lng : null,
+        place: typeof parsed.place === "string" ? parsed.place : null,
+        street: typeof parsed.street === "string" ? parsed.street : null,
       };
     }
   } catch {
@@ -138,8 +144,12 @@ export const cart = {
   removeLines(keys: string[]) {
     set({ ...state, lines: state.lines.filter((l) => !keys.includes(l.key)) });
   },
-  setArea(areaId: string | null, coords?: { lat: number; lng: number } | null) {
-    set({ ...state, areaId, lat: coords?.lat ?? null, lng: coords?.lng ?? null });
+  setArea(
+    areaId: string | null,
+    coords?: { lat: number; lng: number } | null,
+    place?: { label: string | null; street: string | null } | null,
+  ) {
+    set({ ...state, areaId, lat: coords?.lat ?? null, lng: coords?.lng ?? null, place: place?.label ?? null, street: place?.street ?? null });
   },
   clearLines() {
     set({ ...state, lines: [] });

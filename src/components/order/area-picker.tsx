@@ -308,7 +308,7 @@ function PinPicker({
       else if (!res.ok || !body) setMessage(body?.error ?? "Something went wrong — please try again.");
       else if (!body.ok) setOutside(body.reason);
       else {
-        cart.setArea(body.areaId, p);
+        cart.setArea(body.areaId, p, { label: body.place ?? null, street: body.street ?? null });
         onDone();
       }
     } catch {

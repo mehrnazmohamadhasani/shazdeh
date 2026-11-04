@@ -172,3 +172,22 @@ test("zone with a max distance and no areas is ordered under its own name", asyn
   assert.deepEqual(zoneSchema.parse({ ...base, radiusKm: 5, areas: [{ name: "JLT" }] }).areas.map((a) => a.name), ["JLT"]);
   assert.deepEqual(zoneSchema.parse({ ...base, areas: [] }).areas, []);
 });
+
+test("pin address reads building, street, district", async () => {
+  const { placeFromNominatim } = await import("../reverse-geocode");
+  assert.deepEqual(
+    placeFromNominatim({ name: "Grand Hyatt Dubai", address: { road: "Sheikh Rashid Road", neighbourhood: "Bur Dubai", suburb: "Umm Hurair 2", city: "Dubai" } }),
+    { label: "Grand Hyatt Dubai, Sheikh Rashid Road, Umm Hurair 2", street: "Sheikh Rashid Road" },
+  );
+  // A name that only repeats the street or district isn't shown twice.
+  assert.deepEqual(placeFromNominatim({ name: "Financial Center Street", address: { road: "Financial Center Street", suburb: "Burj Khalifa" } }), {
+    label: "Financial Center Street, Burj Khalifa",
+    street: "Financial Center Street",
+  });
+  assert.deepEqual(placeFromNominatim({ name: "", address: { neighbourhood: "Business Bay", suburb: "Business Bay", city: "Dubai" } }), {
+    label: "Business Bay",
+    street: null,
+  });
+  assert.equal(placeFromNominatim({ address: {} }), null);
+  assert.equal(placeFromNominatim(null), null);
+});

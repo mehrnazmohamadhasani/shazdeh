@@ -62,10 +62,13 @@ export function useOrderData() {
   return ctx;
 }
 
-/** What the "Deliver to" button says. Delivering by distance, the zone's area name means nothing to customers. */
-export function deliverToLabel(area: OrderArea | undefined, byDistance: boolean) {
+/**
+ * What the "Deliver to" button says. Delivering by distance, the zone's
+ * area name means nothing to customers — the pin's address does.
+ */
+export function deliverToLabel(area: OrderArea | undefined, byDistance: boolean, place: string | null) {
   if (!area) return byDistance ? "Pin your location" : "Choose your area";
-  return byDistance ? "Pinned location" : area.name;
+  return byDistance ? (place ?? "Pinned location") : area.name;
 }
 
 export type BasketLine = PricedLine & { line: CartLine; product: OrderProduct; variant: OrderVariant };
