@@ -271,19 +271,26 @@ function PinPicker({
     }
     setLocating(true);
     setMessage(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false);
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setFocus(p);
-        setPin(p);
-      },
-      () => {
-        setLocating(false);
-        setMessage("We couldn't get your location — move the map to your building.");
-      },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
-    );
+    const found = (pos: GeolocationPosition) => {
+      setLocating(false);
+      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setFocus(p);
+      setPin(p);
+    };
+    const failed = (err: GeolocationPositionError) => {
+      setLocating(false);
+      setMessage(
+        err.code === err.PERMISSION_DENIED
+          ? "Location is turned off for this site — allow it in your browser or phone settings, or move the map to your building."
+          : "We couldn't get your location — move the map to your building.",
+      );
+    };
+    // GPS first; indoors or on a laptop it often times out, so fall back to
+    // the quicker network-based position (the customer fine-tunes the pin).
+    navigator.geolocation.getCurrentPosition(found, (err) => {
+      if (err.code === err.PERMISSION_DENIED) return failed(err);
+      navigator.geolocation.getCurrentPosition(found, failed, { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 });
+    }, { enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 });
   }
 
   async function confirm(p: Point) {
