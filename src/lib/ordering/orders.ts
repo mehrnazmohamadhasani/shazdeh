@@ -53,8 +53,14 @@ export type Quote = {
 
 type InternalQuote = Quote & { couponId: string | null; couponUsageLimit: number | null; giftClaimId: string | null };
 
-/** `autoGift`: with no code typed, apply the QR gift claimed by this mobile (website checkout). */
-export async function quoteOrder(input: QuoteInput, { autoGift = false }: { autoGift?: boolean } = {}): Promise<InternalQuote> {
+/**
+ * `autoGift`: with no code typed, apply the QR gift claimed by this mobile (website checkout).
+ * `requirePin`: website checkout — when delivering by distance, a pinned location is required.
+ */
+export async function quoteOrder(
+  input: QuoteInput,
+  { autoGift = false, requirePin = false }: { autoGift?: boolean; requirePin?: boolean } = {},
+): Promise<InternalQuote> {
   const [config, items] = await Promise.all([
     getOrderingConfig(),
     loadPricingItems(input.lines.map((l) => l.itemId)),
@@ -62,7 +68,7 @@ export async function quoteOrder(input: QuoteInput, { autoGift = false }: { auto
   const { priced, issues } = priceLines(input.lines, (id) => items.get(id));
   const subtotalFils = priced.reduce((s, l) => s + l.lineTotalFils, 0);
 
-  const delivery = await resolveDelivery(input.areaId, input.lat, input.lng);
+  const delivery = await resolveDelivery(input.areaId, input.lat, input.lng, { requirePin });
   const zone = delivery.ok ? delivery.zone : null;
 
   let couponLookup: Awaited<ReturnType<typeof lookupCoupon>> | null = null;
@@ -305,7 +311,7 @@ export async function placeOrder(input: PlaceOrderInput, origin: string): Promis
       lat: input.address.lat,
       lng: input.address.lng,
     },
-    { autoGift: true },
+    { autoGift: true, requirePin: true },
   );
   if (quote.blockers.length) {
     return { ok: false, status: 409, code: "blocked", error: quote.blockers[0], quote: publicQuote(quote) };

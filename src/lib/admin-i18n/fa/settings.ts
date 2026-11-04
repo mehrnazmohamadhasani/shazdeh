@@ -56,7 +56,8 @@ export const settings: Record<string, string> = {
   Both: "هر دو",
   "Kitchen latitude": "عرض جغرافیایی آشپزخانه",
   "Kitchen longitude": "طول جغرافیایی آشپزخانه",
-  "Only needed for distance limits on zones.": "فقط برای محدودیت فاصله در مناطق ارسال لازم است.",
+  "Set both to deliver by distance: customers pin their location on a map. Never shown to customers.":
+    "با پر کردن هر دو، ارسال بر اساس فاصله می‌شود: مشتری موقعیتش را روی نقشه مشخص می‌کند. هیچ‌وقت به مشتری نشان داده نمی‌شود.",
   "Legal details": "اطلاعات حقوقی",
   "Printed on receipts and in the website footer.": "روی رسید و پایین سایت نمایش داده می‌شود.",
   "Legal business name": "نام قانونی کسب‌وکار",

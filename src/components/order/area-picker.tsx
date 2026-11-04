@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { Bookmark, Check, LocateFixed, Loader2, MapPin, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cart, savedAddresses, useCart, type SavedAddress } from "@/components/order/cart-store";
@@ -14,9 +15,18 @@ import { cn } from "@/lib/utils";
  * searchable list of the areas the kitchen covers, with fee and timing
  * shown next to each. "Use my location" picks the nearest community;
  * nothing pretends to know an exact street address it can't verify.
+ * When the kitchen delivers by distance, customers pin their spot on a
+ * map instead and the server says which zone it falls in.
  */
 
 const NEAREST_MAX_KM = 6;
+// Where the map opens when we know nothing yet: central Dubai.
+const DUBAI = { lat: 25.2048, lng: 55.2708 };
+
+const LocationMap = dynamic(() => import("@/components/order/location-map"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-cream" />,
+});
 
 export function AreaPicker({
   open,
@@ -27,7 +37,7 @@ export function AreaPicker({
   onOpenChange: (open: boolean) => void;
   partners: { label: string; url: string }[];
 }) {
-  const { areas, zoneById } = useOrderData();
+  const { areas, zoneById, config } = useOrderData();
   const { areaId } = useCart();
   const [query, setQuery] = React.useState("");
   const [locating, setLocating] = React.useState(false);
@@ -76,6 +86,16 @@ export function AreaPicker({
         setLocateMessage("We couldn't get your location — pick your area below.");
       },
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    );
+  }
+
+  if (config.deliveryByDistance) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex min-h-[80svh] flex-col sm:min-h-[60svh] sm:max-w-[520px]">
+          {open && <PinPicker saved={saved} partners={partners} onDone={() => onOpenChange(false)} />}
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -192,21 +212,7 @@ export function AreaPicker({
                     Our kitchen covers a set radius so every dish arrives hot.
                     {partners.length > 0 && " You can still find us on:"}
                   </p>
-                  {partners.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {partners.map((p) => (
-                        <a
-                          key={p.label}
-                          href={p.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex min-h-10 items-center rounded-full border border-black-iron/20 px-4 text-[12.5px] font-medium hover:border-terracotta hover:text-terracotta-ink"
-                        >
-                          {p.label}
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  <PartnerLinks partners={partners} />
                 </div>
               )}
             </>
@@ -214,5 +220,169 @@ export function AreaPicker({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PartnerLinks({ partners }: { partners: { label: string; url: string }[] }) {
+  if (partners.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {partners.map((p) => (
+        <a
+          key={p.label}
+          href={p.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-10 items-center rounded-full border border-black-iron/20 px-4 text-[12.5px] font-medium hover:border-terracotta hover:text-terracotta-ink"
+        >
+          {p.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+type Point = { lat: number; lng: number };
+
+/** Delivery by distance: drag the map until the pin is on your building, then confirm. */
+function PinPicker({
+  saved,
+  partners,
+  onDone,
+}: {
+  saved: SavedAddress[];
+  partners: { label: string; url: string }[];
+  onDone: () => void;
+}) {
+  const { lat, lng } = useCart();
+  const start = lat != null && lng != null ? { lat, lng } : DUBAI;
+  const [focus, setFocus] = React.useState<Point>(start);
+  const [pin, setPin] = React.useState<Point>(start);
+  const [locating, setLocating] = React.useState(false);
+  const [checking, setChecking] = React.useState(false);
+  const [outside, setOutside] = React.useState<string | null>(null);
+  const [message, setMessage] = React.useState<string | null>(null);
+  const pinned = saved.filter((s) => s.lat != null && s.lng != null);
+
+  function locate() {
+    if (!("geolocation" in navigator)) {
+      setMessage("Location isn't available on this device — move the map to your building.");
+      return;
+    }
+    setLocating(true);
+    setMessage(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setFocus(p);
+        setPin(p);
+      },
+      () => {
+        setLocating(false);
+        setMessage("We couldn't get your location — move the map to your building.");
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
+
+  async function confirm(p: Point) {
+    setChecking(true);
+    setOutside(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/order/locate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: Number(p.lat.toFixed(6)), lng: Number(p.lng.toFixed(6)) }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.status === 400) setOutside("Sorry — this address is outside our delivery range.");
+      else if (!res.ok || !body) setMessage(body?.error ?? "Something went wrong — please try again.");
+      else if (!body.ok) setOutside(body.reason);
+      else {
+        cart.setArea(body.areaId, p);
+        onDone();
+      }
+    } catch {
+      setMessage("Something went wrong — please try again.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="px-5 pb-3 pt-7 sm:px-8">
+        <DialogTitle className="pr-12 text-[1.625rem] sm:text-[1.75rem]">Where should we deliver?</DialogTitle>
+        <DialogDescription className="mt-2 text-[14px]">
+          Move the map until the pin is on your building, then confirm.
+        </DialogDescription>
+        <button
+          type="button"
+          onClick={locate}
+          disabled={locating}
+          className="mt-5 flex min-h-12 w-full items-center gap-3 rounded-[12px] border border-black-iron/15 px-4 text-left text-[14px] font-medium transition-colors hover:border-terracotta hover:text-terracotta-ink"
+        >
+          {locating ? (
+            <Loader2 className="h-[18px] w-[18px] animate-spin" strokeWidth={1.6} />
+          ) : (
+            <LocateFixed className="h-[18px] w-[18px] text-terracotta-ink" strokeWidth={1.6} />
+          )}
+          {locating ? "Finding you…" : "Use my current location"}
+        </button>
+      </div>
+
+      <div className="mx-5 h-[42svh] min-h-64 overflow-hidden rounded-[12px] border border-black-iron/10 sm:mx-8">
+        <LocationMap focus={focus} zoom={lat != null ? 17 : 12} onMove={setPin} />
+      </div>
+
+      <div className="px-5 pb-6 pt-4 sm:px-8">
+        {message && (
+          <p role="status" className="mb-3 text-[13px] text-rose-sumac">
+            {message}
+          </p>
+        )}
+        {outside && (
+          <div role="status" className="mb-3 rounded-[12px] bg-cream px-4 py-4 text-[14px]">
+            <p className="font-semibold">{outside}</p>
+            <p className="mt-1.5 text-dark-grey">
+              Our kitchen covers a set radius so every dish arrives hot.
+              {partners.length > 0 && " You can still find us on:"}
+            </p>
+            <PartnerLinks partners={partners} />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => confirm(pin)}
+          disabled={checking}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-black-iron px-6 text-[14px] font-semibold text-warm-white transition-colors hover:bg-terracotta-ink disabled:opacity-60"
+        >
+          {checking && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />}
+          Deliver here
+        </button>
+
+        {pinned.length > 0 && (
+          <div className="mt-4">
+            <p className="caption px-1 pb-1">Saved addresses</p>
+            {pinned.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => confirm({ lat: s.lat!, lng: s.lng! })}
+                className="flex min-h-14 w-full items-center gap-3 rounded-[10px] px-1 text-left hover:bg-black-iron/[0.04]"
+              >
+                <Bookmark className="h-4 w-4 shrink-0 text-terracotta-ink" strokeWidth={1.6} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14.5px] font-medium">{s.label}</span>
+                  {s.building && <span className="block truncate text-[12.5px] text-dark-grey">{s.building}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

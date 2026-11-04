@@ -14,7 +14,7 @@ import {
   useCart,
   type SavedAddress,
 } from "@/components/order/cart-store";
-import { useBasket, useOrderData } from "@/components/order/order-data";
+import { deliverToLabel, useBasket, useOrderData } from "@/components/order/order-data";
 import { formatFils } from "@/lib/ordering/money";
 import { normalizeMobile } from "@/lib/ordering/phone";
 import type { Totals } from "@/lib/ordering/pricing";
@@ -290,8 +290,10 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
             >
               <MapPin className="h-5 w-5 shrink-0 text-terracotta-ink" strokeWidth={1.6} />
               <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-dark-grey">Area</span>
-                <span className="block truncate text-[15px] font-semibold">{basket.area?.name ?? "Choose your area"}</span>
+                <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-dark-grey">
+                  {config.deliveryByDistance ? "Deliver to" : "Area"}
+                </span>
+                <span className="block truncate text-[15px] font-semibold">{deliverToLabel(basket.area, config.deliveryByDistance)}</span>
               </span>
               <span className="text-[12.5px] font-medium text-terracotta-ink">Change</span>
             </button>

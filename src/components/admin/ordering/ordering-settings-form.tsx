@@ -176,7 +176,7 @@ export function OrderingSettingsForm({
           ))}
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label={t("Kitchen latitude")} hint={t("Only needed for distance limits on zones.")}>
+          <Field label={t("Kitchen latitude")} hint={t("Set both to deliver by distance: customers pin their location on a map. Never shown to customers.")}>
             <TextInput dir="ltr" type="number" step="any" value={d.kitchenLat ?? ""} onChange={(e) => set("kitchenLat", e.target.value === "" ? null : Number(e.target.value))} placeholder="25.2048" />
           </Field>
           <Field label={t("Kitchen longitude")}>

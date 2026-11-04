@@ -16,7 +16,9 @@ export async function POST(req: Request) {
   const parsed = await parseJson(req, quoteSchema);
   if (!parsed.ok) return parsed.response;
   try {
-    const quote = await quoteOrder(parsed.data, { autoGift: parsed.data.gift === true });
+    // `gift` marks the website checkout; staff phone orders leave it off.
+    const website = parsed.data.gift === true;
+    const quote = await quoteOrder(parsed.data, { autoGift: website, requirePin: website });
     return NextResponse.json(publicQuote(quote), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return serverError(e);
