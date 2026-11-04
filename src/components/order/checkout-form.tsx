@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, Banknote, Check, CreditCard, Gift, Loader2, Lock, MapPin, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { AreaPicker } from "@/components/order/area-picker";
+import { Field } from "@/components/order/form-field";
 import { orderSource } from "@/components/order/order-source";
 import {
   cart,
@@ -92,9 +93,12 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
   const basket = useBasket();
   const [areaOpen, setAreaOpen] = React.useState(false);
 
-  // Saved address for the chosen area (if any) and saved contact details.
-  const [savedList] = React.useState<SavedAddress[]>(() => savedAddresses.list());
-  const [initialAddress] = React.useState(() => savedList.find((a) => a.areaId === cartState.areaId) ?? null);
+  // The address filled in after pinning on the map, else a saved one for the
+  // chosen area; and saved contact details.
+  const [savedList, setSavedList] = React.useState<SavedAddress[]>(() => savedAddresses.list());
+  const [initialAddress] = React.useState(
+    () => savedList.find((a) => a.id === cartState.addressId) ?? (config.deliveryByDistance ? null : savedList.find((a) => a.areaId === cartState.areaId)) ?? null,
+  );
   const [initialContact] = React.useState(() => savedContact.get());
 
   const [addressType, setAddressType] = React.useState<AddressType>(initialAddress?.addressType ?? "apartment");
@@ -105,6 +109,15 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
   const [instructions, setInstructions] = React.useState(initialAddress?.instructions ?? "");
   const [saveAddress, setSaveAddress] = React.useState(true);
   const [savedId, setSavedId] = React.useState<string | null>(initialAddress?.id ?? null);
+  // A new address saved from the map while here fills the form.
+  const [seenAddressId, setSeenAddressId] = React.useState(cartState.addressId);
+  if (cartState.addressId !== seenAddressId) {
+    setSeenAddressId(cartState.addressId);
+    const list = savedAddresses.list();
+    setSavedList(list);
+    const a = list.find((x) => x.id === cartState.addressId);
+    if (a) fillFrom(a);
+  }
 
   const [name, setName] = React.useState(initialContact?.name ?? "");
   const [phone, setPhone] = React.useState(initialContact?.phone ?? "");
@@ -127,7 +140,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
   // One key per checkout visit: retries and double-taps can't create two orders.
   const [idempotencyKey] = React.useState(uid);
 
-  function applySaved(a: SavedAddress) {
+  function fillFrom(a: SavedAddress) {
     setSavedId(a.id);
     setAddressType(a.addressType);
     setBuilding(a.building);
@@ -135,7 +148,13 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
     setFloor(a.floor);
     setStreet(a.street);
     setInstructions(a.instructions);
-    if (a.areaId !== cartState.areaId) cart.setArea(a.areaId, a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+  }
+
+  function applySaved(a: SavedAddress) {
+    fillFrom(a);
+    setSeenAddressId(a.id);
+    const place = [a.building, a.street].filter(Boolean).join(", ") || null;
+    cart.setArea(a.areaId, a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null, { place, addressId: a.id });
   }
 
   // Server quote — debounced, re-run whenever the basket, area or code changes.
@@ -293,7 +312,7 @@ function CheckoutDetails({ partners }: { partners: { label: string; url: string 
                 <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-dark-grey">
                   {config.deliveryByDistance ? "Deliver to" : "Area"}
                 </span>
-                <span className="block truncate text-[15px] font-semibold">{deliverToLabel(basket.area, config.deliveryByDistance)}</span>
+                <span className="block truncate text-[15px] font-semibold">{deliverToLabel(basket.area, config.deliveryByDistance, cartState.place)}</span>
               </span>
               <span className="text-[12.5px] font-medium text-terracotta-ink">Change</span>
             </button>
@@ -683,52 +702,6 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       </h2>
       {children}
     </section>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  error,
-  optional,
-  hint,
-  className,
-  ...input
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  error?: string | null;
-  optional?: boolean;
-  hint?: string;
-  className?: string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  const id = React.useId();
-  return (
-    <div className={className}>
-      <label htmlFor={id} className="flex items-baseline justify-between text-[12.5px] font-medium">
-        {label}
-        {optional && <span className="text-[11.5px] font-normal text-dark-grey">Optional</span>}
-      </label>
-      <input
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={!!error}
-        aria-describedby={error || hint ? `${id}-d` : undefined}
-        className={cn(
-          "mt-1.5 h-12 w-full rounded-[10px] border bg-white/60 px-3.5 text-[15px] focus:outline-none focus:ring-1",
-          error ? "border-rose-sumac focus:ring-rose-sumac/40" : "border-black-iron/15 focus:border-terracotta/60 focus:ring-terracotta/40",
-        )}
-        {...input}
-      />
-      {(error || hint) && (
-        <p id={`${id}-d`} className={cn("mt-1 text-[12px]", error ? "text-rose-sumac" : "text-dark-grey")}>
-          {error ?? hint}
-        </p>
-      )}
-    </div>
   );
 }
 
