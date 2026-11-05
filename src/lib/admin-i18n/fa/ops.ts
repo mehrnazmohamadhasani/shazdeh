@@ -183,6 +183,7 @@ export const ops: Record<string, string> = {
   Discount: "تخفیف",
   VAT: "مالیات (VAT)",
   "Save to stock": "ذخیره در انبار",
+  "Matched by AI — in stock as “{name}”. Change it if wrong.": "هوش مصنوعی تشخیص داد: «{name}» در انبار. اگر اشتباه است عوضش کنید.",
   // Quotations: prices only
   "This is a quotation, not an invoice": "این پیش‌فاکتور است، نه فاکتور",
   "Only the prices are saved: no invoice, no cost, and stock stays as it is. Recipes use these prices until a real invoice comes.":

@@ -3,16 +3,19 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { askWithSchema } from "./ai";
 import { OpsError } from "./documents";
-import { STRONG_MATCH, WEAK_MATCH, nameScore, rankIngredients } from "./ingredient-rank";
+import { WEAK_MATCH, nameScore, rankIngredients } from "./ingredient-rank";
 
 /*
- * "Find matches with AI" on the invoice review: for lines the picker
- * couldn't link, ask the model which stock ingredient each one is (or
- * none). Only a suggestion — the person taps "Use" to apply it. Lines
- * with a clear match by name never go to the model.
+ * Which stock ingredient each invoice line is (or none). Runs on its own
+ * right after a document is read, for the stock lines the supplier's
+ * memory and the name match couldn't link, and again from "Find matches
+ * with AI" on the review. The person sees the pick and checks it before
+ * saving. Lines with a clear match by name never go to the model.
  *
- * The model first says what each line is, in plain English, and a pick
- * is kept only when that description fits the ingredient's name: a slip
+ * The model first says what each line is, in plain English, then names
+ * the ingredient. A pick is kept when that description fits the
+ * ingredient's name, or when the model repeats the ingredient's own name
+ * with its label ("zipper bags" → "Zip bags"): a slip of the label
  * ("dried limon" → "ginger barrel") is dropped, not suggested.
  */
 
@@ -36,13 +39,17 @@ function answerSchema(lineIds: string[], ingredientIds: string[]) {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["line", "product", "ingredient"],
+          required: ["line", "product", "ingredient", "ingredientName"],
           properties: {
             line: { type: "string", enum: lineIds, description: "The line's label, e.g. L1." },
             product: { type: "string", description: "What this line is, in plain English, e.g. \"dried lime\", \"basmati rice\"." },
             ingredient: {
               anyOf: [{ type: "string", enum: ingredientIds }, { type: "null" }],
               description: "The label of the stock ingredient that is this same product, e.g. I4, or null if none is.",
+            },
+            ingredientName: {
+              anyOf: [{ type: "string" }, { type: "null" }],
+              description: "That ingredient's name exactly as listed (the part before the brackets), or null.",
             },
           },
         },
@@ -53,8 +60,11 @@ function answerSchema(lineIds: string[], ingredientIds: string[]) {
 
 const INSTRUCTIONS = `You match lines from a restaurant supplier invoice (Dubai; English, Arabic or Persian, often handwritten or transliterated) to the restaurant's own stock ingredients.
 Answer once for every line, using its label (L1, L2…). First write what the line is in plain English ("product"), then give the label (I1, I2…) of the stock ingredient that is that same product, or null.
-Same product means it would go into the same stock: spelling, language, brand, grade and pack size may differ ("Limon omani" = "dried limon", "برنج" = "rice"), but different products must not match (tomato paste is not tomato; dried lime is not lemon juice; two different rice varieties are different).
+Then repeat that ingredient's name exactly as listed ("ingredientName").
+Same product means it would go into the same stock: spelling, language, brand, grade and pack size may differ ("Limon omani" = "dried limon", "برنج" = "rice", "St Oxo Bio Zipper Bags 28X22CM" = "Zip bags", "StKraft Soup Cups 12 Oz" = "Soup container", "Horeca Alum.foil 45CM" = "Aluminium foil"), but different products must not match (tomato paste is not tomato; egg plant is not egg; vinyl gloves are not latex gloves; lids are not the cups or bowls they close; dried lime is not lemon juice; two different rice varieties are different).
 When unsure, answer null — a wrong match corrupts stock and food cost.`;
+
+const EXACT_NAME = 0.95;
 
 type Stocked = { id: string; name: string; nameFa: string | null; unit: string };
 
@@ -72,12 +82,14 @@ export async function matchLinesWithAi(documentId: string, lines: z.infer<typeof
   if (!doc) throw new OpsError("Document not found.", 404);
   if (!ingredients.length) return lines.map((l) => ({ key: l.key, ingredientId: null }));
 
-  // A clear match by name needs no model.
+  // Only a near-exact name skips the model: "Egg Plant" scores high against
+  // "Egg" by its words, and now that picks are filled in on their own that
+  // must be the model's call.
   const answers = new Map<string, string | null>();
   const ask: typeof lines = [];
   for (const l of lines) {
     const best = rankIngredients(l.description, ingredients)[0];
-    if (best && best.score >= STRONG_MATCH) answers.set(l.key, best.item.id);
+    if (best && best.score >= EXACT_NAME) answers.set(l.key, best.item.id);
     else ask.push(l);
   }
 
@@ -94,13 +106,14 @@ export async function matchLinesWithAi(documentId: string, lines: z.infer<typeof
       usage: { kind: "invoice", documentId },
     });
     const parsed = z
-      .object({ matches: z.array(z.object({ line: z.string(), product: z.string(), ingredient: z.string().nullable() })) })
+      .object({ matches: z.array(z.object({ line: z.string(), product: z.string(), ingredient: z.string().nullable(), ingredientName: z.string().nullable() })) })
       .safeParse(json);
     for (const m of parsed.success ? parsed.data.matches : []) {
       const line = ask[Number(m.line.slice(1)) - 1];
       if (!line) continue;
       const ingredient = m.ingredient ? ingredients[Number(m.ingredient.slice(1)) - 1] : undefined;
-      answers.set(line.key, ingredient && fits(m.product, line.description, ingredient) ? ingredient.id : null);
+      const named = !!ingredient && !!m.ingredientName && [ingredient.name, ingredient.nameFa].some((n) => n && n.trim().toLowerCase() === m.ingredientName!.trim().toLowerCase());
+      answers.set(line.key, ingredient && (named || fits(m.product, line.description, ingredient)) ? ingredient.id : null);
     }
   }
   return lines.map((l) => ({ key: l.key, ingredientId: answers.get(l.key) ?? null }));
