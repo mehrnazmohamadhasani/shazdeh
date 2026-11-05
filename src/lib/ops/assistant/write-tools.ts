@@ -603,7 +603,7 @@ export async function apply(input: StoredInput, actor: Actor, via: string, sourc
     }
     case "record_free_food": {
       const r = await recordFreeFood(
-        { kind: input.kind, day: input.day, items: input.items, recipient: input.recipient, reason: input.reason },
+        { kind: input.kind, day: input.day, items: input.items, stock: [], recipient: input.recipient, reason: input.reason },
         actor,
         { via, sourceDocumentId },
       );

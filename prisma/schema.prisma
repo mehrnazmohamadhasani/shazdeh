@@ -630,6 +630,7 @@ model Ingredient {
   movements     StockMovement[]
   recipeLines   RecipeLine[]
   recipeAliases RecipeNameAlias[]
+  freeFoodItems FreeFoodItem[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 }
@@ -1196,11 +1197,16 @@ model FreeFood {
 }
 
 model FreeFoodItem {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   freeFoodId    String
-  freeFood      FreeFood  @relation(fields: [freeFoodId], references: [id], onDelete: Cascade)
+  freeFood      FreeFood    @relation(fields: [freeFoodId], references: [id], onDelete: Cascade)
   menuItemId    String?
-  menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  menuItem      MenuItem?   @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  /// A stock item given as it is (bread, a drink) instead of a dish:
+  /// `amount` in its unit (g / ml / pcs), quantity 1, cost in unitCostFils.
+  ingredientId  String?
+  ingredient    Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  amount        Float?
   name          String
   quantity      Int
   /// Cost of one portion at the time (approved recipe × latest prices); null when unknown.

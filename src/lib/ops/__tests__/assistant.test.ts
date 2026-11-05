@@ -236,3 +236,16 @@ test("free food: the cost is unknown as soon as one dish has none, never counted
   assert.ok(toolsFor("PURCHASER").includes("record_free_food"));
   assert.ok(!toolsFor("STAFF").includes("record_free_food"));
 });
+
+test("free food with stock items: their cost adds to the dishes', but not to menu value or portions", async () => {
+  const { freeFoodSchema, portionsOf } = await import("../free-food-shared");
+  const t = freeFoodTotals([{ quantity: 2, unitCostFils: 1_000, menuPriceFils: 5_000 }], [{ costFils: 150 }, { costFils: 50 }]);
+  assert.deepEqual(t, { costFils: 2_200, menuValueFils: 10_000, portions: 2 });
+  // A stock item with no price makes the total unknown, never zero.
+  assert.equal(freeFoodTotals([], [{ costFils: null }]).costFils, null);
+  assert.equal(portionsOf([{ quantity: 3, ingredientId: null }, { quantity: 1, ingredientId: "bread" }]), 3);
+  // Only stock items is fine; nothing at all is not.
+  assert.ok(freeFoodSchema.safeParse({ kind: "STAFF_MEAL", stock: [{ ingredientId: "bread", amount: 2 }] }).success);
+  assert.ok(!freeFoodSchema.safeParse({ kind: "STAFF_MEAL", items: [], stock: [] }).success);
+  assert.ok(!freeFoodSchema.safeParse({ kind: "STAFF_MEAL", stock: [{ ingredientId: "bread", amount: 0 }] }).success);
+});

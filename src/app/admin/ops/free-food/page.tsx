@@ -6,7 +6,8 @@ import { FreeFoodActions, FreeFoodForm } from "@/components/admin/ops/free-food-
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { getFreeFoodForEdit, listFreeFood } from "@/lib/ops/free-food";
-import { FREE_FOOD_LABEL, summariseFreeFood, type FreeFoodKind } from "@/lib/ops/free-food-shared";
+import { FREE_FOOD_LABEL, portionsOf, summariseFreeFood, type FreeFoodKind } from "@/lib/ops/free-food-shared";
+import { UNIT, amountText } from "@/components/admin/ops/format";
 import { dubaiToday, pickDay } from "@/lib/ops/today";
 
 export const dynamic = "force-dynamic";
@@ -24,35 +25,37 @@ export default async function FreeFoodPage({ searchParams }: { searchParams: Pro
   const day = pickDay(asked);
   const start = new Date(`${day}T00:00:00+04:00`);
   const end = new Date(start.getTime() + 86_400_000);
-  const [rows, menu, editing] = await Promise.all([
+  const [rows, menu, stockItems, editing] = await Promise.all([
     listFreeFood(start, end),
     prisma.menuItem.findMany({
       where: { isActive: true },
       orderBy: [{ category: { order: "asc" } }, { order: "asc" }],
       select: { id: true, name: true, nameFa: true, category: { select: { name: true } } },
     }),
+    prisma.ingredient.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, nameFa: true, unit: true } }),
     edit ? getFreeFoodForEdit(edit.slice(0, 40)) : Promise.resolve(null),
   ]);
   const summary = summariseFreeFood(
-    rows.map((r) => ({ kind: r.kind as FreeFoodKind, costFils: r.costFils, menuValueFils: r.menuValueFils, portions: r.items.reduce((s, i) => s + i.quantity, 0) })),
+    rows.map((r) => ({ kind: r.kind as FreeFoodKind, costFils: r.costFils, menuValueFils: r.menuValueFils, portions: portionsOf(r.items) })),
   );
-  // Dishes on this month's records whose cost couldn't be worked out, by name.
-  const missing = [
-    ...new Set(rows.flatMap((r) => r.items.filter((i) => i.unitCostFils == null).map((i) => (locale === "fa" && i.menuItem?.nameFa ? i.menuItem.nameFa : i.name)))),
-  ];
+  const itemName = (i: (typeof rows)[number]["items"][number]) =>
+    locale === "fa" && (i.menuItem?.nameFa || i.ingredient?.nameFa) ? (i.menuItem?.nameFa ?? i.ingredient!.nameFa!) : i.name;
+  // Dishes on this day's records whose cost couldn't be worked out, by name (stock items without a price are named on the ingredient page).
+  const missing = [...new Set(rows.flatMap((r) => r.items.filter((i) => i.unitCostFils == null && !i.ingredientId).map(itemName)))];
   const listHref = `/admin/ops/free-food${day !== today ? `?day=${day}` : ""}`;
   const editHref = (id: string) => `/admin/ops/free-food?${day !== today ? `day=${day}&` : ""}edit=${id}`;
 
   return (
     <AdminPage
       title={t("Free food")}
-      description={t("Staff meals, gifts, tastings and compensation: dishes that leave the kitchen without a sale. Their ingredients come out of stock by the recipes, and the cost is kept as it was that day.")}
+      description={t("Staff meals, gifts, tastings and compensation: dishes and stock items that leave the kitchen without a sale. Dishes take their ingredients out of stock by the recipes, stock items by their amount, and the cost is kept as it was that day.")}
       className="max-w-4xl"
     >
       <Card title={editing ? t("Edit free food") : t("Add free food")}>
         <FreeFoodForm
           key={editing?.id ?? `new-${day}`}
           dishes={menu.map((m) => ({ id: m.id, name: m.name, nameFa: m.nameFa, category: m.category.name }))}
+          stockItems={stockItems}
           today={today}
           defaultDay={day}
           editing={editing}
@@ -102,7 +105,11 @@ export default async function FreeFoodPage({ searchParams }: { searchParams: Pro
                       {r.recipient ? ` · ${r.recipient}` : ""}
                     </p>
                     <p className="text-[13px] text-dark-grey">
-                      {r.items.map((i) => `${i.quantity}× ${locale === "fa" && i.menuItem?.nameFa ? i.menuItem.nameFa : i.name}`).join(" · ")}
+                      {r.items
+                        .map((i) =>
+                          i.amount != null && i.ingredient ? `${amountText(i.amount, UNIT[i.ingredient.unit], locale)} ${itemName(i)}` : `${i.quantity}× ${itemName(i)}`,
+                        )
+                        .join(" · ")}
                     </p>
                     <p className="text-[12px] text-dark-grey">
                       {date(r.at, { hour: "2-digit", minute: "2-digit" })}
