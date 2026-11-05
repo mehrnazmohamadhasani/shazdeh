@@ -61,4 +61,15 @@ export const freeFood: Record<string, string> = {
   "by voice": "با صدا",
   "by chat": "با چت",
   "Couldn't save it.": "ثبت نشد.",
+  "Staff meals, gifts, tastings and compensation: dishes and stock items that leave the kitchen without a sale. Dishes take their ingredients out of stock by the recipes, stock items by their amount, and the cost is kept as it was that day.":
+    "غذای کارکنان، هدیه، تست و جبران: غذاها و کالاهای انبار که بدون فروش از آشپزخانه بیرون می‌روند. مواد غذاها طبق دستور پخت و کالاهای انبار به همان مقدار از موجودی کم می‌شوند و هزینه همان‌طور که آن روز بود ثبت می‌ماند.",
+  "Enter how much of each stock item.": "مقدار هر کالای انبار را وارد کنید.",
+  "Saved. Stock taken out.": "ثبت شد. از موجودی کم شد.",
+  "From stock": "از انبار",
+  "Cost {amount}": "هزینه {amount}",
+  "Cost unknown — no price yet": "هزینه نامعلوم — هنوز قیمت ندارد",
+  "Find a dish or stock item": "جستجوی غذا یا کالای انبار",
+  "Nothing matches.": "چیزی پیدا نشد.",
+  "Food cost unknown for some items": "هزینه‌ی بعضی موارد نامعلوم است",
+  "Add the dishes or stock items that were given.": "غذاها یا کالاهای انباری را که داده شد اضافه کنید.",
 };

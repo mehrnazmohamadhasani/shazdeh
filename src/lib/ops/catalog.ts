@@ -234,6 +234,7 @@ export async function mergeIngredients(fromId: string, intoId: string, actor: Ac
     await tx.supplierItem.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.recipeLine.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.recipeNameAlias.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
+    await tx.freeFoodItem.updateMany({ where: { ingredientId: fromId }, data: { ingredientId: intoId } });
     await tx.ingredient.update({ where: { id: intoId }, data: { nameFa: into.nameFa ?? from.nameFa } });
     await tx.ingredient.delete({ where: { id: fromId } });
     await tx.auditLog.create({
