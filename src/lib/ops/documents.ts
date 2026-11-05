@@ -9,6 +9,7 @@ import { costLines, grossLines } from "./costing";
 import { extractionSchema, isStockCategory, type Extraction } from "./extraction";
 import { suggestMatches, type Suggestions } from "./match";
 import { matchLinesWithAi } from "./ai-match";
+import { matchOutcome, sumOutcomes, type MatchOutcome } from "./match-outcome";
 import type { SaveInvoiceInput } from "./save-schema";
 import { fitsUnit, newStockUnit, normalizeName } from "./units";
 import { baseOf, isPlainPack, packFromBase, perUnit, readPack, type CountPack, type Pack } from "./pack";
@@ -206,8 +207,10 @@ export async function processDocument(id: string) {
 /**
  * Stock lines that neither the supplier's memory nor the name could link:
  * the AI picks their ingredient right away, so the review opens with them
- * filled in (marked as the AI's, for a person to check). If the AI is
- * unavailable they simply stay unlinked.
+ * filled in (marked as the AI's, for a person to check). A line with no
+ * stock item gets the AI's clean name (and Persian name) for the new one
+ * instead of the printed text. If the AI is unavailable they simply stay
+ * unlinked.
  */
 async function withAiMatches(id: string, x: Extraction, s: Suggestions): Promise<Suggestions> {
   const open = x.lines
@@ -218,14 +221,16 @@ async function withAiMatches(id: string, x: Extraction, s: Suggestions): Promise
   try {
     const found = await matchLinesWithAi(id, open.map(({ l, i }) => ({ key: String(i), description: l.description.trim().slice(0, 300) })));
     const ids = found.flatMap((f) => (f.ingredientId ? [f.ingredientId] : []));
-    if (!ids.length) return s;
-    const items = await prisma.ingredient.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, meatTypeId: true } });
+    if (!ids.length && !found.some((f) => f.newName)) return s;
+    const items = ids.length ? await prisma.ingredient.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, meatTypeId: true } }) : [];
     return {
       ...s,
       lines: s.lines.map((sug, i) => {
-        const pick = found.find((f) => f.key === String(i))?.ingredientId;
-        const item = pick ? items.find((it) => it.id === pick) : undefined;
-        return item ? { ...sug, ingredientId: item.id, ingredientName: item.name, meatTypeId: item.meatTypeId ?? sug.meatTypeId, matchedBy: "ai" as const } : sug;
+        const f = found.find((x) => x.key === String(i));
+        const item = f?.ingredientId ? items.find((it) => it.id === f.ingredientId) : undefined;
+        if (item) return { ...sug, ingredientId: item.id, ingredientName: item.name, meatTypeId: item.meatTypeId ?? sug.meatTypeId, matchedBy: "ai" as const };
+        if (f?.newName) return { ...sug, ingredientName: f.newName.name, newNameFa: f.newName.nameFa };
+        return sug;
       }),
     };
   } catch (e) {
@@ -339,6 +344,36 @@ async function resolveSupplier(tx: Tx, input: SaveInvoiceInput) {
   return supplier;
 }
 
+/** How the automatic picks fared on this document (see ./match-outcome.ts); nothing when there were none. */
+async function recordMatchOutcome(
+  tx: Tx,
+  id: string,
+  extraction: unknown,
+  input: SaveInvoiceInput,
+  ingredientIds: (string | null)[],
+  actor: { email: string },
+  via: string,
+) {
+  const stored = parseStoredReading(extraction);
+  if (!stored) return;
+  const outcome = matchOutcome(stored.reading.lines.map((l) => l.description), stored.suggestions.lines, input.lines, ingredientIds);
+  if (!outcome.picks && !outcome.named) return;
+  await tx.auditLog.create({
+    data: { actor: actor.email, action: MATCH_OUTCOME_ACTION, entity: "OpsDocument", entityId: id, via, after: outcome as unknown as Prisma.InputJsonValue },
+  });
+}
+
+export const MATCH_OUTCOME_ACTION = "ai_match.outcome";
+
+/** Automatic picks kept vs changed over the last `days` days, for Kitchen settings. */
+export async function matchAccuracy(days = 30) {
+  const rows = await prisma.auditLog.findMany({
+    where: { action: MATCH_OUTCOME_ACTION, createdAt: { gte: new Date(Date.now() - days * DAY_MS) } },
+    select: { after: true },
+  });
+  return sumOutcomes(rows.map((r) => (r.after ?? {}) as Partial<MatchOutcome>));
+}
+
 /** Each line's ingredient id (created when new), or null for lines that aren't stock. */
 async function resolveIngredients(tx: Tx, input: SaveInvoiceInput, actor: { id: string; email: string }, via: string) {
   const ingredientIds: (string | null)[] = [];
@@ -353,7 +388,7 @@ async function resolveIngredients(tx: Tx, input: SaveInvoiceInput, actor: { id: 
       : await tx.ingredient.findFirst({ where: { name: { equals: line.ingredient.name, mode: "insensitive" } } });
     if (!ingredient) {
       ingredient = await tx.ingredient.create({
-        data: { name: line.ingredient.name, unit: newStockUnit(unit), category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
+        data: { name: line.ingredient.name, nameFa: line.ingredient.nameFa ?? null, unit: newStockUnit(unit), category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
       });
     }
     if (!fitsUnit(ingredient.unit, unit)) {
@@ -377,7 +412,7 @@ async function resolveIngredients(tx: Tx, input: SaveInvoiceInput, actor: { id: 
 export async function saveDocument(id: string, input: SaveInvoiceInput, actor: { id: string; email: string }, via = "photo") {
   try {
     return await prisma.$transaction(async (tx) => {
-      const doc = await tx.opsDocument.findUnique({ where: { id }, select: { status: true } });
+      const doc = await tx.opsDocument.findUnique({ where: { id }, select: { status: true, extraction: true } });
       if (!doc) throw new OpsError("Document not found.", 404);
       if (doc.status === "SAVED") throw new OpsError("This document is already saved.", 409);
 
@@ -406,6 +441,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
             : null
         : null;
       const ingredientIds = await resolveIngredients(tx, input, actor, via);
+      await recordMatchOutcome(tx, id, doc.extraction, input, ingredientIds, actor, via);
 
       // Saved again after an edit: keep how it was paid (payer, own money,
       // receipt, and a credit invoice's payment) when the method is unchanged.
@@ -534,11 +570,12 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
 export async function saveQuotationPrices(id: string, input: SaveInvoiceInput, actor: { id: string; email: string }, via = "photo") {
   const settings = await getOpsSettings();
   return prisma.$transaction(async (tx) => {
-    const doc = await tx.opsDocument.findUnique({ where: { id }, select: { status: true } });
+    const doc = await tx.opsDocument.findUnique({ where: { id }, select: { status: true, extraction: true } });
     if (!doc) throw new OpsError("Document not found.", 404);
     if (doc.status !== "NEEDS_REVIEW") throw new OpsError("This document is already saved.", 409);
     const supplier = await resolveSupplier(tx, input);
     const ingredientIds = await resolveIngredients(tx, input, actor, via);
+      await recordMatchOutcome(tx, id, doc.extraction, input, ingredientIds, actor, via);
     const costs = costLines(input.lines, { pricesIncludeVat: input.pricesIncludeVat, discount: input.discount });
     const gross = grossLines(
       costs.map((c) => c.netFils),

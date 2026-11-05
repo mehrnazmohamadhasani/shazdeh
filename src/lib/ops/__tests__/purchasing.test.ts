@@ -151,3 +151,28 @@ test("a corrected price is used as is; purchases are cost ÷ quantity, with VAT 
   assert.equal(filsPerUnit({ type: "OPENING", costFils: 500, quantity: 1000, unitCostFils: null, purchaseLine: null }, true), 0.5);
   assert.deepEqual(PRICED.OR[1], { type: "PRICE", unitCostFils: { not: null } });
 });
+
+test("automatic picks: kept, changed, and the AI's names for new items are counted per saved line", async () => {
+  const { matchOutcome, sumOutcomes } = await import("../match-outcome");
+  const printed = ["St Oxo Bio Zipper Bags 24X40", "Clear Vinyl Gloves 10X100", "StMaxi Roll 800G", "Tomato"];
+  const suggestions = [
+    { ingredientId: "zip", ingredientName: "Zip bags", matchedBy: "ai" as const },
+    { ingredientId: "latex", ingredientName: "Latex gloves", matchedBy: "memory" as const },
+    { ingredientId: null, ingredientName: "Paper towel roll", newNameFa: "دستمال رولی" },
+    { ingredientId: "tomato", ingredientName: "Tomato" }, // this supplier's own memory: not counted
+  ];
+  // Saved in another order; the gloves were changed to a new item.
+  const saved = [
+    { rawName: "StMaxi Roll 800G", ingredient: { name: "paper towel roll" } },
+    { rawName: "st oxo bio zipper bags 24x40", ingredient: { name: "Zip bags" } },
+    { rawName: "Clear Vinyl Gloves 10X100", ingredient: { name: "Vinyl gloves" } },
+    { rawName: "Tomato", ingredient: { name: "Tomato" } },
+  ];
+  const out = matchOutcome(printed, suggestions, saved, ["new1", "zip", "new2", "tomato"]);
+  assert.equal(out.picks, 2);
+  assert.equal(out.kept, 1);
+  assert.deepEqual(out.changed, [{ printed: "Clear Vinyl Gloves 10X100", suggested: "Latex gloves", saved: "Vinyl gloves" }]);
+  assert.equal(out.named, 1);
+  assert.equal(out.namedKept, 1);
+  assert.deepEqual(sumOutcomes([out, { picks: 3, kept: 3 }, {}]), { picks: 5, kept: 4, named: 1, namedKept: 1 });
+});

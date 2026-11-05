@@ -11,6 +11,9 @@ import { PRICED, filsPerUnit } from "./prices";
  * TRN, then name) and, per line, the ingredient and pack size the owner
  * confirmed last time this supplier sent the same item. That memory
  * (SupplierItem) is how a supplier gets more accurate with every upload.
+ * The same printed name confirmed for another supplier links the
+ * ingredient too (its pack is worked out again): what one invoice
+ * teaches helps every supplier.
  */
 
 export type LineSuggestion = {
@@ -31,8 +34,14 @@ export type LineSuggestion = {
   pack?: Pack | null;
   /** False: more than one pack fits (or none does) — a person checks. */
   packSure?: boolean;
-  /** "ai": the ingredient was picked by the AI after reading — shown so a person checks it. */
-  matchedBy?: "ai";
+  /**
+   * How the ingredient was found when it isn't this supplier's memory:
+   * "memory" = the same printed name was confirmed for another supplier;
+   * "ai" = picked by the AI after reading. Shown so a person checks it.
+   */
+  matchedBy?: "ai" | "memory";
+  /** No stock item fits: a clean name (and Persian name) the AI suggests for the new one. */
+  newNameFa?: string | null;
 };
 
 export type Suggestions = {
@@ -59,6 +68,12 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
         include: { ingredient: { select: { id: true, name: true, unit: true, meatTypeId: true } } },
       })
     : [];
+  // The same printed name confirmed for any other supplier.
+  const elsewhere = await prisma.supplierItem.findMany({
+    where: { rawName: { in: x.lines.map((l) => normalizeName(l.description)) }, ...(supplier ? { supplierId: { not: supplier.id } } : {}) },
+    orderBy: { updatedAt: "desc" },
+    select: { rawName: true, ingredientId: true },
+  });
   const stockLines = x.lines.filter((l) => isStockCategory(l.category));
   const [ingredients, meatTypes, lastBuys] = await Promise.all([
     prisma.ingredient.findMany({ select: { id: true, name: true, unit: true, meatTypeId: true } }),
@@ -105,7 +120,8 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
       };
     }
     const description = normalizeName(l.description);
-    const known = ingredients.find((i) => {
+    const shared = elsewhere.find((m) => m.rawName === description);
+    const known = shared ? ingredients.find((i) => i.id === shared.ingredientId) : ingredients.find((i) => {
       const n = normalizeName(i.name);
       return description === n || description.split(" ").includes(n) || (n.length > 3 && description.includes(n));
     });
@@ -133,6 +149,7 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
       packs,
       pack,
       packSure: sure,
+      ...(shared && known ? { matchedBy: "memory" as const } : {}),
     };
   });
 

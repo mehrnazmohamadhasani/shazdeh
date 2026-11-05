@@ -250,15 +250,18 @@ export function IngredientStatus({
   ingredients,
   printed,
   aiSuggestion,
-  byAi = false,
+  byAi = null,
+  suggestedNew = null,
   onUse,
 }: {
   value: string;
   ingredients: PickerIngredient[];
   printed: string;
   aiSuggestion?: PickerIngredient | null;
-  /** Picked by the AI when the document was read: say so, so a person checks it. */
-  byAi?: boolean;
+  /** Picked when the document was read — by the AI, or remembered from another supplier: say so, so a person checks it. */
+  byAi?: "ai" | "memory" | null;
+  /** No stock item fits: the AI's name for the new one. */
+  suggestedNew?: { name: string; nameFa: string } | null;
   onUse: (name: string) => void;
 }) {
   const { t } = useAdminI18n();
@@ -266,7 +269,17 @@ export function IngredientStatus({
   if (selected && byAi) {
     return (
       <span className="inline-flex items-center gap-1.5 text-terracotta-ink">
-        <Sparkles className="h-3.5 w-3.5" /> {t("Matched by AI — in stock as “{name}”. Change it if wrong.", { name: selected.name })}
+        <Sparkles className="h-3.5 w-3.5" />{" "}
+        {byAi === "memory"
+          ? t("Known from another supplier — in stock as “{name}”. Change it if wrong.", { name: selected.name })
+          : t("Matched by AI — in stock as “{name}”. Change it if wrong.", { name: selected.name })}
+      </span>
+    );
+  }
+  if (!selected && suggestedNew) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-cinnamon-bark">
+        <Sparkles className="h-3.5 w-3.5" /> {t("Not in stock — AI suggests a new item “{name}” ({fa}). Pick an existing one if it is.", { name: suggestedNew.name, fa: suggestedNew.nameFa })}
       </span>
     );
   }

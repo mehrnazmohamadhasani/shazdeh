@@ -183,6 +183,11 @@ export const ops: Record<string, string> = {
   Discount: "تخفیف",
   VAT: "مالیات (VAT)",
   "Save to stock": "ذخیره در انبار",
+  "Invoice item matching: nothing to measure yet.": "تشخیص کالاهای فاکتور: هنوز چیزی برای سنجش نیست.",
+  "Invoice item matching, last 30 days: {kept} of {picks} items kept as matched · {namedKept} of {named} new-item names kept.":
+    "تشخیص کالاهای فاکتور در ۳۰ روز گذشته: {kept} از {picks} کالا همان‌طور که تشخیص داده شد ماند · {namedKept} از {named} اسم کالای جدید نگه داشته شد.",
+  "Known from another supplier — in stock as “{name}”. Change it if wrong.": "از فاکتور تأمین‌کننده‌ی دیگری شناخته شد: «{name}» در انبار. اگر اشتباه است عوضش کنید.",
+  "Not in stock — AI suggests a new item “{name}” ({fa}). Pick an existing one if it is.": "در انبار نیست؛ هوش مصنوعی کالای جدید «{fa}» ({name}) را پیشنهاد می‌دهد. اگر در انبار هست، آن را انتخاب کنید.",
   "Matched by AI — in stock as “{name}”. Change it if wrong.": "هوش مصنوعی تشخیص داد: «{name}» در انبار. اگر اشتباه است عوضش کنید.",
   // Quotations: prices only
   "This is a quotation, not an invoice": "این پیش‌فاکتور است، نه فاکتور",
