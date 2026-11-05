@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { ChangeUnitButton, DeleteIngredientButton, IngredientForm, MergeForm, MovementForm, PriceForm } from "@/components/admin/ops/forms";
+import { ChangeUnitButton, DeleteIngredientButton, IngredientForm, MergeForm, PriceForm } from "@/components/admin/ops/forms";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { getIngredient, ingredientKeptReason } from "@/lib/ops/catalog";
 import { CMS_ROLES } from "@/lib/api";
@@ -108,10 +108,6 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
           <MeatTypeSelect ingredientId={ingredient.id} value={ingredient.meatTypeId} types={meatTypes} />
         </Card>
       )}
-
-      <Card title={t("Waste, staff meal or correction")}>
-        <MovementForm ingredientId={ingredient.id} unit={unit} />
-      </Card>
 
       <Card title={t("Correct the price")} description={t("Stock stays as it is. Recipes and food cost use this price until the next invoice.")}>
         <PriceForm ingredientId={ingredient.id} unit={unit} withVat={settings.foodCostIncludesVat} />
