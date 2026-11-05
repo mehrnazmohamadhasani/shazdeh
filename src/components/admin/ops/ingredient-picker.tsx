@@ -250,16 +250,26 @@ export function IngredientStatus({
   ingredients,
   printed,
   aiSuggestion,
+  byAi = false,
   onUse,
 }: {
   value: string;
   ingredients: PickerIngredient[];
   printed: string;
   aiSuggestion?: PickerIngredient | null;
+  /** Picked by the AI when the document was read: say so, so a person checks it. */
+  byAi?: boolean;
   onUse: (name: string) => void;
 }) {
   const { t } = useAdminI18n();
   const selected = ingredients.find((i) => i.name.trim().toLowerCase() === value.trim().toLowerCase()) ?? null;
+  if (selected && byAi) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-terracotta-ink">
+        <Sparkles className="h-3.5 w-3.5" /> {t("Matched by AI — in stock as “{name}”. Change it if wrong.", { name: selected.name })}
+      </span>
+    );
+  }
   if (selected) {
     return (
       <span className="inline-flex items-center gap-1.5 text-olive-leaf">

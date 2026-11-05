@@ -62,6 +62,8 @@ type LineState = {
   /** False: more than one pack fits — a person picks one. */
   packSure: boolean;
   source: Suggestions["lines"][number]["source"];
+  /** The ingredient was picked by the AI after reading, and nobody has changed it yet. */
+  aiMatched: boolean;
   /** Kind of meat chosen on this screen, or found by the reading; undefined = the ingredient's own (unchanged). */
   meatTypeId?: string | null;
   confidence: number;
@@ -169,6 +171,7 @@ export function InvoiceReview({
         packs: s?.packs ?? (pack ? [pack] : []),
         packSure: s?.packSure ?? s?.source === "learned",
         source: s?.source ?? null,
+        aiMatched: s?.matchedBy === "ai",
         // The reading (or the ingredient) says it is raw meat: start with that kind.
         meatTypeId: s?.meatTypeId ?? undefined,
         confidence: l.confidence,
@@ -635,14 +638,15 @@ export function InvoiceReview({
                               ingredients={ingredients}
                               printed={l.rawName}
                               aiSuggestion={aiMatches[l.key]}
-                              onUse={(name) => update(l.key, { ingredientName: name })}
+                              byAi={l.aiMatched}
+                              onUse={(name) => update(l.key, { ingredientName: name, aiMatched: false })}
                             />
                           }
                         >
                           <IngredientPicker
                             id={`${l.key}-ingredient`}
                             value={l.ingredientName}
-                            onChange={(name) => update(l.key, { ingredientName: name })}
+                            onChange={(name) => update(l.key, { ingredientName: name, aiMatched: false })}
                             ingredients={ingredients}
                             printed={l.rawName}
                             aiSuggestion={aiMatches[l.key]}
@@ -706,6 +710,7 @@ export function InvoiceReview({
                   packs: [],
                   packSure: true,
                   source: null,
+                  aiMatched: false,
                   confidence: 1,
                   note: null,
                 },

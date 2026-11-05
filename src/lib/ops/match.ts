@@ -31,6 +31,8 @@ export type LineSuggestion = {
   pack?: Pack | null;
   /** False: more than one pack fits (or none does) — a person checks. */
   packSure?: boolean;
+  /** "ai": the ingredient was picked by the AI after reading — shown so a person checks it. */
+  matchedBy?: "ai";
 };
 
 export type Suggestions = {

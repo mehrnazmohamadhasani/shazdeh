@@ -8,6 +8,7 @@ import { readDocument } from "./ai";
 import { costLines, grossLines } from "./costing";
 import { extractionSchema, isStockCategory, type Extraction } from "./extraction";
 import { suggestMatches, type Suggestions } from "./match";
+import { matchLinesWithAi } from "./ai-match";
 import type { SaveInvoiceInput } from "./save-schema";
 import { fitsUnit, newStockUnit, normalizeName } from "./units";
 import { baseOf, isPlainPack, packFromBase, perUnit, readPack, type CountPack, type Pack } from "./pack";
@@ -162,7 +163,7 @@ export async function processDocument(id: string) {
     const result = await readDocument({ data: Buffer.from(doc.data), mimeType: doc.mimeType, name: doc.originalName }, id, meatKinds.map((m) => m.name));
     // A delivery-platform receipt photographed as an invoice: read it as a sale instead.
     if (result.extraction.documentType === "platform_order") return processPlatformDocument(id);
-    const suggestions = await suggestMatches(result.extraction);
+    const suggestions = await withAiMatches(id, result.extraction, await suggestMatches(result.extraction));
     const stored: StoredReading = { reading: result.extraction, suggestions };
     // Another photo of an invoice that is already saved: refused, never a second copy of its stock.
     const saved = await savedCopyOf(result.extraction, suggestions.supplierId);
@@ -199,6 +200,37 @@ export async function processDocument(id: string) {
       where: { id },
       data: { status: "FAILED", error: (e instanceof Error ? e.message : String(e)).slice(0, 1000) },
     });
+  }
+}
+
+/**
+ * Stock lines that neither the supplier's memory nor the name could link:
+ * the AI picks their ingredient right away, so the review opens with them
+ * filled in (marked as the AI's, for a person to check). If the AI is
+ * unavailable they simply stay unlinked.
+ */
+async function withAiMatches(id: string, x: Extraction, s: Suggestions): Promise<Suggestions> {
+  const open = x.lines
+    .map((l, i) => ({ l, i }))
+    .filter(({ l, i }) => isStockCategory(l.category) && !s.lines[i]?.ingredientId && l.description.trim())
+    .slice(0, 80);
+  if (!open.length) return s;
+  try {
+    const found = await matchLinesWithAi(id, open.map(({ l, i }) => ({ key: String(i), description: l.description.trim().slice(0, 300) })));
+    const ids = found.flatMap((f) => (f.ingredientId ? [f.ingredientId] : []));
+    if (!ids.length) return s;
+    const items = await prisma.ingredient.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, meatTypeId: true } });
+    return {
+      ...s,
+      lines: s.lines.map((sug, i) => {
+        const pick = found.find((f) => f.key === String(i))?.ingredientId;
+        const item = pick ? items.find((it) => it.id === pick) : undefined;
+        return item ? { ...sug, ingredientId: item.id, ingredientName: item.name, meatTypeId: item.meatTypeId ?? sug.meatTypeId, matchedBy: "ai" as const } : sug;
+      }),
+    };
+  } catch (e) {
+    if (!(e instanceof AiBudgetError)) await reportError(e, { where: `ops document AI match ${id}` });
+    return s;
   }
 }
 
