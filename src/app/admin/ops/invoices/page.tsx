@@ -83,6 +83,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
               const status =
                 kind === "supplier_statement" && d.status === "NEEDS_REVIEW"
                   ? { label: "Statement", tone: "neutral" as const }
+                  : kind === "quotation" && d.status === "NEEDS_REVIEW"
+                    ? { label: "Quotation — prices only", tone: "neutral" as const }
                   : kind === "platform_order" && d.status === "NEEDS_REVIEW"
                     ? { label: "Sale — not a purchase", tone: "neutral" as const }
                     : DOC_STATUS[d.status];

@@ -183,6 +183,23 @@ export const ops: Record<string, string> = {
   Discount: "تخفیف",
   VAT: "مالیات (VAT)",
   "Save to stock": "ذخیره در انبار",
+  // Quotations: prices only
+  "This is a quotation, not an invoice": "این پیش‌فاکتور است، نه فاکتور",
+  "Only the prices are saved: no invoice, no cost, and stock stays as it is. Recipes use these prices until a real invoice comes.":
+    "فقط قیمت‌ها ذخیره می‌شوند: فاکتور و هزینه‌ای ثبت نمی‌شود و موجودی تغییر نمی‌کند. دستور پخت‌ها تا رسیدن فاکتور واقعی از این قیمت‌ها استفاده می‌کنند.",
+  "It's a real invoice": "فاکتور واقعی است",
+  "It's a quotation": "پیش‌فاکتور است",
+  "Supplier & quotation": "تأمین‌کننده و پیش‌فاکتور",
+  "Quotation date": "تاریخ پیش‌فاکتور",
+  "Save prices only": "فقط ذخیره‌ی قیمت‌ها",
+  "Match at least one line to a stock item: its price is what gets saved.": "دست‌کم یک ردیف را به یک کالای انبار وصل کنید؛ قیمت همان ذخیره می‌شود.",
+  "Prices saved for {n} items — stock unchanged": "قیمت {n} کالا ذخیره شد؛ موجودی تغییر نکرد",
+  "Price saved for {n} item — stock unchanged": "قیمت {n} کالا ذخیره شد؛ موجودی تغییر نکرد",
+  "Quotation — prices only": "پیش‌فاکتور؛ فقط قیمت",
+  "Quotation — prices saved": "پیش‌فاکتور؛ قیمت‌ها ذخیره شد",
+  "{n} prices from this quotation were saved on {date}. No invoice or cost was added and stock didn't change.":
+    "{n} قیمت از این پیش‌فاکتور در {date} ذخیره شد. فاکتور یا هزینه‌ای ثبت نشد و موجودی تغییر نکرد.",
+  "No line is matched to a stock item, so there is no price to save.": "هیچ ردیفی به کالای انبار وصل نیست، پس قیمتی برای ذخیره نیست.",
   "{n} to check": "{n} مورد برای بررسی",
   "Numbers add up": "اعداد درست است",
 

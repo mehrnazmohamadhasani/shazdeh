@@ -8,7 +8,7 @@ import { InvoiceReview } from "@/components/admin/ops/invoice-review";
 import { DiscardButton, EditInvoiceButton, InvoicePayment, RetryRead, type PaymentMethod } from "@/components/admin/ops/document-actions";
 import { RECEIPT_LABEL, type ReceiptKind } from "@/components/admin/ops/payment-labels";
 import { ReadAsSaleButton } from "@/components/admin/ops/platform-forms";
-import { EDIT_REASON, MANUAL_MIME, getDocument, parseStoredReading } from "@/lib/ops/documents";
+import { EDIT_REASON, MANUAL_MIME, QUOTATION_ACTION, getDocument, parseStoredReading } from "@/lib/ops/documents";
 import { reconcileStatement } from "@/lib/ops/catalog";
 import { listMeatKinds } from "@/lib/ops/meat";
 import { toFils } from "@/lib/ordering/money";
@@ -318,12 +318,28 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       </>
     );
   } else {
+    // A quotation whose prices were kept: say so instead of "nothing was saved".
+    const quoted =
+      doc.status === "DISCARDED"
+        ? await prisma.auditLog.findFirst({ where: { entity: "OpsDocument", entityId: doc.id, action: QUOTATION_ACTION }, orderBy: { createdAt: "desc" }, select: { createdAt: true, after: true } })
+        : null;
+    const quotedPrices = ((quoted?.after as { prices?: unknown[] } | null)?.prices ?? []).length;
     body = (
-      <Card title={doc.status === "FAILED" ? t("AI couldn't read this document") : t(status.label)}>
+      <Card title={doc.status === "FAILED" ? t("AI couldn't read this document") : quoted ? t("Quotation — prices saved") : t(status.label)}>
         {doc.error && doc.status !== "DISCARDED" && <p className="text-[14px] text-pomegranate-red">{t(doc.error)}</p>}
         {doc.status === "DISCARDED" ? (
           <>
-            {savedCopy ? (
+            {quoted ? (
+              <p className="text-[14px] text-dark-grey">
+                {t("{n} prices from this quotation were saved on {date}. No invoice or cost was added and stock didn't change.", {
+                  n: quotedPrices,
+                  date: date(quoted.createdAt),
+                })}{" "}
+                <Link href="/admin/ops/stock" className="font-medium text-terracotta-ink admin-link">
+                  {t("See stock →")}
+                </Link>
+              </p>
+            ) : savedCopy ? (
               <p className="text-[14px] text-dark-grey">
                 {t("This invoice is already saved, so this copy was not added.")}{" "}
                 {savedCopy.documentId && (

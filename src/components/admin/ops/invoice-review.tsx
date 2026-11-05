@@ -131,6 +131,8 @@ export function InvoiceReview({
   const [invoiceNo, setInvoiceNo] = React.useState(reading.invoiceNumber ?? "");
   const [invoiceDate, setInvoiceDate] = React.useState(reading.invoiceDate ?? "");
   const [paymentMode, setPaymentMode] = React.useState(reading.paymentMode ?? "");
+  // A quotation keeps prices only: no invoice, no cost, no stock. The AI says so; a person can switch.
+  const [asQuote, setAsQuote] = React.useState(reading.documentType === "quotation");
   const [dueDate, setDueDate] = React.useState("");
   const [paidBy, setPaidBy] = React.useState("");
   const [notes, setNotes] = React.useState(reading.notes ?? "");
@@ -310,6 +312,7 @@ export function InvoiceReview({
     const missing: string[] = [];
     if (!supplierName.trim()) missing.push(t("supplier"));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) missing.push(t("date"));
+    if (asQuote && !lines.some((l) => isStock(l.category) && l.ingredientName.trim())) return toast.error(t("Match at least one line to a stock item: its price is what gets saved."));
     if (num(total) == null) missing.push(t("total"));
     lines.forEach((l, i) => {
       // Only the line total counts for cost; a receipt that prints no quantity is one of it.
@@ -328,9 +331,9 @@ export function InvoiceReview({
       supplier: { id: supplier?.id ?? null, name: supplier?.name ?? supplierName.trim(), trn: trn.trim() || null, phone: phone.trim() || null },
       invoiceNo: invoiceNo.trim() || null,
       invoiceDate,
-      paymentMode: (paymentMode || null) as SaveInvoiceInput["paymentMode"],
-      dueDate: paymentMode === "credit" ? dueDate || suggestedDue || null : null,
-      paidBy: paymentMode && paymentMode !== "credit" ? paidBy.trim() || null : null,
+      paymentMode: (asQuote ? null : paymentMode || null) as SaveInvoiceInput["paymentMode"],
+      dueDate: !asQuote && paymentMode === "credit" ? dueDate || suggestedDue || null : null,
+      paidBy: !asQuote && paymentMode && paymentMode !== "credit" ? paidBy.trim() || null : null,
       notes: notes.trim() || null,
       pricesIncludeVat,
       subtotal: num(subtotal),
@@ -362,6 +365,13 @@ export function InvoiceReview({
     };
     setBusy("save");
     try {
+      if (asQuote) {
+        const result = await post("save-prices", input);
+        toast.success(t(result.prices > 1 ? "Prices saved for {n} items — stock unchanged" : "Price saved for {n} item — stock unchanged", { n: result.prices }));
+        router.push("/admin/ops/invoices");
+        router.refresh();
+        return;
+      }
       const result = await post("save", input);
       toast.success(
         result.movements
@@ -405,7 +415,20 @@ export function InvoiceReview({
     <div className="space-y-5">
       {docFlags.length > 0 && <Flags flags={docFlags} />}
 
-      <Card title={t("Supplier & invoice")}>
+      {asQuote ? (
+        <div className="flex flex-wrap items-start gap-3 rounded-[16px] border border-saffron-orange/30 bg-saffron-orange/[0.08] px-4 py-3 text-[13.5px] text-cinnamon-bark">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-black-iron">{t("This is a quotation, not an invoice")}</p>
+            <p className="mt-0.5">{t("Only the prices are saved: no invoice, no cost, and stock stays as it is. Recipes use these prices until a real invoice comes.")}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setAsQuote(false)} disabled={!!busy}>
+            {t("It's a real invoice")}
+          </Button>
+        </div>
+      ) : null}
+
+      <Card title={asQuote ? t("Supplier & quotation") : t("Supplier & invoice")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label={t("Supplier")}
@@ -425,19 +448,21 @@ export function InvoiceReview({
               ))}
             </datalist>
           </Field>
-          <Field label={t("Invoice date")} required>
+          <Field label={asQuote ? t("Quotation date") : t("Invoice date")} required>
             <TextInput type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
           </Field>
-          <Field label={t("Paid by")}>
-            <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as typeof paymentMode)}>
-              <option value="">{t("Not shown")}</option>
-              <option value="cash">{t("Cash")}</option>
-              <option value="card">{t("Card")}</option>
-              <option value="credit">{t("Credit (pay later)")}</option>
-              <option value="transfer">{t("Bank transfer")}</option>
-            </Select>
-          </Field>
-          {paymentMode === "credit" ? (
+          {!asQuote && (
+            <Field label={t("Paid by")}>
+              <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as typeof paymentMode)}>
+                <option value="">{t("Not shown")}</option>
+                <option value="cash">{t("Cash")}</option>
+                <option value="card">{t("Card")}</option>
+                <option value="credit">{t("Credit (pay later)")}</option>
+                <option value="transfer">{t("Bank transfer")}</option>
+              </Select>
+            </Field>
+          )}
+          {asQuote ? null : paymentMode === "credit" ? (
             <Field
               label={t("Payment due")}
               hint={
@@ -732,7 +757,7 @@ export function InvoiceReview({
       <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-black-iron/[0.07] bg-warm-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-[16px] sm:border">
         <Button onClick={save} disabled={!!busy}>
           {busy === "save" && <Loader2 className="h-4 w-4 animate-spin" />}
-          {t("Save to stock")}
+          {asQuote ? t("Save prices only") : t("Save to stock")}
         </Button>
         {errors > 0 ? (
           <StatusPill tone="bad">
@@ -742,6 +767,11 @@ export function InvoiceReview({
           <StatusPill tone="good">{t("Numbers add up")}</StatusPill>
         )}
         <div className="ms-auto flex gap-1">
+          {!asQuote && !manual && (
+            <Button variant="ghost" size="sm" onClick={() => setAsQuote(true)} disabled={!!busy}>
+              {t("It's a quotation")}
+            </Button>
+          )}
           {!manual && (
             <Button variant="ghost" size="sm" onClick={readAgain} disabled={!!busy}>
               {busy === "read" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} {t("Read again")}

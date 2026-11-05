@@ -48,7 +48,7 @@ export const extractedLineSchema = z.object({
 });
 
 export const extractionSchema = z.object({
-  documentType: z.enum(["supplier_invoice", "shop_receipt", "card_slip", "platform_order", "supplier_statement", "other"]),
+  documentType: z.enum(["supplier_invoice", "shop_receipt", "card_slip", "platform_order", "supplier_statement", "quotation", "other"]),
   handwritten: z.boolean(),
   supplier: z.object({ name: str, trn: str, phone: str }),
   invoiceNumber: str,
@@ -85,7 +85,7 @@ const obj = (properties: Record<string, unknown>) => ({
 });
 
 export const extractionJsonSchema = obj({
-  documentType: { type: "string", enum: ["supplier_invoice", "shop_receipt", "card_slip", "platform_order", "supplier_statement", "other"] },
+  documentType: { type: "string", enum: ["supplier_invoice", "shop_receipt", "card_slip", "platform_order", "supplier_statement", "quotation", "other"] },
   handwritten: { type: "boolean" },
   supplier: obj({ name: s, trn: s, phone: s }),
   invoiceNumber: s,
@@ -135,6 +135,8 @@ export const EXTRACTION_PROMPT = `You read purchase documents for SHĀZDEH, a Pe
 The image is a supplier invoice, a shop receipt, a card slip or a handwritten bill. It may be in English, Arabic or Persian, photographed at an angle, cropped, faded or with glare. Layouts differ for every supplier: read by meaning, never by position.
 
 First decide what the document is. SHĀZDEH also prints receipts for its own customer orders from delivery platforms (Talabat, Careem, Noon Food, Deliveroo, Keeta): they show SHĀZDEH's name, a customer, dishes like "Ghormeh Sabzi" and fees. Those are SALES, not purchases: set documentType to "platform_order", supplier.name to the platform's name, and still read the lines and totals.
+
+A quotation (titled QUOTATION, QUOTE, PRO FORMA / PROFORMA INVOICE, ESTIMATE, PRICE LIST, عرض سعر or پیش‌فاکتور) offers prices but is not a sale yet: set documentType to "quotation" and read it exactly like an invoice (supplier, number, date, lines, packs, totals). A document titled TAX INVOICE or INVOICE is never a quotation, even if it says "valid until".
 
 A supplier "statement of account" lists several of the supplier's invoices (number, date, amount) but no items: set documentType to "supplier_statement", supplier.name to the supplier, and add one line per listed invoice with description = the invoice number exactly as printed, itemCode = that invoice's date as YYYY-MM-DD, lineTotal = its amount, quantity = null and category "other". total is the statement total.
 
