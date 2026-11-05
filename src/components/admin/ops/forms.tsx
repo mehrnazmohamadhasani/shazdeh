@@ -268,64 +268,6 @@ export function IngredientForm({
   );
 }
 
-// Correction first (and chosen by default): the most common entry.
-const MOVEMENT_LABEL = { ADJUSTMENT: "Correction (+ or −)", WASTE: "Waste (thrown away)", STAFF_MEAL: "Staff meal" } as const;
-
-export function MovementForm({ ingredientId, unit }: { ingredientId: string; unit: BaseUnit }) {
-  const { t } = useAdminI18n();
-  const { busy, submit, router } = useSubmit();
-  const [type, setType] = React.useState<keyof typeof MOVEMENT_LABEL>("ADJUSTMENT");
-  const [amount, setAmount] = React.useState("");
-  const [day, setDay] = React.useState(today);
-  const [note, setNote] = React.useState("");
-  const value = num(amount);
-  return (
-    <form
-      className="grid gap-3 sm:grid-cols-[1.3fr_1fr_1fr]"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (value == null || value === 0) return toast.error(t("Enter an amount"));
-        void submit(
-          `/api/admin/ops/ingredients/${ingredientId}/movements`,
-          "POST",
-          { type, quantity: value * PER[unit], day, note },
-          t("Stock updated"),
-          () => {
-            setAmount("");
-            setNote("");
-            router.refresh();
-          },
-        );
-      }}
-    >
-      <Field label={t("What happened")}>
-        <Select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
-          {Object.entries(MOVEMENT_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>
-              {t(v)}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label={t("Amount ({unit})", { unit: t(DISPLAY[unit]) })} hint={t(type === "ADJUSTMENT" ? "Use − to remove" : "Taken out of stock")}>
-        <TextInput dir="ltr" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t("e.g. {example}", { example: type === "ADJUSTMENT" ? "-0.5" : "0.5" })} />
-      </Field>
-      <Field label={t("Day")}>
-        <TextInput type="date" value={day} onChange={(e) => setDay(e.target.value)} />
-      </Field>
-      <Field label={t("Note")} className="sm:col-span-2">
-        <TextInput dir="auto" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("e.g. burnt rice, expired")} />
-      </Field>
-      <div className="flex items-end">
-        <Button type="submit" size="sm" disabled={busy}>
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-          {t("Save")}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 /**
  * Corrects the price without touching stock: typed per kg / L / piece in
  * AED, sent as fils per g / ml / piece. Recipes use it until the next
