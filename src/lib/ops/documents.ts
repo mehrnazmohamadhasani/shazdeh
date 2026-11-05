@@ -14,7 +14,8 @@ import { baseOf, isPlainPack, packFromBase, perUnit, readPack, type CountPack, t
 import { reportError } from "@/lib/report-error";
 import { processRecipeDocument } from "./recipe-import";
 import { processPlatformDocument } from "./platform-import";
-import { chosenCost, getOpsSettings } from "./settings";
+import { getOpsSettings } from "./settings";
+import { PRICED, filsPerUnit } from "./prices";
 import { AiBudgetError } from "./ai-usage";
 import { decideInvoiceAutoSave } from "./autosave";
 
@@ -640,7 +641,7 @@ export async function stockSummary() {
     prisma.stockMovement.groupBy({ by: ["ingredientId"], _sum: { quantity: true } }),
     prisma.stockMovement.findMany({
       // The opening stock's value counts as a price until the first purchase.
-      where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null },
+      where: { OR: [{ type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null }, PRICED.OR[1]] },
       orderBy: { at: "desc" },
       distinct: ["ingredientId"],
       select: {
@@ -648,6 +649,8 @@ export async function stockSummary() {
         at: true,
         quantity: true,
         costFils: true,
+        type: true,
+        unitCostFils: true,
         purchaseLine: { select: { grossFils: true, invoice: { select: { supplier: { select: { name: true } } } } } },
       },
     }),
@@ -668,9 +671,7 @@ export async function stockSummary() {
             at: last.at.toISOString(),
             supplier: last.purchaseLine?.invoice.supplier.name ?? null,
             costPerUnitFils:
-              last.costFils != null && last.quantity > 0
-                ? chosenCost(last.costFils, last.purchaseLine?.grossFils, settings.foodCostIncludesVat)! / last.quantity
-                : null,
+              (last.type === "PRICE" || (last.costFils != null && last.quantity > 0)) ? filsPerUnit(last, settings.foodCostIncludesVat) : null,
           }
         : null,
     };

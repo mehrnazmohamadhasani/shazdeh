@@ -151,6 +151,18 @@ export const stock: Record<string, string> = {
   "e.g. burnt rice, expired": "مثلاً برنج سوخته، تاریخ‌گذشته",
   "Enter an amount": "مقدار را وارد کنید",
   "Stock updated": "موجودی به‌روز شد",
+  "Correct the price": "اصلاح قیمت",
+  "Stock stays as it is. Recipes and food cost use this price until the next invoice.":
+    "موجودی تغییر نمی‌کند. دستور پخت‌ها و هزینه‌ی غذا تا فاکتور بعدی از این قیمت استفاده می‌کنند.",
+  "AED per {unit} (ex VAT)": "درهم برای هر {unit} (بدون VAT)",
+  "AED per {unit} (with VAT)": "درهم برای هر {unit} (با VAT)",
+  piece: "عدد",
+  "e.g. invoice price was wrong": "مثلاً قیمت فاکتور اشتباه بود",
+  "Save price": "ذخیره‌ی قیمت",
+  "Enter a price": "قیمت را وارد کنید",
+  "Enter a price.": "قیمت را وارد کنید.",
+  "Price updated": "قیمت به‌روز شد",
+  "Price corrected": "اصلاح قیمت",
 
   // Errors from the stock and supplier APIs
   "Supplier not found.": "تأمین‌کننده پیدا نشد.",

@@ -136,3 +136,18 @@ test("roles: the purchaser sees purchasing screens only", () => {
   assert.ok(roleMayOpen("ADMIN", "/admin/team"));
   assert.equal(roleHome("EDITOR"), "/admin");
 });
+
+test("a corrected price is used as is; purchases are cost ÷ quantity, with VAT when chosen", async () => {
+  const { filsPerUnit, PRICED } = await import("../prices");
+  // 12.50 AED / kg typed by hand → 1.25 fils per g, whatever the VAT setting.
+  const corrected = { type: "PRICE", costFils: null, quantity: 0, unitCostFils: 1.25 };
+  assert.equal(filsPerUnit(corrected, false), 1.25);
+  assert.equal(filsPerUnit(corrected, true), 1.25);
+  // 2 kg bought for 20 AED (21 with VAT).
+  const bought = { type: "PURCHASE", costFils: 2000, quantity: 2000, unitCostFils: null, purchaseLine: { grossFils: 2100 } };
+  assert.equal(filsPerUnit(bought, false), 1);
+  assert.equal(filsPerUnit(bought, true), 1.05);
+  // Opening stock has no invoice line: always its value.
+  assert.equal(filsPerUnit({ type: "OPENING", costFils: 500, quantity: 1000, unitCostFils: null, purchaseLine: null }, true), 0.5);
+  assert.deepEqual(PRICED.OR[1], { type: "PRICE", unitCostFils: { not: null } });
+});

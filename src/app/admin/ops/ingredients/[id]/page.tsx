@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminPage, Card, StatusPill } from "@/components/admin/ui";
-import { ChangeUnitButton, DeleteIngredientButton, IngredientForm, MergeForm, MovementForm } from "@/components/admin/ops/forms";
+import { ChangeUnitButton, DeleteIngredientButton, IngredientForm, MergeForm, MovementForm, PriceForm } from "@/components/admin/ops/forms";
 import { UNIT, amountText, day, unitPrice } from "@/components/admin/ops/format";
 import { getIngredient, ingredientKeptReason } from "@/lib/ops/catalog";
 import { CMS_ROLES } from "@/lib/api";
@@ -29,6 +29,7 @@ const MOVEMENT_LABEL: Record<string, string> = {
   GIFT: "Given away",
   ADJUSTMENT: "Correction",
   COUNT: "Stock count",
+  PRICE: "Price corrected",
 };
 
 export default async function IngredientPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,26 +40,34 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
   if (!ingredient) notFound();
   const unit = UNIT[ingredient.unit];
   const meatTypes = await listMeatKinds(ingredient.meatTypeId);
-  const sameUnit = await prisma.ingredient.findMany({
-    where: { id: { not: id }, unit: ingredient.unit },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  const [sameUnit, corrections] = await Promise.all([
+    prisma.ingredient.findMany({
+      where: { id: { not: id }, unit: ingredient.unit },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.stockMovement.findMany({ where: { ingredientId: id, type: "PRICE", unitCostFils: { not: null } }, orderBy: { at: "desc" }, take: 20 }),
+  ]);
 
-  // Price per kg / L / piece for each purchase, with or without VAT as chosen in Ops settings.
-  const prices = ingredient.purchaseLines
-    .filter((l) => l.baseQty && l.netFils != null)
-    .map((l) => ({
-      id: l.id,
-      at: l.invoice.invoiceDate,
-      supplier: l.invoice.supplier,
-      documentId: l.invoice.documentId,
-      qty: l.baseQty!,
-      perBase: chosenCost(l.netFils, l.grossFils, settings.foodCostIncludesVat)! / l.baseQty!,
-    }));
+  // Price per kg / L / piece for each purchase, with or without VAT as chosen
+  // in Ops settings, and each price corrected by hand — newest first.
+  const prices = [
+    ...ingredient.purchaseLines
+      .filter((l) => l.baseQty && l.netFils != null)
+      .map((l) => ({
+        id: l.id,
+        at: l.invoice.invoiceDate,
+        supplier: l.invoice.supplier as { id: string; name: string } | null,
+        documentId: l.invoice.documentId,
+        qty: l.baseQty as number | null,
+        note: null as string | null,
+        perBase: chosenCost(l.netFils, l.grossFils, settings.foodCostIncludesVat)! / l.baseQty!,
+      })),
+    ...corrections.map((m) => ({ id: m.id, at: m.at, supplier: null, documentId: null, qty: null, note: m.note, perBase: m.unitCostFils! })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime());
   // Latest price from each supplier → who is cheapest now.
-  const latestBySupplier = new Map<string, (typeof prices)[number]>();
-  for (const p of prices) if (!latestBySupplier.has(p.supplier.id)) latestBySupplier.set(p.supplier.id, p);
+  const latestBySupplier = new Map<string, (typeof prices)[number] & { supplier: { id: string; name: string } }>();
+  for (const p of prices) if (p.supplier && !latestBySupplier.has(p.supplier.id)) latestBySupplier.set(p.supplier.id, { ...p, supplier: p.supplier });
   const bySupplier = [...latestBySupplier.values()].sort((a, b) => a.perBase - b.perBase);
 
   return (
@@ -104,6 +113,10 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
         <MovementForm ingredientId={ingredient.id} unit={unit} />
       </Card>
 
+      <Card title={t("Correct the price")} description={t("Stock stays as it is. Recipes and food cost use this price until the next invoice.")}>
+        <PriceForm ingredientId={ingredient.id} unit={unit} withVat={settings.foodCostIncludesVat} />
+      </Card>
+
       {bySupplier.length > 1 && (
         <Card title={t("By supplier")} description={t("Latest price from each supplier, cheapest first.")} bodyClassName="p-0">
           <ul className="divide-y divide-black-iron/[0.06] text-[14px]">
@@ -132,14 +145,19 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
               <li key={p.id} className="flex items-center gap-3 px-5 py-3 md:px-6">
                 <span className="w-16 shrink-0 text-dark-grey">{day(p.at, false, intl)}</span>
                 <span dir="auto" className="min-w-0 flex-1 truncate">
-                  {p.documentId ? (
+                  {!p.supplier ? (
+                    <>
+                      {t("Price corrected")}
+                      {p.note && <span className="text-dark-grey"> · {p.note}</span>}
+                    </>
+                  ) : p.documentId ? (
                     <Link href={`/admin/ops/invoices/${p.documentId}`} className="admin-link">
                       {p.supplier.name}
                     </Link>
                   ) : (
                     p.supplier.name
                   )}
-                  <span className="text-dark-grey"> · {amountText(p.qty, unit, locale)}</span>
+                  {p.qty != null && <span className="text-dark-grey"> · {amountText(p.qty, unit, locale)}</span>}
                 </span>
                 <span className="shrink-0 tabular-nums">{unitPrice(p.perBase, unit, locale)}</span>
               </li>
@@ -165,10 +183,14 @@ export default async function IngredientPage({ params }: { params: Promise<{ id:
                     </span>
                   )}
                 </span>
-                <span className={m.quantity < 0 ? "shrink-0 tabular-nums text-pomegranate-red" : "shrink-0 tabular-nums text-olive-leaf"}>
-                  {m.quantity < 0 ? "−" : "+"}
-                  {amountText(Math.abs(m.quantity), unit, locale)}
-                </span>
+                {m.type === "PRICE" ? (
+                  <span className="shrink-0 tabular-nums text-dark-grey">{m.unitCostFils != null ? unitPrice(m.unitCostFils, unit, locale) : "—"}</span>
+                ) : (
+                  <span className={m.quantity < 0 ? "shrink-0 tabular-nums text-pomegranate-red" : "shrink-0 tabular-nums text-olive-leaf"}>
+                    {m.quantity < 0 ? "−" : "+"}
+                    {amountText(Math.abs(m.quantity), unit, locale)}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

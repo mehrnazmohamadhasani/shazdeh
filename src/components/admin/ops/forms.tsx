@@ -326,6 +326,53 @@ export function MovementForm({ ingredientId, unit }: { ingredientId: string; uni
   );
 }
 
+/**
+ * Corrects the price without touching stock: typed per kg / L / piece in
+ * AED, sent as fils per g / ml / piece. Recipes use it until the next
+ * invoice brings a newer price.
+ */
+export function PriceForm({ ingredientId, unit, withVat }: { ingredientId: string; unit: BaseUnit; withVat: boolean }) {
+  const { t } = useAdminI18n();
+  const { busy, submit, router } = useSubmit();
+  const [price, setPrice] = React.useState("");
+  const [note, setNote] = React.useState("");
+  const value = num(price);
+  const per = t(unit === "pcs" ? "piece" : DISPLAY[unit]);
+  return (
+    <form
+      className="grid gap-3 sm:grid-cols-[1fr_2fr_auto]"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (value == null || value < 0) return toast.error(t("Enter a price"));
+        void submit(
+          `/api/admin/ops/ingredients/${ingredientId}/price`,
+          "POST",
+          { filsPerUnit: (value * 100) / PER[unit], note },
+          t("Price updated"),
+          () => {
+            setPrice("");
+            setNote("");
+            router.refresh();
+          },
+        );
+      }}
+    >
+      <Field label={t(withVat ? "AED per {unit} (with VAT)" : "AED per {unit} (ex VAT)", { unit: per })}>
+        <TextInput dir="ltr" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={t("e.g. {example}", { example: "10.50" })} />
+      </Field>
+      <Field label={t("Note")}>
+        <TextInput dir="auto" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("e.g. invoice price was wrong")} />
+      </Field>
+      <div className="flex items-end">
+        <Button type="submit" size="sm" disabled={busy}>
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t("Save price")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 // ─── Stock count ────────────────────────────────────────────────────────────
 
 export type CountRow = {

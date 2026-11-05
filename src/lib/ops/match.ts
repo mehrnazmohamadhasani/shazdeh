@@ -4,6 +4,7 @@ import { isStockCategory, type Extraction } from "./extraction";
 import { lineNet } from "./costing";
 import { choosePack, packFromBase, packOptions, packStock, readPack, type Pack } from "./pack";
 import { normalizeName, type BaseUnit } from "./units";
+import { PRICED, filsPerUnit } from "./prices";
 
 /*
  * Links a fresh reading to what SHĀZDEH already knows: the supplier (by
@@ -63,16 +64,16 @@ export async function suggestMatches(x: Extraction): Promise<Suggestions> {
     // The last price paid per g / pc (ex VAT): it tells "a tub" from "a box of six".
     stockLines.length
       ? prisma.stockMovement.findMany({
-          where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null, costFils: { not: null }, quantity: { gt: 0 } },
+          where: PRICED,
           orderBy: { at: "desc" },
           distinct: ["ingredientId"],
-          select: { ingredientId: true, costFils: true, quantity: true },
+          select: { ingredientId: true, type: true, costFils: true, quantity: true, unitCostFils: true },
         })
       : [],
   ]);
   const lastPrice = (ingredientId: string | undefined) => {
     const m = ingredientId ? lastBuys.find((b) => b.ingredientId === ingredientId) : undefined;
-    return m ? m.costFils! / m.quantity : null;
+    return m ? filsPerUnit(m, false) : null;
   };
   // The reading names one of the kinds of meat; match it by name (any case or language).
   const meatTypeFor = (named: string | null | undefined) => {

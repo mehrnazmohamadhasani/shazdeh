@@ -272,6 +272,12 @@ export async function changeIngredientUnit(id: string, unit: "G" | "ML" | "PCS",
       purchaseLines: await scale("PurchaseLine", "baseQty", `"ingredientId"`),
       supplierItems: await scale("SupplierItem", "baseQtyPerUnit", `"ingredientId"`),
       recipeLines: await scale("RecipeLine", "quantity", `"ingredientId"`),
+      // Prices typed by hand are per unit: per old unit ÷ factor = per new unit.
+      priceCorrections: await tx.$executeRawUnsafe(
+        `UPDATE "StockMovement" SET "unitCostFils" = "unitCostFils" / $1 WHERE "ingredientId" = $2 AND "unitCostFils" IS NOT NULL`,
+        factor,
+        id,
+      ),
     };
     await tx.ingredient.update({ where: { id }, data: { unit, lowStockAt: before.lowStockAt == null ? null : before.lowStockAt * factor } });
     await tx.auditLog.create({
@@ -476,6 +482,25 @@ export async function addMovement(
   });
   await prisma.auditLog.create({
     data: { actor: actor.email, action: "stock.movement", entity: "StockMovement", entityId: m.id, via, after: { ingredientId, type: input.type, quantity, note: input.note } },
+  });
+  return { id: m.id };
+}
+
+/**
+ * Corrects an ingredient's price without touching its stock: a PRICE
+ * entry (quantity 0) that recipes, food cost and the Stock screen use as
+ * the latest price until a newer invoice. For when a price was wrong
+ * mid-month and nobody knows the exact amount on the shelf.
+ */
+export async function setPrice(ingredientId: string, input: { filsPerUnit: number; note: string | null }, actor: Actor, via = "manual") {
+  if (!(input.filsPerUnit >= 0) || !Number.isFinite(input.filsPerUnit)) throw new OpsError("Enter a price.");
+  const item = await prisma.ingredient.findUnique({ where: { id: ingredientId }, select: { id: true } });
+  if (!item) throw new OpsError("Ingredient not found.", 404);
+  const m = await prisma.stockMovement.create({
+    data: { ingredientId, type: "PRICE", quantity: 0, unitCostFils: input.filsPerUnit, at: new Date(), note: input.note, createdById: actor.id },
+  });
+  await prisma.auditLog.create({
+    data: { actor: actor.email, action: "stock.price", entity: "StockMovement", entityId: m.id, via, after: { ingredientId, filsPerUnit: input.filsPerUnit, note: input.note } },
   });
   return { id: m.id };
 }
