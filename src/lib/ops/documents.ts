@@ -286,6 +286,61 @@ export function dubaiDate(day: string) {
 
 const DAY_MS = 86_400_000;
 
+/** The invoice's supplier: the chosen one (filling a missing TRN or phone) or a new one. */
+async function resolveSupplier(tx: Tx, input: SaveInvoiceInput) {
+  let supplier;
+  if (input.supplier.id) {
+    const known = await tx.supplier.findUnique({ where: { id: input.supplier.id }, select: { phone: true } });
+    supplier = await tx.supplier.update({
+      where: { id: input.supplier.id },
+      data: {
+        ...(input.supplier.trn ? { trn: input.supplier.trn } : {}),
+        // Fill a missing phone; never overwrite one someone already entered.
+        ...(input.supplier.phone && !known?.phone ? { phone: input.supplier.phone } : {}),
+      },
+    });
+  } else {
+    supplier = await tx.supplier.create({
+      data: { name: input.supplier.name, trn: input.supplier.trn, phone: input.supplier.phone },
+    });
+  }
+  return supplier;
+}
+
+/** Each line's ingredient id (created when new), or null for lines that aren't stock. */
+async function resolveIngredients(tx: Tx, input: SaveInvoiceInput, actor: { id: string; email: string }, via: string) {
+  const ingredientIds: (string | null)[] = [];
+  for (const line of input.lines) {
+    if (!line.ingredient) {
+      ingredientIds.push(null);
+      continue;
+    }
+    const unit = DB_UNIT[line.ingredient.unit];
+    let ingredient = line.ingredient.id
+      ? await tx.ingredient.findUnique({ where: { id: line.ingredient.id } })
+      : await tx.ingredient.findFirst({ where: { name: { equals: line.ingredient.name, mode: "insensitive" } } });
+    if (!ingredient) {
+      ingredient = await tx.ingredient.create({
+        data: { name: line.ingredient.name, unit: newStockUnit(unit), category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
+      });
+    }
+    if (!fitsUnit(ingredient.unit, unit)) {
+      throw new OpsError(`"${ingredient.name}" is counted in ${ingredient.unit.toLowerCase()}, not ${line.ingredient.unit}.`);
+    }
+    // The kind of meat chosen on review belongs to the ingredient (so the next invoice knows it too).
+    const meatTypeId = line.ingredient.meatTypeId;
+    if (meatTypeId !== undefined && meatTypeId !== ingredient.meatTypeId) {
+      if (meatTypeId && !(await tx.meatType.count({ where: { id: meatTypeId } }))) throw new OpsError("That kind of meat no longer exists.");
+      await tx.ingredient.update({ where: { id: ingredient.id }, data: { meatTypeId } });
+      await tx.auditLog.create({
+        data: { actor: actor.email, action: "ingredient.meat_type", entity: "Ingredient", entityId: ingredient.id, via, before: { meatTypeId: ingredient.meatTypeId }, after: { meatTypeId } },
+      });
+    }
+    ingredientIds.push(ingredient.id);
+  }
+  return ingredientIds;
+}
+
 /** Saves a reviewed reading as a purchase invoice, its stock and what was learned. */
 export async function saveDocument(id: string, input: SaveInvoiceInput, actor: { id: string; email: string }, via = "photo") {
   try {
@@ -294,22 +349,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
       if (!doc) throw new OpsError("Document not found.", 404);
       if (doc.status === "SAVED") throw new OpsError("This document is already saved.", 409);
 
-      let supplier;
-      if (input.supplier.id) {
-        const known = await tx.supplier.findUnique({ where: { id: input.supplier.id }, select: { phone: true } });
-        supplier = await tx.supplier.update({
-          where: { id: input.supplier.id },
-          data: {
-            ...(input.supplier.trn ? { trn: input.supplier.trn } : {}),
-            // Fill a missing phone; never overwrite one someone already entered.
-            ...(input.supplier.phone && !known?.phone ? { phone: input.supplier.phone } : {}),
-          },
-        });
-      } else {
-        supplier = await tx.supplier.create({
-          data: { name: input.supplier.name, trn: input.supplier.trn, phone: input.supplier.phone },
-        });
-      }
+      const supplier = await resolveSupplier(tx, input);
 
       if (input.invoiceNo) {
         const existing = await tx.purchaseInvoice.findFirst({
@@ -333,35 +373,7 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
             ? new Date(at.getTime() + supplier.paymentTermsDays * DAY_MS)
             : null
         : null;
-      const ingredientIds: (string | null)[] = [];
-      for (const line of input.lines) {
-        if (!line.ingredient) {
-          ingredientIds.push(null);
-          continue;
-        }
-        const unit = DB_UNIT[line.ingredient.unit];
-        let ingredient = line.ingredient.id
-          ? await tx.ingredient.findUnique({ where: { id: line.ingredient.id } })
-          : await tx.ingredient.findFirst({ where: { name: { equals: line.ingredient.name, mode: "insensitive" } } });
-        if (!ingredient) {
-          ingredient = await tx.ingredient.create({
-            data: { name: line.ingredient.name, unit: newStockUnit(unit), category: line.category === "packaging" ? "PACKAGING" : line.category === "supplies" ? "SUPPLIES" : "FOOD" },
-          });
-        }
-        if (!fitsUnit(ingredient.unit, unit)) {
-          throw new OpsError(`"${ingredient.name}" is counted in ${ingredient.unit.toLowerCase()}, not ${line.ingredient.unit}.`);
-        }
-        // The kind of meat chosen on review belongs to the ingredient (so the next invoice knows it too).
-        const meatTypeId = line.ingredient.meatTypeId;
-        if (meatTypeId !== undefined && meatTypeId !== ingredient.meatTypeId) {
-          if (meatTypeId && !(await tx.meatType.count({ where: { id: meatTypeId } }))) throw new OpsError("That kind of meat no longer exists.");
-          await tx.ingredient.update({ where: { id: ingredient.id }, data: { meatTypeId } });
-          await tx.auditLog.create({
-            data: { actor: actor.email, action: "ingredient.meat_type", entity: "Ingredient", entityId: ingredient.id, via, before: { meatTypeId: ingredient.meatTypeId }, after: { meatTypeId } },
-          });
-        }
-        ingredientIds.push(ingredient.id);
-      }
+      const ingredientIds = await resolveIngredients(tx, input, actor, via);
 
       // Saved again after an edit: keep how it was paid (payer, own money,
       // receipt, and a credit invoice's payment) when the method is unchanged.
@@ -478,6 +490,65 @@ export async function saveDocument(id: string, input: SaveInvoiceInput, actor: {
     throw e;
   }
 }
+
+/**
+ * A quotation (pro forma, estimate): nothing was bought, so no invoice,
+ * no cost and no stock — only each stock line's price is kept, as a
+ * corrected price (PRICE entry) that recipes use until a real invoice.
+ * The supplier learns the item names like an invoice; the document
+ * leaves the list (DISCARDED) with an audit entry saying prices came
+ * from it.
+ */
+export async function saveQuotationPrices(id: string, input: SaveInvoiceInput, actor: { id: string; email: string }, via = "photo") {
+  const settings = await getOpsSettings();
+  return prisma.$transaction(async (tx) => {
+    const doc = await tx.opsDocument.findUnique({ where: { id }, select: { status: true } });
+    if (!doc) throw new OpsError("Document not found.", 404);
+    if (doc.status !== "NEEDS_REVIEW") throw new OpsError("This document is already saved.", 409);
+    const supplier = await resolveSupplier(tx, input);
+    const ingredientIds = await resolveIngredients(tx, input, actor, via);
+    const costs = costLines(input.lines, { pricesIncludeVat: input.pricesIncludeVat, discount: input.discount });
+    const gross = grossLines(
+      costs.map((c) => c.netFils),
+      { totalFils: toFils(input.total), hasVat: input.pricesIncludeVat || (input.vat ?? 0) > 0 || costs.some((c) => (c.vatFils ?? 0) > 0) },
+    );
+    const now = new Date();
+    const note = `Quotation${input.invoiceNo ? ` ${input.invoiceNo}` : ""} · ${supplier.name}`;
+    const prices: { ingredientId: string; filsPerUnit: number }[] = [];
+    for (const [i, line] of input.lines.entries()) {
+      const ingredientId = ingredientIds[i];
+      if (!ingredientId || !line.stockQuantity || line.stockQuantity <= 0 || !isStockCategory(line.category)) continue;
+      const cost = settings.foodCostIncludesVat && gross[i] != null ? gross[i]! : costs[i].netFils;
+      if (cost == null) continue;
+      const filsPerUnit = cost / line.stockQuantity;
+      await tx.stockMovement.create({
+        data: { ingredientId, type: "PRICE", quantity: 0, unitCostFils: filsPerUnit, at: now, note, createdById: actor.id },
+      });
+      prices.push({ ingredientId, filsPerUnit });
+      await tx.supplierItem.upsert({
+        where: { supplierId_rawName: { supplierId: supplier.id, rawName: normalizeName(line.rawName) } },
+        create: { supplierId: supplier.id, rawName: normalizeName(line.rawName), ingredientId, baseQtyPerUnit: line.stockQuantity / line.quantity, pack: line.pack ?? Prisma.DbNull },
+        update: { ingredientId, baseQtyPerUnit: line.stockQuantity / line.quantity, pack: line.pack ?? Prisma.DbNull },
+      });
+    }
+    if (!prices.length) throw new OpsError("No line is matched to a stock item, so there is no price to save.");
+    await tx.opsDocument.update({ where: { id }, data: { status: "DISCARDED" } });
+    await tx.auditLog.create({
+      data: {
+        actor: actor.email,
+        action: QUOTATION_ACTION,
+        entity: "OpsDocument",
+        entityId: id,
+        via,
+        after: { supplier: supplier.name, quotationNo: input.invoiceNo, prices },
+      },
+    });
+    return { prices: prices.length };
+  });
+}
+
+/** Audit action of a quotation whose prices were saved: the document page reads it. */
+export const QUOTATION_ACTION = "quotation.prices";
 
 /**
  * Undo a saved invoice: every stock movement it made is cancelled by an
