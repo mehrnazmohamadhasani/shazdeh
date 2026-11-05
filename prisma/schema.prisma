@@ -548,6 +548,10 @@ enum StockMovementType {
   GIFT
   ADJUSTMENT
   COUNT
+  /// A corrected price, typed on the ingredient page: quantity 0 (stock
+  /// unchanged), the price in unitCostFils. Counts as the latest price
+  /// until a newer purchase.
+  PRICE
 }
 
 /// An uploaded file, kept immutably (private — served only to admins).
@@ -736,6 +740,8 @@ model StockMovement {
   quantity        Float
   /// What this quantity cost, when known (purchases).
   costFils        Int?
+  /// PRICE only: fils per g / ml / pc.
+  unitCostFils    Float?
   at              DateTime
   purchaseLineId  String?           @unique
   purchaseLine    PurchaseLine?     @relation(fields: [purchaseLineId], references: [id], onDelete: Cascade)

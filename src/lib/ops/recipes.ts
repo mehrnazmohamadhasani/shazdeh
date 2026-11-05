@@ -3,7 +3,8 @@ import { newStockUnit } from "./units";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { OpsError } from "./documents";
-import { chosenCost, getOpsSettings } from "./settings";
+import { getOpsSettings } from "./settings";
+import { PRICED, filsPerUnit } from "./prices";
 import { costVersion, dishMargin, wouldCycle, type CostContext, type CostLine, type CostRecipe, type CostVersion } from "./recipe-cost";
 import { dishCostFrom, type DishCost } from "./profit";
 
@@ -37,17 +38,17 @@ export type DraftLineInput = {
 async function latestPrices(asOf: Date) {
   const [rows, settings] = await Promise.all([
     prisma.stockMovement.findMany({
-      where: { type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null, costFils: { not: null }, quantity: { gt: 0 }, at: { lte: asOf } },
+      where: { ...PRICED, at: { lte: asOf } },
       orderBy: { at: "desc" },
       distinct: ["ingredientId"],
-      select: { ingredientId: true, costFils: true, quantity: true, at: true, purchaseLine: { select: { grossFils: true } } },
+      select: { ingredientId: true, type: true, costFils: true, quantity: true, unitCostFils: true, at: true, purchaseLine: { select: { grossFils: true } } },
     }),
     getOpsSettings(),
   ]);
   return new Map(
     rows.map((r) => [
       r.ingredientId,
-      { filsPerUnit: chosenCost(r.costFils, r.purchaseLine?.grossFils, settings.foodCostIncludesVat)! / r.quantity, at: r.at },
+      { filsPerUnit: filsPerUnit(r, settings.foodCostIncludesVat), at: r.at },
     ]),
   );
 }

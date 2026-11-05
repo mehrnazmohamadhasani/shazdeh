@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { chosenCost, getOpsSettings } from "../settings";
+import { getOpsSettings } from "../settings";
+import { PRICED, filsPerUnit } from "../prices";
 import { findByName, type MatchResult, type Named } from "./match";
 import type { ItemRef } from "./types";
 
@@ -99,10 +100,10 @@ export async function onHand(ingredientIds: string[], asOf?: Date) {
 export async function lastPrices(ingredientIds: string[]) {
   const [rows, settings] = await Promise.all([
     prisma.stockMovement.findMany({
-      where: { ingredientId: { in: ingredientIds }, type: { in: ["PURCHASE", "OPENING"] }, reversedBy: null, costFils: { not: null }, quantity: { gt: 0 } },
+      where: { ingredientId: { in: ingredientIds }, ...PRICED },
       orderBy: { at: "desc" },
       distinct: ["ingredientId"],
-      select: { ingredientId: true, costFils: true, quantity: true, at: true, purchaseLine: { select: { grossFils: true, invoice: { select: { supplier: { select: { name: true } } } } } } },
+      select: { ingredientId: true, type: true, costFils: true, quantity: true, unitCostFils: true, at: true, purchaseLine: { select: { grossFils: true, invoice: { select: { supplier: { select: { name: true } } } } } } },
     }),
     getOpsSettings(),
   ]);
@@ -110,7 +111,7 @@ export async function lastPrices(ingredientIds: string[]) {
     rows.map((r) => [
       r.ingredientId,
       {
-        filsPerUnit: chosenCost(r.costFils, r.purchaseLine?.grossFils, settings.foodCostIncludesVat)! / r.quantity,
+        filsPerUnit: filsPerUnit(r, settings.foodCostIncludesVat),
         at: r.at,
         supplier: r.purchaseLine?.invoice.supplier.name ?? null,
       },

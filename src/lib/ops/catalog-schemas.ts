@@ -33,6 +33,12 @@ export const movementSchema = z.object({
   note: text(300),
 });
 
+export const priceSchema = z.object({
+  /** Fils per g / ml / pc. */
+  filsPerUnit: z.number().finite().min(0).max(1_000_000),
+  note: text(300),
+});
+
 export const countSchema = z.object({
   day,
   counts: z.array(z.object({ ingredientId: z.string().min(1), counted: z.number().finite().min(0) })).min(1).max(500),
