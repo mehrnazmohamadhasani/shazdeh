@@ -71,6 +71,10 @@ export const resend = {
       unsubscribed: false,
       segments: [{ id: segmentId }],
     }),
+  /** Unsubscribes a contact (by id or email) from all Broadcasts. */
+  unsubscribeContact: (contact: string) => call("PATCH", `/contacts/${encodeURIComponent(contact)}`, { unsubscribed: true }),
+  /** Deletes a contact (by id or email). */
+  deleteContact: (contact: string) => call("DELETE", `/contacts/${encodeURIComponent(contact)}`),
   addToSegment: (contact: string, segmentId: string) =>
     call("POST", `/contacts/${encodeURIComponent(contact)}/segments/${segmentId}`),
   removeFromSegment: (contact: string, segmentId: string) =>

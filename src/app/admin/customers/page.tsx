@@ -12,7 +12,7 @@ export async function generateMetadata() {
 
 /** Everyone we can reach: guests who ordered and people who claimed a QR gift, one row per mobile. */
 export default async function CustomersPage() {
-  await requireAdmin();
+  const user = await requireAdmin();
   const { t } = await getAdminI18n();
   const rows = await loadCustomerRows();
   return (
@@ -20,7 +20,7 @@ export default async function CustomersPage() {
       title={t("Customers")}
       description={t("Everyone who ordered from the website (or by WhatsApp and phone) and everyone who claimed a QR gift — one row per mobile.")}
     >
-      <CustomersList rows={rows} />
+      <CustomersList rows={rows} canErase={user.role === "ADMIN"} />
     </AdminPage>
   );
 }

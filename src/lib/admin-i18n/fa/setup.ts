@@ -122,6 +122,25 @@ export const setup: Record<string, string> = {
   "Last order": "آخرین سفارش",
   Offers: "پیشنهادها",
   Unsubscribed: "لغو عضویت کرده",
+  "Stop offers": "قطع پیشنهادها",
+  "Deleted customer": "مشتری حذف‌شده",
+  "Delete data": "حذف اطلاعات",
+  "Delete {name}'s personal data? Their name, mobile, email and addresses are removed for good; their orders stay for the tax records without them. This can't be undone.":
+    "اطلاعات شخصی {name} حذف شود؟ نام، موبایل، ایمیل و آدرس‌هایش برای همیشه پاک می‌شود؛ سفارش‌هایش بدون این اطلاعات برای سوابق مالیاتی می‌ماند. این کار برگشت‌پذیر نیست.",
+  "Stop sending news and offers to {name}? They won't receive campaigns again.":
+    "دیگر برای {name} خبر و پیشنهاد فرستاده نشود؟ از این به بعد هیچ کمپینی برایش ارسال نمی‌شود.",
+  "Something went wrong — try again": "مشکلی پیش آمد — دوباره امتحان کنید",
+  "Customer data deleted": "اطلاعات مشتری حذف شد",
+  "Offers stopped": "ارسال پیشنهاد قطع شد",
+  "Resend (the email service) couldn't be updated. Campaigns from this panel still skip this customer.":
+    "سرویس ایمیل (Resend) به‌روز نشد. کمپین‌های این پنل همچنان این مشتری را کنار می‌گذارند.",
+  "No customer with this mobile.": "مشتری‌ای با این موبایل پیدا نشد.",
+  "Only an admin can delete a customer's data.": "فقط مدیر می‌تواند اطلاعات مشتری را حذف کند.",
+  "Invalid mobile number.": "شماره‌ی موبایل درست نیست.",
+  "This customer has an order in progress. Delete their data after it is delivered.":
+    "این مشتری سفارشی در حال انجام دارد. بعد از تحویل، اطلاعاتش را حذف کنید.",
+  "This customer has an online payment that may still complete. Try again tomorrow.":
+    "این مشتری یک پرداخت آنلاین دارد که ممکن است هنوز انجام شود. فردا دوباره امتحان کنید.",
 
   // Campaigns
   Campaigns: "کمپین‌ها",

@@ -1,8 +1,10 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Download } from "lucide-react";
-import { Card, EmptyState, StatTile, StatusPill, TextInput, chipButtonClass } from "@/components/admin/ui";
+import { toast } from "sonner";
+import { Card, EmptyState, StatTile, StatusPill, TextInput, chipButtonClass, chipDangerClass } from "@/components/admin/ui";
 import { useAdminI18n } from "@/components/admin/i18n";
 import { formatPhone } from "@/lib/ordering/phone";
 import { cn } from "@/lib/utils";
@@ -17,8 +19,40 @@ const FILTERS: { key: CustomerFilter; label: string }[] = [
 // Rendering thousands of rows is slow on a tablet; the download always has them all.
 const SHOWN = 300;
 
-export function CustomersList({ rows }: { rows: CustomerListRow[] }) {
+export function CustomersList({ rows, canErase }: { rows: CustomerListRow[]; canErase: boolean }) {
   const { t, money, date } = useAdminI18n();
+  const router = useRouter();
+  const [busy, setBusy] = React.useState<string | null>(null);
+
+  /** A customer asked to stop offers, or to have their data deleted. */
+  async function act(r: CustomerListRow, action: "unsubscribe" | "erase") {
+    const who = r.name || r.phone;
+    const question =
+      action === "erase"
+        ? t("Delete {name}'s personal data? Their name, mobile, email and addresses are removed for good; their orders stay for the tax records without them. This can't be undone.", { name: who })
+        : t("Stop sending news and offers to {name}? They won't receive campaigns again.", { name: who });
+    if (!confirm(question)) return;
+    setBusy(r.phone);
+    try {
+      const res = await fetch("/api/admin/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, phone: r.phone }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(t(json?.error ?? "Something went wrong — try again"));
+        return;
+      }
+      toast.success(action === "erase" ? t("Customer data deleted") : t("Offers stopped"));
+      if (json?.resendOk === false) toast.warning(t("Resend (the email service) couldn't be updated. Campaigns from this panel still skip this customer."));
+      router.refresh();
+    } catch {
+      toast.error(t("Connection problem — try again"));
+    } finally {
+      setBusy(null);
+    }
+  }
   const [filter, setFilter] = React.useState<CustomerFilter>("all");
   const [q, setQ] = React.useState("");
   const [now] = React.useState(() => new Date());
@@ -114,6 +148,9 @@ export function CustomersList({ rows }: { rows: CustomerListRow[] }) {
                 <th className="px-4 py-3 text-start font-medium max-md:hidden">{t("Last order")}</th>
                 <th className="px-4 py-3 text-start font-medium max-md:hidden">{t("Gift")}</th>
                 <th className="px-4 py-3 text-start font-medium max-sm:hidden">{t("Offers")}</th>
+                <th className="px-4 py-3 text-end font-medium">
+                  <span className="sr-only">{t("Actions")}</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black-iron/[0.06]">
@@ -169,6 +206,20 @@ export function CustomersList({ rows }: { rows: CustomerListRow[] }) {
                     ) : (
                       <span className="text-dark-grey">{t("No")}</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {r.marketingOk && (
+                        <button type="button" disabled={busy !== null} onClick={() => act(r, "unsubscribe")} className={chipButtonClass}>
+                          {t("Stop offers")}
+                        </button>
+                      )}
+                      {canErase && (
+                        <button type="button" disabled={busy !== null} onClick={() => act(r, "erase")} className={chipDangerClass}>
+                          {t("Delete data")}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -18,6 +18,7 @@ import { formatPhone } from "@/lib/ordering/phone";
 import { STAFF_ACTION, STAFF_LABEL, nextStatus, type OrderStatusValue } from "@/lib/ordering/status";
 import { SourceBadge } from "@/components/admin/orders/source-badge";
 import { cn } from "@/lib/utils";
+import { ERASED_PHONE } from "@/lib/ordering/customer-privacy-rules";
 
 /*
  * The kitchen board. Designed to be read across a counter: the order
@@ -470,9 +471,13 @@ function HistoryTable({ orders }: { orders: BoardOrder[] }) {
                 {o.customerName} · {o.areaName}
               </td>
               <td className="whitespace-nowrap px-4 py-3 tabular-nums max-lg:hidden">
-                <a href={`tel:${o.customerPhone}`} dir="ltr" className="admin-link text-black-iron/80 hover:text-terracotta-ink">
-                  {formatPhone(o.customerPhone)}
-                </a>
+                {o.customerPhone === ERASED_PHONE ? (
+                  <span className="text-dark-grey">—</span>
+                ) : (
+                  <a href={`tel:${o.customerPhone}`} dir="ltr" className="admin-link text-black-iron/80 hover:text-terracotta-ink">
+                    {formatPhone(o.customerPhone)}
+                  </a>
+                )}
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-black-iron/80">{t(STAFF_LABEL[o.status])}</td>
               <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-black-iron">{money(o.totalFils)}</td>

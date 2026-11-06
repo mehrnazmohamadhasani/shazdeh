@@ -31,6 +31,7 @@ import {
 } from "@/lib/ordering/status";
 import { SourceBadge, type OrderSourceValue } from "@/components/admin/orders/source-badge";
 import { cn } from "@/lib/utils";
+import { ERASED_NAME, ERASED_PHONE } from "@/lib/ordering/customer-privacy-rules";
 
 export type OrderDetailData = {
   id: string;
@@ -97,6 +98,8 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
   const adjustable = o.status === "RECEIVED" || o.status === "CONFIRMED" || o.status === "PREPARING";
   const next = nextStatus(o.status);
   const phoneDigits = o.customerPhone.replace(/\D/g, "");
+  // The customer asked for their data to be deleted (Customers page).
+  const erased = o.customerPhone === ERASED_PHONE;
 
   // Keep the page live while it's open on a tablet.
   React.useEffect(() => {
@@ -248,26 +251,30 @@ export function OrderDetail({ order: o, providers }: { order: OrderDetailData; p
           {/* Customer & address */}
           <section className="rounded-[16px] border border-black-iron/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] p-5">
             <h2 className="text-[16px] font-semibold text-black-iron">{t("Customer")}</h2>
-            <p dir="auto" className="mt-3 text-[16px] font-semibold text-black-iron">{o.customerName}</p>
-            <p className="text-[12.5px] text-dark-grey">
-              {o.previousOrders > 0
-                ? t(o.previousOrders > 1 ? "{n} previous delivered orders" : "{n} previous delivered order", { n: o.previousOrders })
-                : t("First order")}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2 print:hidden">
-              <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron">
-                <Phone className="h-4 w-4" /> <span dir="ltr">{formatPhone(o.customerPhone)}</span>
-              </a>
-              <a
-                href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Hello ${o.customerName.split(" ")[0]}, this is SHĀZDEH about your order ${o.number}.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron"
-              >
-                <MessageSquare className="h-4 w-4" /> WhatsApp
-              </a>
-            </div>
-            <p dir="ltr" className="mt-1 hidden text-[14px] text-black-iron print:block">{formatPhone(o.customerPhone)}</p>
+            <p dir="auto" className="mt-3 text-[16px] font-semibold text-black-iron">{erased ? t(ERASED_NAME) : o.customerName}</p>
+            {!erased && (
+              <>
+                <p className="text-[12.5px] text-dark-grey">
+                  {o.previousOrders > 0
+                    ? t(o.previousOrders > 1 ? "{n} previous delivered orders" : "{n} previous delivered order", { n: o.previousOrders })
+                    : t("First order")}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 print:hidden">
+                  <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron">
+                    <Phone className="h-4 w-4" /> <span dir="ltr">{formatPhone(o.customerPhone)}</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Hello ${o.customerName.split(" ")[0]}, this is SHĀZDEH about your order ${o.number}.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-black-iron/15 px-3.5 text-[13px] text-black-iron"
+                  >
+                    <MessageSquare className="h-4 w-4" /> WhatsApp
+                  </a>
+                </div>
+                <p dir="ltr" className="mt-1 hidden text-[14px] text-black-iron print:block">{formatPhone(o.customerPhone)}</p>
+              </>
+            )}
             {o.customerEmail && <p dir="ltr" className="mt-2 text-[13px] text-dark-grey">{o.customerEmail}</p>}
 
             <div className="mt-5 border-t border-black-iron/[0.08] pt-4 text-[14px] leading-relaxed text-black-iron">
