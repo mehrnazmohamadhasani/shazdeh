@@ -2,6 +2,7 @@ import { AdminPage } from "@/components/admin/ui";
 import { GalleryManager } from "@/components/admin/gallery-manager";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -10,6 +11,7 @@ export async function generateMetadata() {
 }
 
 export default async function GalleryAdminPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const images = await prisma.galleryImage.findMany({
     orderBy: { order: "asc" },

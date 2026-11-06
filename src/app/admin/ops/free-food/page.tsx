@@ -9,6 +9,7 @@ import { getFreeFoodForEdit, listFreeFood } from "@/lib/ops/free-food";
 import { FREE_FOOD_LABEL, portionsOf, summariseFreeFood, type FreeFoodKind } from "@/lib/ops/free-food-shared";
 import { UNIT, amountText } from "@/components/admin/ops/format";
 import { dubaiToday, pickDay } from "@/lib/ops/today";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -18,6 +19,7 @@ export async function generateMetadata() {
 
 /** Staff meals, gifts, tastings and compensation: what left the kitchen without a sale, and what it cost. */
 export default async function FreeFoodPage({ searchParams }: { searchParams: Promise<{ day?: string; edit?: string }> }) {
+  await requireAdmin();
   const { t, money, date, locale } = await getAdminI18n();
   const { day: asked, edit } = await searchParams;
   // One Dubai day at a time (today unless another is picked).

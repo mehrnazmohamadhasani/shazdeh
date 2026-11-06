@@ -1,6 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar, AdminMobileBar } from "@/components/admin/sidebar";
 import { OrderAlarm } from "@/components/admin/orders/order-alarm";
@@ -8,7 +6,6 @@ import { AssistantFab } from "@/components/admin/assistant/assistant-fab";
 import { AdminI18nProvider } from "@/components/admin/i18n";
 import { vapidPublicKey } from "@/lib/notifications/push";
 import { getAdminLocale } from "@/lib/admin-i18n/server";
-import { roleHome, roleMayOpen } from "@/lib/roles";
 
 export async function generateMetadata(): Promise<Metadata> {
   const fa = (await getAdminLocale()) === "fa";
@@ -31,13 +28,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Also checks the role from the database; every page calls it again
+  // because layouts don't re-render on client-side navigation.
   const [user, locale] = await Promise.all([requireAdmin(), getAdminLocale()]);
-  // The proxy checks the token's role; this re-checks the current role
-  // from the database so a demotion applies on the next page load.
-  const pathname = (await headers()).get("x-pathname") ?? "";
-  if (!roleMayOpen(user.role, pathname)) {
-    redirect(roleHome(user.role));
-  }
 
   return (
     <AdminI18nProvider locale={locale}>

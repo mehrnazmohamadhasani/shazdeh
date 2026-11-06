@@ -1,5 +1,6 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cache } from "react";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
@@ -10,6 +11,7 @@ import {
   SESSION_COOKIE,
   getAuthSecret,
 } from "@/lib/auth-secret";
+import { roleHome, roleMayOpen } from "@/lib/roles";
 
 const SESSION_DURATION_DAYS = 7;
 
@@ -94,16 +96,25 @@ export async function currentUser(session: SessionClaims | null): Promise<Sessio
   return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 
-/** Gate for admin pages. */
-export async function requireAdmin(): Promise<SessionUser> {
+/**
+ * Gate for admin pages. Every admin page.tsx must call it: the layout's
+ * own call does not run again on client-side navigation, so a removed or
+ * demoted account would otherwise keep reading pages from an open tab.
+ * Cached per request, so layout + page cost one database read.
+ */
+export const requireAdmin = cache(async (): Promise<SessionUser> => {
   const session = await getSessionUser();
   const user = await currentUser(session);
   // A valid token for a removed account or an old password: send them to
   // sign in and have the proxy drop the stale cookie (otherwise /login
   // would bounce straight back here).
   if (!user) redirect(session ? "/login?signed-out=1" : "/login");
+  // The proxy sets x-pathname (overwriting any sent by the browser) and
+  // checks the token's role; this checks the role in the database.
+  const pathname = (await headers()).get("x-pathname");
+  if (pathname && !roleMayOpen(user.role, pathname)) redirect(roleHome(user.role));
   return user;
-}
+});
 
 export async function authenticate(
   email: string,

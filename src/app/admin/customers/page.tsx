@@ -2,6 +2,7 @@ import { AdminPage } from "@/components/admin/ui";
 import { CustomersList } from "@/components/admin/ordering/customers-list";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { loadCustomerRows } from "@/lib/ordering/customers";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -11,6 +12,7 @@ export async function generateMetadata() {
 
 /** Everyone we can reach: guests who ordered and people who claimed a QR gift, one row per mobile. */
 export default async function CustomersPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const rows = await loadCustomerRows();
   return (

@@ -7,6 +7,7 @@ import { listOrders } from "@/lib/ordering/admin";
 import { getOrderingSettings } from "@/lib/ordering/config";
 import { providersForModel } from "@/lib/delivery";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -15,6 +16,7 @@ export async function generateMetadata() {
 }
 
 export default async function OrdersPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const [data, settings] = await Promise.all([listOrders("active"), getOrderingSettings()]);
   const providers = providersForModel(settings.deliveryModel).map(({ id, label, description }) => ({ id, label, description }));

@@ -3,6 +3,7 @@ import { AdminPage } from "@/components/admin/ui";
 import { MenuItemForm } from "@/components/admin/menu-item-form";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -11,6 +12,7 @@ export async function generateMetadata() {
 }
 
 export default async function NewMenuItemPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const categories = await prisma.category.findMany({ orderBy: { order: "asc" }, select: { id: true, name: true } });
   if (categories.length === 0) redirect("/admin/categories");

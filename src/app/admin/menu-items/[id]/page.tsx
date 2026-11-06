@@ -8,6 +8,7 @@ import { ModifiersEditor } from "@/components/admin/ordering/modifiers-editor";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { dishRecipeSummary } from "@/lib/ops/recipes";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -16,6 +17,7 @@ export async function generateMetadata() {
 }
 
 export default async function EditMenuItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ added?: string }> }) {
+  await requireAdmin();
   const [{ id }, { added }, { t }] = await Promise.all([params, searchParams, getAdminI18n()]);
   const [item, categories, recipe] = await Promise.all([
     prisma.menuItem.findUnique({

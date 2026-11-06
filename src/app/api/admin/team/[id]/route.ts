@@ -22,17 +22,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (target.role === "ADMIN" && rest.role && rest.role !== "ADMIN" && (await adminCount()) <= 1) {
       return NextResponse.json({ error: "Keep at least one admin." }, { status: 409 });
     }
-    // A new password signs this person out on every device.
+    // A new password or a new role signs this person out on every device,
+    // so no old sign-in keeps the old role (the proxy trusts the token's role).
+    const roleChanged = !!rest.role && rest.role !== target.role;
     const { sessionVersion, ...user } = await prisma.user.update({
       where: { id },
       data: {
         ...rest,
-        ...(password ? { passwordHash: await bcrypt.hash(password, 12), sessionVersion: { increment: 1 } } : {}),
+        ...(password ? { passwordHash: await bcrypt.hash(password, 12) } : {}),
+        ...(password || roleChanged ? { sessionVersion: { increment: 1 } } : {}),
       },
       select: { id: true, email: true, name: true, role: true, sessionVersion: true },
     });
-    // …except the admin changing their own password on this device.
-    if (password && id === auth.user.id) await setSessionCookie(await signSession({ ...user, sessionVersion }));
+    // …except the admin changing their own account on this device.
+    if ((password || roleChanged) && id === auth.user.id) await setSessionCookie(await signSession({ ...user, sessionVersion }));
     return ok(user);
   } catch (e) {
     return serverError(e);

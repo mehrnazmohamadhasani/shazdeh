@@ -3,6 +3,7 @@ import { NewOrderForm } from "@/components/admin/orders/new-order-form";
 import { getOrderMenu } from "@/lib/ordering/catalog";
 import { getDeliveryNetwork } from "@/lib/ordering/zones";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -12,6 +13,7 @@ export async function generateMetadata() {
 
 /** An order a customer sent on WhatsApp or by phone, entered by staff. */
 export default async function NewOrderPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const [menu, network] = await Promise.all([getOrderMenu(), getDeliveryNetwork()]);
   return (

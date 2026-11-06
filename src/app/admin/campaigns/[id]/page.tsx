@@ -6,7 +6,7 @@ import { CampaignEditor } from "@/components/admin/campaigns/campaign-editor";
 import { CampaignSetupNotice } from "@/components/admin/campaigns/setup-notice";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
-import { currentUser, getSessionUser } from "@/lib/auth";
+import { currentUser, getSessionUser, requireAdmin } from "@/lib/auth";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { audienceCounts, campaignConfig } from "@/lib/campaigns/send";
 
@@ -17,6 +17,7 @@ export async function generateMetadata() {
 }
 
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const { id } = await params;
   const [campaign, counts, user] = await Promise.all([

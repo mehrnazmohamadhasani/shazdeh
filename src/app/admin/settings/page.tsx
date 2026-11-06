@@ -2,6 +2,7 @@ import { AdminPage } from "@/components/admin/ui";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -10,6 +11,7 @@ export async function generateMetadata() {
 }
 
 export default async function SettingsAdminPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const settings = await prisma.restaurantSettings.upsert({
     where: { id: "default" },

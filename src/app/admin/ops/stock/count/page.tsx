@@ -5,6 +5,7 @@ import { CountForm } from "@/components/admin/ops/forms";
 import { UNIT } from "@/components/admin/ops/format";
 import { countPacks, stockSummary } from "@/lib/ops/documents";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -13,6 +14,7 @@ export async function generateMetadata() {
 }
 
 export default async function CountPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const [rows, packs] = await Promise.all([stockSummary(), countPacks()]);
   return (

@@ -10,6 +10,7 @@ import { RecipeImportForm } from "@/components/admin/ops/recipe-import-form";
 import { day } from "@/components/admin/ops/format";
 import { getRecipeImport } from "@/lib/ops/recipe-import";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -18,6 +19,7 @@ export async function generateMetadata() {
 }
 
 export default async function RecipeImportPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ dish?: string }> }) {
+  await requireAdmin();
   const [{ t, intl }, { id }, { dish }] = await Promise.all([getAdminI18n(), params, searchParams]);
   // Added from a dish's page: the recipe is for that dish.
   const data = await getRecipeImport(id, dish?.slice(0, 40) ?? null);

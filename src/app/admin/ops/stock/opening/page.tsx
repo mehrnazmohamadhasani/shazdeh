@@ -5,6 +5,7 @@ import { OpeningStockForm } from "@/components/admin/ops/forms";
 import { UNIT } from "@/components/admin/ops/format";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -13,6 +14,7 @@ export async function generateMetadata() {
 }
 
 export default async function OpeningStockPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const [ingredients, openings] = await Promise.all([
     prisma.ingredient.findMany({ select: { id: true, name: true, unit: true, category: true }, orderBy: { name: "asc" } }),

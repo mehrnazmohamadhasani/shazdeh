@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { campaignConfig } from "@/lib/campaigns/send";
 import { AUDIENCE_LABEL, STATUS_TONE } from "@/components/admin/campaigns/labels";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -14,6 +15,7 @@ export async function generateMetadata() {
 }
 
 export default async function CampaignsPage() {
+  await requireAdmin();
   const { t, date } = await getAdminI18n();
   const campaigns = await prisma.campaign.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
   const { missing } = campaignConfig();

@@ -4,6 +4,7 @@ import { PayBackButton, VoidWithdrawalButton, WithdrawalForm } from "@/component
 import { day } from "@/components/admin/ops/format";
 import { ownerCash } from "@/lib/ops/cash";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -12,6 +13,7 @@ export async function generateMetadata() {
 }
 
 export default async function OwnerCashPage() {
+  await requireAdmin();
   const { t, money, intl, date } = await getAdminI18n();
   const monthName = (m: string) => date(new Date(`${m}-15T12:00:00+04:00`), { month: "long", year: "numeric" });
   const { people, withdrawals, invoices } = await ownerCash();

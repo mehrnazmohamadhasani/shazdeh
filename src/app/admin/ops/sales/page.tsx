@@ -8,6 +8,7 @@ import { day } from "@/components/admin/ops/format";
 import { parseStoredPlatform } from "@/lib/ops/platform-import";
 import { monthRange, salesOverview } from "@/lib/ops/sales";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -16,6 +17,7 @@ export async function generateMetadata() {
 }
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+  await requireAdmin();
   const { t, money, intl } = await getAdminI18n();
   const { month: asked } = await searchParams;
   const { month, byChannel, orders, pending } = await salesOverview(asked);

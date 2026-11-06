@@ -3,6 +3,7 @@ import { ZonesManager } from "@/components/admin/ordering/zones-manager";
 import { prisma } from "@/lib/prisma";
 import { deliversByDistance } from "@/lib/ordering/zones";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -11,6 +12,7 @@ export async function generateMetadata() {
 }
 
 export default async function DeliveryPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const [zones, byDistance] = await Promise.all([
     prisma.deliveryZone.findMany({

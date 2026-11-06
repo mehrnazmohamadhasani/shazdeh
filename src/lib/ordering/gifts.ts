@@ -77,15 +77,11 @@ export async function claimGift(input: {
   }
   if (byPhone?.orderId) return { ok: false, status: 409, error: "You've already used this gift. Thank you for ordering with us!" };
 
+  // Claiming again with a known number only re-sends the gift to the email
+  // first given. Changing it here would let anyone who knows a customer's
+  // number redirect their gift link (and opt them in to marketing).
   const claim = byPhone
-    ? await prisma.giftClaim.update({
-        where: { id: byPhone.id },
-        data: {
-          name: input.name ?? byPhone.name,
-          email,
-          ...(input.marketingOptIn ? { marketingOptIn: true } : {}),
-        },
-      })
+    ? byPhone
     : await prisma.giftClaim.create({
         data: {
           couponId: coupon.id,

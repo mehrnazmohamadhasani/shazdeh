@@ -4,6 +4,7 @@ import { getOrderDetail } from "@/lib/ordering/admin";
 import { getOrderingSettings } from "@/lib/ordering/config";
 import { providersForModel } from "@/lib/delivery";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -12,6 +13,7 @@ export async function generateMetadata() {
 }
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
   const { id } = await params;
   const [detail, settings] = await Promise.all([getOrderDetail(id), getOrderingSettings()]);
   if (!detail) notFound();

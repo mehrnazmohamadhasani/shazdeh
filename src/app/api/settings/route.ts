@@ -8,7 +8,11 @@ import {
   serverError,
 } from "@/lib/api";
 
+// Staff only: nothing public reads this, and the row holds contact
+// details the site may not show (the site reads settings server-side).
 export async function GET() {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
   try {
     // Read-only: a GET must never create rows.
     const settings = await prisma.restaurantSettings.findUnique({

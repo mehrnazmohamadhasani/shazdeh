@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { absoluteUrl } from "@/lib/seo";
 import { giftScanPath } from "@/lib/ordering/gift-utils";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -12,6 +13,7 @@ export async function generateMetadata() {
 }
 
 export default async function CouponsPage() {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const [coupons, used] = await Promise.all([
     prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, include: { _count: { select: { claims: true } } } }),

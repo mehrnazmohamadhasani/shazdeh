@@ -3,6 +3,7 @@ import { GiftClaims } from "@/components/admin/ordering/gift-claims";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { giftStatus } from "@/lib/ordering/gift-utils";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -12,6 +13,7 @@ export async function generateMetadata() {
 
 /** Everyone who claimed a QR gift: who used it, who hasn't yet. */
 export default async function GiftClaimsPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
+  await requireAdmin();
   const { t } = await getAdminI18n();
   const { code } = await searchParams;
   const [gifts, claims] = await Promise.all([

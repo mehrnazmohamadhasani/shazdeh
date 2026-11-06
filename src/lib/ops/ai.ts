@@ -75,6 +75,8 @@ export async function readWithSchema(
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
+      // Don't keep the document (receipts can carry customer details) on OpenAI's side.
+      store: false,
       instructions: opts.instructions,
       input: [{ role: "user", content: [{ type: "input_text", text: opts.prompt }, attachment] }],
       text: { format: { type: "json_schema", name: opts.schemaName, schema: opts.jsonSchema, strict: true } },
@@ -125,6 +127,8 @@ export async function askWithSchema(opts: {
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
+      // Don't keep the document (receipts can carry customer details) on OpenAI's side.
+      store: false,
       instructions: opts.instructions,
       input: [{ role: "user", content: [{ type: "input_text", text: opts.prompt }] }],
       text: { format: { type: "json_schema", name: opts.schemaName, schema: opts.jsonSchema, strict: true } },
