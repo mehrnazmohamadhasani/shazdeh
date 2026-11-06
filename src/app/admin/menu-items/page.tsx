@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { AdminPage } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { MenuItemsTable } from "@/components/admin/menu-items-table";
+import { MenuArabicFill } from "@/components/admin/menu-arabic-fill";
 import { prisma } from "@/lib/prisma";
 import { getAdminI18n } from "@/lib/admin-i18n/server";
 import { requireAdmin } from "@/lib/auth";
@@ -16,7 +17,7 @@ export async function generateMetadata() {
 export default async function MenuItemsAdminPage() {
   await requireAdmin();
   const { t } = await getAdminI18n();
-  const [items, categories] = await Promise.all([
+  const [items, categories, arabicMissing] = await Promise.all([
     prisma.menuItem.findMany({
       orderBy: [{ category: { order: "asc" } }, { order: "asc" }],
       select: {
@@ -31,6 +32,7 @@ export default async function MenuItemsAdminPage() {
       },
     }),
     prisma.category.findMany({ orderBy: { order: "asc" }, select: { id: true, name: true } }),
+    prisma.menuItem.count({ where: { nameAr: null } }),
   ]);
 
   return (
@@ -38,11 +40,14 @@ export default async function MenuItemsAdminPage() {
       title={t("Menu")}
       description={t("Changes appear on the website straight away.")}
       actions={
-        <Button asChild size="sm">
-          <Link href="/admin/menu-items/new">
-            <Plus className="h-4 w-4" /> {t("New dish")}
-          </Link>
-        </Button>
+        <>
+          <MenuArabicFill missing={arabicMissing} />
+          <Button asChild size="sm">
+            <Link href="/admin/menu-items/new">
+              <Plus className="h-4 w-4" /> {t("New dish")}
+            </Link>
+          </Button>
+        </>
       }
     >
       <MenuItemsTable items={items} categories={categories} />

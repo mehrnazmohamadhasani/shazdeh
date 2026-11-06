@@ -2,6 +2,7 @@
  * View models shared by the ordering server loaders and client UI.
  * No server-only imports here.
  */
+import type { DishArabicView } from "@/lib/dish";
 import type { PricingGroup, PricingItem, ZoneTerms } from "@/lib/ordering/pricing";
 
 /** One orderable portion of a product ("Fesenjan — Large"). */
@@ -26,6 +27,8 @@ export type OrderProduct = {
   description: string | null;
   ingredients: string | null;
   allergens: string | null;
+  /** Arabic name (without the size), description, ingredients and allergens; null until written. */
+  arabic: DishArabicView | null;
   imageUrl: string | null;
   isVegetarian: boolean;
   categorySlug: string;

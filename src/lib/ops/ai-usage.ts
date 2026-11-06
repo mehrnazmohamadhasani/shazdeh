@@ -29,7 +29,7 @@ export async function assertAiBudget() {
 }
 
 export async function recordAiUsage(entry: {
-  kind: "invoice" | "recipe" | "platform" | "assistant" | "voice";
+  kind: "invoice" | "recipe" | "platform" | "assistant" | "voice" | "translate";
   model: string;
   inputTokens: number | null;
   outputTokens: number | null;

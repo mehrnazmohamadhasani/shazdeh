@@ -116,7 +116,7 @@ export async function askWithSchema(opts: {
   prompt: string;
   schemaName: string;
   jsonSchema: object;
-  usage: { kind: "invoice" | "recipe" | "platform"; documentId?: string };
+  usage: { kind: "invoice" | "recipe" | "platform" | "translate"; documentId?: string };
 }): Promise<unknown> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new AiNotConfiguredError();

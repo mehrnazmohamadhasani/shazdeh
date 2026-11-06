@@ -16,6 +16,7 @@ import { findPlatform, getSocialLinks } from "@/lib/social";
 import { whatsappHref } from "@/lib/links";
 import { breadcrumbJsonLd, dishJsonLd } from "@/lib/seo";
 import { formatPrice } from "@/lib/utils";
+import { ArabicDetails } from "@/components/menu/arabic-details";
 
 export const revalidate = 60;
 
@@ -165,6 +166,8 @@ export default async function DishPage({ params }: Props) {
                 )}
               </dl>
             )}
+
+            <ArabicDetails arabic={dish.arabic} className="mt-10 pt-8" />
 
             <div className="mt-10 border-t border-black-iron/10 pt-8">
               <p className="caption">Price</p>

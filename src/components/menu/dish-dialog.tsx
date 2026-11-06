@@ -15,6 +15,7 @@ import { DishSubtitle } from "@/components/menu/dish-card";
 import type { DishCardData } from "@/lib/dish";
 import { whatsappHref } from "@/lib/links";
 import { formatPrice } from "@/lib/utils";
+import { ArabicDetails } from "@/components/menu/arabic-details";
 
 /*
  * Dish detail — quick view from any dish card. Keeps the visitor in
@@ -95,6 +96,8 @@ export function DishDialog({
                 )}
               </dl>
             )}
+
+            <ArabicDetails arabic={d.arabic} className="mt-6" />
 
             <div className="mt-auto pt-8">
               <div className="flex items-end justify-between gap-4 border-t border-black-iron/10 pt-6">

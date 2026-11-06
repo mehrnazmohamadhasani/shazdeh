@@ -10,6 +10,7 @@ import { formatFils } from "@/lib/ordering/money";
 import { unitPriceFils, validateSelection, type PricingGroup } from "@/lib/ordering/pricing";
 import { variantToPricingItem, type OrderProduct } from "@/lib/ordering/types";
 import { cn } from "@/lib/utils";
+import { ArabicDetails } from "@/components/menu/arabic-details";
 
 /*
  * Product sheet — the "customise and add" moment. Bottom sheet on
@@ -171,6 +172,7 @@ function SheetBody({
             Allergen details for this dish aren&apos;t listed yet. If you have an allergy, please contact us before ordering.
           </p>
         )}
+        <ArabicDetails arabic={product.arabic} className="mt-5" />
       </div>
 
       {product.variants.length > 1 && (

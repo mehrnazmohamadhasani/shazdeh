@@ -58,6 +58,12 @@ model MenuItem {
   name           String
   nameFa         String?
   description    String?
+  // Arabic, shown next to the English on the site and on receipts
+  // (Consumer Protection Regulation 66/2023, Art. 40: ingredients in Arabic too).
+  nameAr         String?
+  descriptionAr  String?
+  ingredientsAr  String?
+  allergensAr    String?
   price          Float
   imageUrl       String?
   categoryId     String
@@ -419,6 +425,8 @@ model OrderItem {
   menuItemId    String?
   menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   name          String
+  /// Arabic name at the time of ordering, for the bilingual tax invoice.
+  nameAr        String?
   portion       String?
   unitPriceFils Int // dish + selected options
   quantity      Int
@@ -913,7 +921,7 @@ model CashWithdrawal {
 /// One AI call: what it cost, so a monthly cap can stop runaway spending.
 model AiUsage {
   id           String   @id @default(cuid())
-  /// invoice | recipe | platform | assistant | voice
+  /// invoice | recipe | platform | assistant | voice | translate
   kind         String
   model        String
   inputTokens  Int

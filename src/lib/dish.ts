@@ -3,6 +3,25 @@
  * Kept free of server-only imports so client code can use the types.
  */
 
+/** A dish's Arabic details, or null when it has none yet. */
+export type DishArabicView = { name: string | null; description: string | null; ingredients: string | null; allergens: string | null };
+
+/** Arabic portion words at the end of a name, e.g. "قورمه سبزي (كبير)". */
+const ARABIC_PORTION = /\s*[(\-–—]?\s*(?:كبير|صغير|وسط|متوسط|عائلي)\s*\)?\s*$/;
+
+export function arabicView(
+  row: { nameAr: string | null; descriptionAr: string | null; ingredientsAr: string | null; allergensAr: string | null },
+  stripPortion = false,
+): DishArabicView | null {
+  if (!row.nameAr && !row.descriptionAr && !row.ingredientsAr && !row.allergensAr) return null;
+  return {
+    name: row.nameAr && stripPortion ? row.nameAr.replace(ARABIC_PORTION, "").trim() || row.nameAr : row.nameAr,
+    description: row.descriptionAr,
+    ingredients: row.ingredientsAr,
+    allergens: row.allergensAr,
+  };
+}
+
 export type DishCardData = {
   id: string;
   slug: string;
@@ -16,6 +35,7 @@ export type DishCardData = {
   description?: string | null;
   ingredients?: string | null;
   allergens?: string | null;
+  arabic?: DishArabicView | null;
   price: number;
   imageUrl?: string | null;
   isVegetarian: boolean;
@@ -49,6 +69,10 @@ type DishRow = {
   description: string | null;
   ingredients: string | null;
   allergens: string | null;
+  nameAr: string | null;
+  descriptionAr: string | null;
+  ingredientsAr: string | null;
+  allergensAr: string | null;
   price: number;
   imageUrl: string | null;
   isVegetarian: boolean;
@@ -70,6 +94,7 @@ export function toDishCard(
     description: row.description,
     ingredients: row.ingredients,
     allergens: row.allergens,
+    arabic: arabicView(row),
     price: row.price,
     imageUrl: row.imageUrl,
     isVegetarian: row.isVegetarian,

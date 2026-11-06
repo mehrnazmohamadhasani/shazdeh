@@ -129,4 +129,23 @@ export const menu: Record<string, string> = {
   "That slug is already in use.": "این آدرس صفحه قبلاً استفاده شده است. آدرس دیگری بنویسید.",
   "That record already exists.": "این مورد از قبل وجود دارد.",
   "Slug must be lowercase letters, numbers and dashes only": "آدرس صفحه فقط می‌تواند حروف کوچک انگلیسی، عدد و خط تیره داشته باشد",
+
+  // Arabic on the menu (UAE law: ingredients in Arabic too)
+  "Write the Arabic name, description, ingredients and allergens with AI for {n} dishes? Check them afterwards on each dish.":
+    "نام، توضیح، مواد و حساسیت‌زاهای عربی برای {n} غذا با هوش مصنوعی نوشته شود؟ بعداً در صفحه‌ی هر غذا بررسی‌شان کنید.",
+  "Arabic added to {n} dishes.": "عربی برای {n} غذا اضافه شد.",
+  "Writing Arabic…": "در حال نوشتن عربی…",
+  "Arabic missing · {n}": "بدون عربی · {n}",
+  "Write the English name first.": "اول نام انگلیسی را بنویسید.",
+  "Arabic filled in. Check it, then save.": "عربی نوشته شد. بررسی کنید و بعد ذخیره کنید.",
+  "Couldn't write the Arabic. Try again.": "عربی نوشته نشد. دوباره امتحان کنید.",
+  "AI isn't set up on the server.": "هوش مصنوعی روی سرور راه‌اندازی نشده است.",
+  Arabic: "عربی",
+  "UAE law asks online menus to show ingredients in Arabic too. Shown next to the English on the website and receipts.":
+    "طبق قانون امارات، منوی آنلاین باید مواد غذا را به عربی هم نشان دهد. کنار انگلیسی در سایت و رسید نمایش داده می‌شود.",
+  "Fill with AI": "پر کردن با هوش مصنوعی",
+  "Arabic name": "نام عربی",
+  "Arabic description": "توضیح عربی",
+  "Arabic ingredients": "مواد به عربی",
+  "Arabic allergens": "حساسیت‌زاها به عربی",
 };

@@ -170,6 +170,15 @@ async function insertOrder(d: OrderDraft): Promise<{ created: boolean; id: strin
   const { quote } = d;
   const zone = quote.zone!;
   const area = quote.area!;
+  // Arabic dish names, kept on the lines for the bilingual tax invoice.
+  const arabic = new Map(
+    (
+      await prisma.menuItem.findMany({
+        where: { id: { in: quote.lines.map((l) => l.itemId) }, nameAr: { not: null } },
+        select: { id: true, nameAr: true },
+      })
+    ).map((m) => [m.id, m.nameAr]),
+  );
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const order = await prisma.$transaction(async (tx) => {
@@ -242,6 +251,7 @@ async function insertOrder(d: OrderDraft): Promise<{ created: boolean; id: strin
               create: quote.lines.map((l) => ({
                 menuItemId: l.itemId,
                 name: l.name,
+                nameAr: arabic.get(l.itemId) ?? null,
                 portion: l.portion,
                 unitPriceFils: l.unitPriceFils,
                 quantity: l.quantity,

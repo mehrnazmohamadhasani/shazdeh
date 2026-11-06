@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, Loader2, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { Card, Field, Select, SwitchRow, TextArea, TextInput, chipButtonClass } from "@/components/admin/ui";
@@ -35,6 +35,10 @@ export type MenuItemDraft = {
   categoryId: string;
   ingredients: string;
   allergens: string;
+  nameAr: string;
+  descriptionAr: string;
+  ingredientsAr: string;
+  allergensAr: string;
   isVegetarian: boolean;
   isAvailable: boolean;
   isActive: boolean;
@@ -50,6 +54,10 @@ const EMPTY: MenuItemDraft = {
   categoryId: "",
   ingredients: "",
   allergens: "",
+  nameAr: "",
+  descriptionAr: "",
+  ingredientsAr: "",
+  allergensAr: "",
   isVegetarian: false,
   isAvailable: true,
   isActive: true,
@@ -84,6 +92,10 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
         description: draft.description || null,
         ingredients: draft.ingredients || null,
         allergens: draft.allergens || null,
+        nameAr: draft.nameAr || null,
+        descriptionAr: draft.descriptionAr || null,
+        ingredientsAr: draft.ingredientsAr || null,
+        allergensAr: draft.allergensAr || null,
       };
       const res = await fetch(isEditing ? `/api/menu-items/${initial!.id}` : "/api/menu-items", {
         method: isEditing ? "PATCH" : "POST",
@@ -106,6 +118,35 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
       toast.error((err as Error).message);
     } finally {
       setPending(false);
+    }
+  }
+
+  const [translating, setTranslating] = React.useState(false);
+
+  /** AI draft of the Arabic from the English; fills only the empty Arabic fields. Nothing is saved until "Save". */
+  async function draftArabic() {
+    if (!draft.name.trim()) return toast.error(t("Write the English name first."));
+    setTranslating(true);
+    try {
+      const res = await fetch("/api/admin/menu-items/arabic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dish: { name: draft.name, description: draft.description, ingredients: draft.ingredients, allergens: draft.allergens } }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(t(json?.error ?? "Couldn't write the Arabic. Try again."));
+      setDraft((d) => ({
+        ...d,
+        nameAr: d.nameAr || json.nameAr || "",
+        descriptionAr: d.descriptionAr || json.descriptionAr || "",
+        ingredientsAr: d.ingredientsAr || json.ingredientsAr || "",
+        allergensAr: d.allergensAr || json.allergensAr || "",
+      }));
+      toast.success(t("Arabic filled in. Check it, then save."));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setTranslating(false);
     }
   }
 
@@ -189,6 +230,32 @@ export function MenuItemForm({ initial, categories }: { initial?: Partial<MenuIt
           </Field>
           <Field label={t("Allergens")}>
             <TextArea value={draft.allergens} onChange={(e) => update("allergens", e.target.value)} rows={3} placeholder={t("Contains: dairy, walnuts.")} dir="auto" />
+          </Field>
+        </div>
+      </Card>
+
+      <Card
+        title={t("Arabic")}
+        description={t("UAE law asks online menus to show ingredients in Arabic too. Shown next to the English on the website and receipts.")}
+        actions={
+          <button type="button" onClick={draftArabic} disabled={translating} className={chipButtonClass}>
+            {translating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {t("Fill with AI")}
+          </button>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t("Arabic name")}>
+            <TextInput value={draft.nameAr} onChange={(e) => update("nameAr", e.target.value)} lang="ar" placeholder="قورمه سبزي" dir="rtl" />
+          </Field>
+          <Field label={t("Arabic description")}>
+            <TextArea value={draft.descriptionAr} onChange={(e) => update("descriptionAr", e.target.value)} lang="ar" rows={3} dir="rtl" />
+          </Field>
+          <Field label={t("Arabic ingredients")}>
+            <TextArea value={draft.ingredientsAr} onChange={(e) => update("ingredientsAr", e.target.value)} lang="ar" rows={3} dir="rtl" />
+          </Field>
+          <Field label={t("Arabic allergens")}>
+            <TextArea value={draft.allergensAr} onChange={(e) => update("allergensAr", e.target.value)} lang="ar" rows={3} dir="rtl" />
           </Field>
         </div>
       </Card>

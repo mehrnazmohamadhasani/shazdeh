@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Bell, BellRing, Check, ExternalLink, Loader2, Phone, XCircle } from "lucide-react";
+import { Bell, BellRing, Check, ExternalLink, FileText, Loader2, Phone, XCircle } from "lucide-react";
 import { WhatsappIcon } from "@/components/icons/social";
 import { ArchLines } from "@/components/brand/arch";
 import { cart } from "@/components/order/cart-store";
@@ -12,6 +12,7 @@ import type { TrackingView } from "@/lib/ordering/orders";
 import { formatFils } from "@/lib/ordering/money";
 import { CUSTOMER_STEPS, PAYMENT_LABEL, PAYMENT_METHOD_LABEL, isTerminal } from "@/lib/ordering/status";
 import { cn } from "@/lib/utils";
+import { hasInvoice } from "@/lib/ordering/invoice";
 
 /*
  * Confirmation + live status in one place. It polls the backend every
@@ -317,6 +318,16 @@ export function OrderTracker({
             </div>
             {view.pricesIncludeVat && <p className="text-[11.5px] text-dark-grey">Includes VAT of {formatFils(view.vatFils)}</p>}
           </dl>
+          {hasInvoice(view.status) && (
+            <a
+              href={`/order/track/${token}/invoice`}
+              target="_blank"
+              rel="noopener"
+              className="mt-4 inline-flex min-h-10 items-center gap-2 text-[13px] font-medium text-terracotta-ink underline-offset-4 hover:underline"
+            >
+              <FileText className="h-4 w-4" /> Tax invoice · <span lang="ar" dir="rtl">فاتورة ضريبية</span>
+            </a>
+          )}
         </aside>
       </div>
     </div>

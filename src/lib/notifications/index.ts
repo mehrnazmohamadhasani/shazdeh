@@ -6,6 +6,7 @@ import { formatFils } from "@/lib/ordering/money";
 import { getOrderingSettings } from "@/lib/ordering/config";
 import { sendPush } from "@/lib/notifications/push";
 import { reportError } from "@/lib/report-error";
+import { hasInvoice } from "@/lib/ordering/invoice";
 
 /*
  * Order notifications.
@@ -165,6 +166,8 @@ export async function notifyOrder(orderId: string, event: OrderEventName, { deta
     });
     if (!order) return;
     const trackUrl = absoluteUrl(`/order/track/${order.trackingToken}`);
+    // The Arabic + English tax invoice, once the order is a sale.
+    const invoiceUrl = hasInvoice(order.status) ? absoluteUrl(`/order/track/${order.trackingToken}/invoice`) : null;
     const summary = order.items
       .map((i) => `${i.quantity}× ${i.name}${i.portion ? ` (${i.portion})` : ""}`)
       .join(", ");
@@ -191,12 +194,13 @@ ${lines.map((l) => `<p style="margin:4px 0">${esc(l)}</p>`).join("")}
           )
           .join("")}<tr><td style="padding-top:8px;border-top:1px solid #ddd;font-weight:700">Total</td><td style="padding-top:8px;border-top:1px solid #ddd;text-align:right;font-weight:700">${formatFils(order.totalFils)}</td></tr></table>
 <p style="margin-top:20px"><a href="${esc(trackUrl)}" style="background:#ce4927;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Track your order</a></p>
+${invoiceUrl ? `<p style="margin-top:14px;font-size:13px"><a href="${esc(invoiceUrl)}" style="color:#1d1d1b">Tax invoice · <span dir="rtl">فاتورة ضريبية</span></a></p>` : ""}
 <p style="color:#777;font-size:12px;margin-top:24px">SHĀZDEH — Persian Cuisine</p></div>`;
         try {
           const status = await sendEmail(
             order.customerEmail,
             `SHĀZDEH · ${copy.subject} · ${order.number}`,
-            `${lines.join("\n")}\n\nOrder ${order.number}\n${summary}\nTotal: ${formatFils(order.totalFils)}\n\nTrack your order: ${trackUrl}\n\nSHĀZDEH — Persian Cuisine`,
+            `${lines.join("\n")}\n\nOrder ${order.number}\n${summary}\nTotal: ${formatFils(order.totalFils)}\n\nTrack your order: ${trackUrl}${invoiceUrl ? `\nTax invoice / فاتورة ضريبية: ${invoiceUrl}` : ""}\n\nSHĀZDEH — Persian Cuisine`,
             html,
           );
           await log(order.id, event, "email", order.customerEmail, status);

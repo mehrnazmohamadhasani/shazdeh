@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
-import { splitPortion } from "@/lib/dish";
+import { arabicView, splitPortion } from "@/lib/dish";
 import { toFils } from "@/lib/ordering/money";
 import type { PricingGroup, PricingItem } from "@/lib/ordering/pricing";
 import type { OrderCategory, OrderProduct } from "@/lib/ordering/types";
@@ -14,6 +14,10 @@ const ITEM_SELECT = {
   description: true,
   ingredients: true,
   allergens: true,
+  nameAr: true,
+  descriptionAr: true,
+  ingredientsAr: true,
+  allergensAr: true,
   price: true,
   imageUrl: true,
   isVegetarian: true,
@@ -106,6 +110,7 @@ async function loadOrderMenu(): Promise<OrderCategory[]> {
             description: item.description,
             ingredients: item.ingredients,
             allergens: item.allergens,
+            arabic: arabicView(item, true),
             imageUrl: item.imageUrl,
             isVegetarian: item.isVegetarian,
             categorySlug: c.slug,
